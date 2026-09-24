@@ -1,0 +1,63 @@
+# Docker Compose per l'ambiente LOCALE di GymPlanner.
+#
+#   docker compose up -d                 -> solo PostgreSQL (sviluppo con backend/frontend locali)
+#   docker compose --profile app up -d   -> PostgreSQL + backend + frontend (nginx) su http://localhost:8081
+#
+# Le variabili sono lette da `.env` (vedi `.env.example`).
+name: gymplanner
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gymplanner}
+      POSTGRES_USER: ${POSTGRES_USER:-gymplanner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Impostare POSTGRES_PASSWORD nel file .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    profiles: ["app"]
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-gymplanner}
+      DB_USERNAME: ${POSTGRES_USER:-gymplanner}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      GYM_ADMIN_USERNAME: ${GYM_ADMIN_USERNAME:-}
+      GYM_ADMIN_EMAIL: ${GYM_ADMIN_EMAIL:-}
+      GYM_ADMIN_PASSWORD: ${GYM_ADMIN_PASSWORD:-}
+      GYM_COOKIE_SECURE: ${GYM_COOKIE_SECURE:-false}
+      GYM_TIME_ZONE: ${GYM_TIME_ZONE:-Europe/Rome}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+
+  frontend:
+    profiles: ["app"]
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8081:80"
+
+volumes:
+  pgdata:

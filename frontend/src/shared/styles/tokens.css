@@ -1,0 +1,118 @@
+/*
+ * GymPlanner design tokens (see docs/design-system.md).
+ * Primitive palette -> semantic tokens. Components only use semantic tokens.
+ * All text/background pairs are checked for WCAG AA (>= 4.5:1 for text).
+ */
+:root {
+  /* Primitives */
+  --orange-500: #f97316;
+  --orange-600: #ea580c;
+  --orange-700: #c2410c;
+  --orange-100: #ffedd5;
+  --green-700: #15803d;
+  --green-600: #16a34a;
+  --green-100: #dcfce7;
+  --red-700: #b91c1c;
+  --red-100: #fee2e2;
+  --amber-800: #92400e;
+  --amber-100: #fef3c7;
+  --blue-700: #1d4ed8;
+  --blue-100: #dbeafe;
+  --slate-50: #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+  --slate-900: #0f172a;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+
+  /* Semantic - light */
+  --color-bg: var(--slate-100);
+  --color-surface: #ffffff;
+  --color-surface-muted: var(--slate-50);
+  --color-text: var(--slate-900);
+  --color-text-muted: var(--slate-600);
+  --color-border: var(--slate-300);
+  --color-primary: var(--orange-500);
+  --color-primary-hover: var(--orange-600);
+  --color-on-primary: var(--slate-900);
+  --color-primary-text: var(--orange-700);
+  --color-primary-soft: var(--orange-100);
+  --color-success: var(--green-700);
+  --color-success-soft: var(--green-100);
+  --color-danger: var(--red-700);
+  --color-danger-soft: var(--red-100);
+  --color-warning: var(--amber-800);
+  --color-warning-soft: var(--amber-100);
+  --color-info: var(--blue-700);
+  --color-info-soft: var(--blue-100);
+  --color-focus: var(--blue-700);
+  --color-nav-bg: var(--gray-900);
+  --color-nav-text: #f9fafb;
+
+  /* Typography */
+  --font-body: 'Barlow', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'Barlow Condensed', 'Barlow', system-ui, sans-serif;
+  --text-xs: 0.8125rem;
+  --text-sm: 0.9375rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+  --text-display: 3.5rem;
+
+  /* Spacing, radius, elevation */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.08);
+  --shadow-md: 0 4px 16px rgb(15 23 42 / 0.12);
+  --touch-target: 44px;
+  --content-max: 72rem;
+  --transition: 180ms ease-out;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: var(--gray-900);
+    --color-surface: var(--gray-800);
+    --color-surface-muted: #273244;
+    --color-text: #f8fafc;
+    --color-text-muted: var(--slate-300);
+    --color-border: #475569;
+    --color-primary-text: #fdba74;
+    --color-primary-soft: #43261a;
+    --color-success: #4ade80;
+    --color-success-soft: #14321f;
+    --color-danger: #fca5a5;
+    --color-danger-soft: #3f1d1d;
+    --color-warning: #fcd34d;
+    --color-warning-soft: #3b2f12;
+    --color-info: #93c5fd;
+    --color-info-soft: #1e2a44;
+    --color-focus: #93c5fd;
+    --color-nav-bg: #0b1220;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 4px 16px rgb(0 0 0 / 0.5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition: 0ms;
+  }
+}
