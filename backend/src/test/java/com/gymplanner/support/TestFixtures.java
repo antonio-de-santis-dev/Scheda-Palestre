@@ -54,6 +54,22 @@ public class TestFixtures {
         return new AuthenticatedUser(id, username, role, mustChangePassword, 0);
     }
 
+    /** Inserts an active muscle group with a unique name and returns its id. */
+    public UUID createMuscleGroup(String name) {
+        return insertCatalog("muscle_groups", name);
+    }
+
+    public UUID createExercise(String name) {
+        return insertCatalog("exercises", name);
+    }
+
+    private UUID insertCatalog(String table, String name) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("insert into " + table + " (id, name, active, created_at, updated_at) values (?, ?, true, now(), now())",
+                id, name + " " + id.toString().substring(0, 8));
+        return id;
+    }
+
     public RequestPostProcessor as(AuthenticatedUser user) {
         return authentication(UsernamePasswordAuthenticationToken.authenticated(user, null, user.authorities()));
     }
