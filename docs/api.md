@@ -29,3 +29,24 @@ Con `mustChangePassword = true` gli altri endpoint rispondono 403 `PASSWORD_CHAN
 | 404 | `NOT_FOUND` (risorsa inesistente **o** non accessibile) |
 | 409 | `CONFLICT`, `CONCURRENT_MODIFICATION` e codici di duplicato specifici |
 | 422 | codici di regola di dominio specifici |
+
+## Account (ADMIN)
+
+| Metodo | Endpoint | Funzione | Risposte |
+| --- | --- | --- | --- |
+| GET | `/api/admin/users?q=&role=&active=&page=&size=` | elenco paginato e ricerca (nome, username, email) | 200 `Page<User>` |
+| POST | `/api/admin/users` | crea USER (ruolo sempre USER) | 201 `{user, temporaryPassword}`; 409 `USERNAME_TAKEN`/`EMAIL_TAKEN` |
+| GET | `/api/admin/users/{id}` | dettaglio | 200; 404 |
+| PUT | `/api/admin/users/{id}` | modifica nome, cognome, username, email, telefono | 200; 409 |
+| POST | `/api/admin/users/{id}/activate` | riattiva | 200 |
+| POST | `/api/admin/users/{id}/deactivate` | disattiva e invalida le sessioni | 200; 422 `CANNOT_DEACTIVATE_SELF`, `LAST_ACTIVE_ADMIN` |
+| POST | `/api/admin/users/{id}/reset-password` | password temporanea mostrata una sola volta | 200 `{user, temporaryPassword}` |
+
+Corpo di creazione/modifica:
+
+```json
+{ "firstName": "Mario", "lastName": "Rossi", "username": "mario", "email": "mario@example.test", "phone": null }
+```
+
+`User`: `{id, firstName, lastName, username, email, phone, role, active, mustChangePassword, locked, createdAt, updatedAt}`.
+Il campo `passwordHash` non è mai esposto. `Page<T>`: `{content, page, size, totalElements, totalPages}`.
