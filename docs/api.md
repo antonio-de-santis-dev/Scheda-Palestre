@@ -66,3 +66,51 @@ Stessa forma per `muscle-groups` ed `exercises`:
 `Item`: `{id, name, active, createdAt, updatedAt}`. I nomi sono univoci senza distinzione fra
 maiuscole e minuscole e gli spazi multipli sono normalizzati. Un elemento disattivato resta visibile nelle schede
 che lo usano, ma non può essere inserito in nuove configurazioni (`422 CATALOG_ITEM_INACTIVE`).
+
+## Schede (ADMIN)
+
+Tutte le operazioni di struttura restituiscono la **scheda completa aggiornata** (`PlanStructure`).
+
+| Metodo | Endpoint | Funzione | Errori principali |
+| --- | --- | --- | --- |
+| GET | `/api/admin/plans?q=&deleted=false&page=&size=` | elenco (attive o eliminate) | |
+| POST | `/api/admin/plans` | crea `{name, description?, expiresOn?}` | 400 |
+| GET | `/api/admin/plans/{id}` | struttura completa | 404 |
+| PUT | `/api/admin/plans/{id}` | metadati `{name, description, expiresOn, version}` | 409 `CONCURRENT_MODIFICATION`, 422 `PLAN_DELETED` |
+| DELETE | `/api/admin/plans/{id}` | eliminazione logica (chiude le assegnazioni attive) | 204 |
+| POST | `/api/admin/plans/{id}/restore` | ripristino | |
+| POST | `/api/admin/plans/{id}/duplicate` | copia profonda senza assegnazioni (`copiedFromPlanId`) | 201 |
+| POST | `/api/admin/plans/{id}/sessions` | aggiunge sessione `{title}` | 201 |
+| PUT | `/api/admin/sessions/{id}` | rinomina `{title}` | |
+| DELETE | `/api/admin/sessions/{id}` | elimina (e rinumera) | |
+| PUT | `/api/admin/plans/{id}/sessions/order` | riordino atomico `{ids:[...]}` | 422 `INVALID_ORDER` |
+| POST | `/api/admin/sessions/{id}/sections` | aggiunge sezione `{muscleGroupId}` | 409 `MUSCLE_GROUP_ALREADY_IN_SESSION`, 422 `CATALOG_ITEM_INACTIVE` |
+| DELETE | `/api/admin/sections/{id}` | elimina sezione | |
+| PUT | `/api/admin/sessions/{id}/sections/order` | riordina sezioni | 422 `INVALID_ORDER` |
+| POST | `/api/admin/sections/{id}/exercises` | aggiunge esercizio configurato | 400, 422 `CATALOG_ITEM_INACTIVE` |
+| PUT | `/api/admin/plan-exercises/{id}` | sostituisce la configurazione completa (serie personalizzate incluse) | 400 `INVALID_CUSTOM_SETS` |
+| DELETE | `/api/admin/plan-exercises/{id}` | elimina configurazione | |
+| PUT | `/api/admin/sections/{id}/exercises/order` | riordina esercizi | 422 `INVALID_ORDER` |
+
+Esercizio configurato:
+
+```json
+{
+  "exerciseId": "uuid", "setsCount": 3, "reps": 10, "toFailure": false, "restSeconds": 90,
+  "customSets": [
+    {"setIndex": 1, "reps": 12, "toFailure": false, "restSeconds": 60},
+    {"setIndex": 2, "reps": 10, "toFailure": false, "restSeconds": 90},
+    {"setIndex": 3, "reps": 0,  "toFailure": true,  "restSeconds": 0}
+  ]
+}
+```
+
+Regole: `toFailure=true` implica `reps=0` (mostrato come **MAX**), altrimenti `reps` 1-100;
+`setsCount` 1-20; `restSeconds` 0-600 (0 = nessun timer); `customSets` vuoto oppure
+esattamente `setsCount` righe con indici da 1 a N.
+
+`PlanStructure`: `{id, name, description, expiresOn, createdBy, copiedFromPlanId, createdAt,
+updatedAt, deletedAt, version, executable, sessions:[{id, title, position, sections:[{id,
+muscleGroupId, muscleGroupName, muscleGroupActive, position, exercises:[{id, exerciseId,
+exerciseName, exerciseActive, position, setsCount, reps, toFailure, restSeconds, customized,
+sets:[{setIndex, reps, toFailure, restSeconds}]}]}]}]}`. `sets` contiene sempre le N serie effettive.
