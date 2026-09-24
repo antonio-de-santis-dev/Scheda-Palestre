@@ -15,10 +15,11 @@ import { moved, plansApi, usePlan, usePlanMutation, type PlanExerciseInput } fro
 import { PlanMetadataForm } from './PlanMetadataForm';
 import { PlanStatusBadge } from './PlanStatusBadge';
 import { ExerciseEditor } from './ExerciseEditor';
+import { ActiveAssigneesNotice } from '../assignments/ActiveAssigneesNotice';
 
 type Confirm = { title: string; body: ReactNode; label: string; run: () => Promise<unknown> } | null;
 
-export function PlanEditorPage({ assigneesNotice }: { assigneesNotice?: (planId: string) => ReactNode }) {
+export function PlanEditorPage() {
   const { id = '' } = useParams();
   const query = usePlan(id);
   const plan = query.data;
@@ -47,7 +48,7 @@ export function PlanEditorPage({ assigneesNotice }: { assigneesNotice?: (planId:
       <QueryState isLoading={query.isLoading} error={query.error} onRetry={() => void query.refetch()}>
         {plan ? (
           <div className="stack">
-            {assigneesNotice ? assigneesNotice(plan.id) : null}
+            <ActiveAssigneesNotice planId={plan.id} />
             {plan.deletedAt ? (
               <Alert tone="warning" title="Scheda eliminata">
                 <p>Ripristinala dall'elenco delle schede per poterla modificare.</p>

@@ -117,6 +117,7 @@ describe('user detail', () => {
     let deactivated = false;
     server.use(
       http.get('*/api/admin/users/:id', () => HttpResponse.json({ ...mario, active: !deactivated })),
+      http.get('*/api/admin/users/:id/assignments', () => HttpResponse.json([])),
       http.post('*/api/admin/users/:id/deactivate', () => {
         deactivated = true;
         return HttpResponse.json({ ...mario, active: false });
@@ -135,6 +136,7 @@ describe('user detail', () => {
     asAdmin();
     server.use(
       http.get('*/api/admin/users/:id', () => HttpResponse.json(mario)),
+      http.get('*/api/admin/users/:id/assignments', () => HttpResponse.json([])),
       http.post('*/api/admin/users/:id/reset-password', () =>
         HttpResponse.json({ user: { ...mario, mustChangePassword: true }, temporaryPassword: 'NewTemp12345' }),
       ),

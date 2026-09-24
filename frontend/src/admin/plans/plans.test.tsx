@@ -20,6 +20,7 @@ function setup(plan = planStructure()) {
   server.use(
     http.get('*/api/auth/me', () => HttpResponse.json(adminUser)),
     http.get('*/api/admin/plans/:id', () => HttpResponse.json(current)),
+    http.get('*/api/admin/plans/:id/assignments', () => HttpResponse.json([])),
     http.get('*/api/admin/exercises', () =>
       HttpResponse.json(catalogPage([{ id: 'ex-1', name: 'Panca piana' }, { id: 'ex-3', name: 'Squat' }])),
     ),

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Copy, FilePlus2, Pencil, RotateCcw, Trash2 } from 'lucide-react';
+import { Copy, FilePlus2, Pencil, RotateCcw, Trash2, UsersRound } from 'lucide-react';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
 import { SelectField, TextField } from '../../shared/components/Field';
@@ -124,6 +124,14 @@ export function PlansPage() {
                         <Link className="btn btn--secondary btn--sm" to={`/admin/plans/${plan.id}/edit`} aria-label={`Modifica ${plan.name}`}>
                           <Pencil size={16} aria-hidden="true" />
                           Modifica
+                        </Link>
+                        <Link
+                          className="btn btn--secondary btn--sm"
+                          to={`/admin/plans/${plan.id}/assignments`}
+                          aria-label={`Assegnazioni di ${plan.name}`}
+                        >
+                          <UsersRound size={16} aria-hidden="true" />
+                          Assegna
                         </Link>
                         <Button
                           variant="secondary"
