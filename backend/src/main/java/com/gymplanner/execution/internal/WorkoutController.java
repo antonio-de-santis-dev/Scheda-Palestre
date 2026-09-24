@@ -3,6 +3,9 @@ package com.gymplanner.execution.internal;
 import com.gymplanner.execution.internal.WorkoutDtos.StartWorkoutRequest;
 import com.gymplanner.execution.internal.WorkoutDtos.WorkoutState;
 import com.gymplanner.shared.security.AuthenticatedUser;
+import com.gymplanner.shared.web.PageResponse;
+import com.gymplanner.shared.web.Paging;
+import org.springframework.data.domain.Sort;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.time.LocalDate;
@@ -56,6 +59,13 @@ class WorkoutController {
     @GetMapping("/workouts/current")
     ResponseEntity<WorkoutState> current(@AuthenticationPrincipal AuthenticatedUser user) {
         return workouts.current(user.id()).map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @GetMapping("/workouts")
+    PageResponse<WorkoutDtos.WorkoutSummary> history(@AuthenticationPrincipal AuthenticatedUser user,
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
+        Sort sort = Sort.by(Sort.Order.desc("scheduledDate"), Sort.Order.desc("startedAt"));
+        return PageResponse.of(workouts.history(user.id(), Paging.of(page, size, sort)), s -> s);
     }
 
     /** Full state of one of the user's workouts (resume after reload, history detail). */
