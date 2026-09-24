@@ -27,7 +27,7 @@ Documentazione tecnica: `docs/architecture.md`, `docs/api.md`, `docs/decisions/`
 | 2 | Schede (editor completo, serie personalizzate, duplicazione, eliminazione logica), assegnazioni | Fatto |
 | 3 | Giorni, rotazione, Oggi, esecuzione con timer, calendario | Fatto |
 | 4 | Storico essenziale, profilo | Fatto |
-| Finale | Test E2E Playwright, verifica finale, documentazione completa, merge su `main` | Vedi `docs/progress.md` |
+| Finale | Test E2E Playwright, verifica finale, documentazione completa, merge su `main` | Fatto |
 
 Tutte le decisioni aperte O-01…O-07 della specifica sono state chiuse con le proposte consigliate
 (`docs/decisions/0004-open-decisions.md`). Le funzionalità marcate FUTURO **non** vanno implementate.
