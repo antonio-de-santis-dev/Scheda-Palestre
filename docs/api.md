@@ -143,3 +143,20 @@ con `status` ∈ `PENDING`, `ACTIVE`, `CLOSED`.
 | --- | --- | --- |
 | GET | `/api/me/assignments` | le proprie assegnazioni (attiva riconoscibile da `status`) |
 | GET | `/api/me/assignments/{id}/plan` | struttura della scheda in sola lettura; 404 se l'assegnazione non è propria |
+
+## Area USER - giorni di allenamento
+
+| Metodo | Endpoint | Funzione | Errori |
+| --- | --- | --- | --- |
+| GET | `/api/me/schedule` | giorni correnti `{assignmentId, weekdays}` (`assignmentId` null senza scheda attiva) | |
+| PUT | `/api/me/schedule` | sostituisce i giorni `{weekdays:[1,3,5]}` (ISO: 1=lunedì … 7=domenica) e ri-ancora la rotazione | 400 `VALIDATION_ERROR`, 422 `NO_ACTIVE_ASSIGNMENT` |
+
+### Rotazione e ri-ancoraggio
+
+La sessione di un giorno `d` è `S[(i0 + k) mod N]`, dove `k` è il numero di giorni pianificati fra
+l'ancora `a` (inclusa) e `d` (esclusa), calcolato come settimane intere × giorni scelti più il resto
+(`RotationCalculator`). Un giorno pianificato consuma la sessione anche se non viene svolto (O-01).
+
+Il ri-ancoraggio (cambio dei giorni, sessioni aggiunte/eliminate/riordinate, nuova attivazione)
+sposta l'ancora a oggi, oppure a domani se oggi era già un giorno di allenamento, e mantiene come
+prossima la stessa sessione che sarebbe stata proposta. Gli allenamenti esistenti non cambiano.
