@@ -1,0 +1,45 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/
+!.vscode/extensions.json
+*.swp
+.project
+.classpath
+.settings/
+
+# Logs and temp
+*.log
+logs/
+tmp/
+*.tmp
+
+# Backend (Maven)
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+backend/HELP.md
+
+# Frontend (Node / Vite / Playwright)
+node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/playwright/.cache/
+*.tsbuildinfo
+
+# Local databases
+*.db
+pgdata/
