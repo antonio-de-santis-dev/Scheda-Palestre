@@ -8,7 +8,7 @@ import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import { SelectField, TextField } from '../../shared/components/Field';
 import { QueryState } from '../../shared/components/States';
 import { StatusBadge } from '../../shared/components/StatusBadge';
-import { formatRest } from '../../shared/utils/format';
+import { restText } from '../../shared/utils/format';
 import { describeSets, type PlanSection, type PlanSession, type PlanStructure } from '../../shared/api/planTypes';
 import { useActiveCatalog } from '../catalog/api';
 import { moved, plansApi, usePlan, usePlanMutation, type PlanExerciseInput } from './api';
@@ -361,7 +361,7 @@ function SectionBlock({ section, index, total, readOnly, onMove, run, ask }: Sec
               ) : null}
             </span>
             <span className="exercise-row__values">
-              {describeSets(exercise)} · recupero {formatRest(exercise.restSeconds)}
+              {describeSets(exercise)} · {restText(exercise.restSeconds)}
               {exercise.customized ? ' · serie personalizzate' : ''}
             </span>
             {!readOnly ? (

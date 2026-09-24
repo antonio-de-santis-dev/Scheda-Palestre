@@ -79,3 +79,8 @@ export function formatRest(seconds: number): string {
   }
   return seconds < 60 ? `${seconds}"` : formatDuration(seconds);
 }
+
+/** "recupero 1:30" or "nessun recupero" (rest 0 = no timer). */
+export function restText(seconds: number): string {
+  return seconds === 0 ? 'nessun recupero' : `recupero ${formatRest(seconds)}`;
+}

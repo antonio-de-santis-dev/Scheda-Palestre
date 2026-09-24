@@ -1,4 +1,4 @@
-import { CalendarCheck, ClipboardList, Dumbbell, LayoutDashboard, Target, Users } from 'lucide-react';
+import { CalendarCheck, CalendarDays, ClipboardList, Dumbbell, LayoutDashboard, Sun, Target, Users } from 'lucide-react';
 import type { ComponentType } from 'react';
 import type { NavItem } from '../layouts/AppLayout';
 
@@ -11,7 +11,8 @@ export const ADMIN_NAV: NavItem[] = [
 ];
 
 export const USER_NAV: NavItem[] = [
-  { to: '/app', label: 'Home', icon: LayoutDashboard, end: true },
+  { to: '/app/today', label: 'Oggi', icon: Sun },
+  { to: '/app/calendar', label: 'Calendario', icon: CalendarDays },
   { to: '/app/plans', label: 'Schede', icon: ClipboardList },
   { to: '/app/schedule', label: 'Giorni', icon: CalendarCheck },
 ];

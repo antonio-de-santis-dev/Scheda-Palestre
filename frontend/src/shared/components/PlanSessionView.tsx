@@ -1,6 +1,6 @@
 import type { PlanSession } from '../api/planTypes';
 import { describeSets } from '../api/planTypes';
-import { formatRest } from '../utils/format';
+import { restText } from '../utils/format';
 
 /** Read-only rendering of a session: muscle sections, exercises and planned values. */
 export function PlanSessionView({ session, headingLevel = 2 }: { session: PlanSession; headingLevel?: 2 | 3 }) {
@@ -23,7 +23,7 @@ export function PlanSessionView({ session, headingLevel = 2 }: { session: PlanSe
                   <span className="exercise-row__name">{exercise.exerciseName}</span>
                   <span className="exercise-row__values">
                     {describeSets(exercise)}
-                    {exercise.customized ? ` (${exercise.setsCount} serie)` : ''} · recupero {formatRest(exercise.restSeconds)}
+                    {exercise.customized ? ` (${exercise.setsCount} serie)` : ''} · {restText(exercise.restSeconds)}
                   </span>
                 </li>
               ))}
