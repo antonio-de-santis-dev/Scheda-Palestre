@@ -175,3 +175,12 @@ export function CatalogPage({ kind }: { kind: CatalogKind }) {
     </>
   );
 }
+
+/** Distinct components per catalog so switching route remounts the page state. */
+export function MuscleGroupsPage() {
+  return <CatalogPage kind="muscle-groups" />;
+}
+
+export function ExercisesPage() {
+  return <CatalogPage kind="exercises" />;
+}

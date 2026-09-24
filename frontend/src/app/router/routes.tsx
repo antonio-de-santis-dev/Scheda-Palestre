@@ -1,25 +1,24 @@
+import type { ComponentType } from 'react';
 import { Navigate, type RouteObject } from 'react-router';
 import { HomeRedirect, RequireAuth } from '../../auth/guards';
 import { LoginPage } from '../../auth/LoginPage';
 import { ChangePasswordPage } from '../../auth/ChangePasswordPage';
 import { AppLayout } from '../layouts/AppLayout';
-import { AdminDashboardPage } from '../../admin/AdminDashboardPage';
-import { UsersPage } from '../../admin/users/UsersPage';
-import { UserDetailPage } from '../../admin/users/UserDetailPage';
-import { CatalogPage } from '../../admin/catalog/CatalogPage';
-import { PlansPage } from '../../admin/plans/PlansPage';
-import { PlanEditorPage } from '../../admin/plans/PlanEditorPage';
-import { PlanAssignmentsPage } from '../../admin/assignments/PlanAssignmentsPage';
-import { MyPlansPage } from '../../user/plans/MyPlansPage';
-import { MyPlanDetailPage } from '../../user/plans/MyPlanDetailPage';
-import { SchedulePage } from '../../user/schedule/SchedulePage';
-import { TodayPage } from '../../user/today/TodayPage';
-import { WorkoutPage } from '../../user/workout/WorkoutPage';
-import { CalendarPage } from '../../user/calendar/CalendarPage';
-import { HistoryDetailPage, HistoryPage } from '../../user/history/HistoryPages';
-import { ProfilePage } from '../../user/profile/ProfilePage';
+import { LoadingState } from '../../shared/components/States';
 import { NotFoundPage } from './AccessDeniedPage';
 import { ADMIN_NAV, USER_NAV } from './navigation';
+
+/**
+ * Route-level code splitting: each page is downloaded only when first opened, so a USER on a
+ * phone never downloads the ADMIN editor.
+ */
+function page<M>(load: () => Promise<M>, pick: (module: M) => ComponentType): Pick<RouteObject, 'lazy'> {
+  return {
+    lazy: async () => ({ Component: pick(await load()) }),
+  };
+}
+
+const fallback = <LoadingState />;
 
 export const routes: RouteObject[] = [
   { path: '/', element: <HomeRedirect /> },
@@ -34,25 +33,33 @@ export const routes: RouteObject[] = [
   },
   {
     path: '/admin',
+    hydrateFallbackElement: fallback,
     element: (
       <RequireAuth role="ADMIN">
         <AppLayout home="/admin" areaLabel="amministrazione" items={ADMIN_NAV} />
       </RequireAuth>
     ),
     children: [
-      { index: true, element: <AdminDashboardPage /> },
-      { path: 'users', element: <UsersPage /> },
-      { path: 'users/:id', element: <UserDetailPage /> },
-      { path: 'catalog/muscle-groups', element: <CatalogPage key="muscle-groups" kind="muscle-groups" /> },
-      { path: 'catalog/exercises', element: <CatalogPage key="exercises" kind="exercises" /> },
-      { path: 'plans', element: <PlansPage /> },
-      { path: 'plans/:id/edit', element: <PlanEditorPage /> },
-      { path: 'plans/:id/assignments', element: <PlanAssignmentsPage /> },
-      { path: 'profile', element: <ProfilePage /> },
+      { index: true, ...page(() => import('../../admin/AdminDashboardPage'), (m) => m.AdminDashboardPage) },
+      { path: 'users', ...page(() => import('../../admin/users/UsersPage'), (m) => m.UsersPage) },
+      { path: 'users/:id', ...page(() => import('../../admin/users/UserDetailPage'), (m) => m.UserDetailPage) },
+      {
+        path: 'catalog/muscle-groups',
+        ...page(() => import('../../admin/catalog/CatalogPage'), (m) => m.MuscleGroupsPage),
+      },
+      { path: 'catalog/exercises', ...page(() => import('../../admin/catalog/CatalogPage'), (m) => m.ExercisesPage) },
+      { path: 'plans', ...page(() => import('../../admin/plans/PlansPage'), (m) => m.PlansPage) },
+      { path: 'plans/:id/edit', ...page(() => import('../../admin/plans/PlanEditorPage'), (m) => m.PlanEditorPage) },
+      {
+        path: 'plans/:id/assignments',
+        ...page(() => import('../../admin/assignments/PlanAssignmentsPage'), (m) => m.PlanAssignmentsPage),
+      },
+      { path: 'profile', ...page(() => import('../../user/profile/ProfilePage'), (m) => m.ProfilePage) },
     ],
   },
   {
     path: '/app',
+    hydrateFallbackElement: fallback,
     element: (
       <RequireAuth role="USER">
         <AppLayout home="/app" areaLabel="utente" items={USER_NAV} />
@@ -60,15 +67,21 @@ export const routes: RouteObject[] = [
     ),
     children: [
       { index: true, element: <Navigate to="/app/today" replace /> },
-      { path: 'today', element: <TodayPage /> },
-      { path: 'workout/:id', element: <WorkoutPage /> },
-      { path: 'calendar', element: <CalendarPage /> },
-      { path: 'plans', element: <MyPlansPage /> },
-      { path: 'plans/:assignmentId', element: <MyPlanDetailPage /> },
-      { path: 'schedule', element: <SchedulePage /> },
-      { path: 'history', element: <HistoryPage /> },
-      { path: 'history/:workoutId', element: <HistoryDetailPage /> },
-      { path: 'profile', element: <ProfilePage /> },
+      { path: 'today', ...page(() => import('../../user/today/TodayPage'), (m) => m.TodayPage) },
+      { path: 'workout/:id', ...page(() => import('../../user/workout/WorkoutPage'), (m) => m.WorkoutPage) },
+      { path: 'calendar', ...page(() => import('../../user/calendar/CalendarPage'), (m) => m.CalendarPage) },
+      { path: 'plans', ...page(() => import('../../user/plans/MyPlansPage'), (m) => m.MyPlansPage) },
+      {
+        path: 'plans/:assignmentId',
+        ...page(() => import('../../user/plans/MyPlanDetailPage'), (m) => m.MyPlanDetailPage),
+      },
+      { path: 'schedule', ...page(() => import('../../user/schedule/SchedulePage'), (m) => m.SchedulePage) },
+      { path: 'history', ...page(() => import('../../user/history/HistoryPages'), (m) => m.HistoryPage) },
+      {
+        path: 'history/:workoutId',
+        ...page(() => import('../../user/history/HistoryPages'), (m) => m.HistoryDetailPage),
+      },
+      { path: 'profile', ...page(() => import('../../user/profile/ProfilePage'), (m) => m.ProfilePage) },
     ],
   },
   { path: '*', element: <NotFoundPage /> },
