@@ -12,6 +12,7 @@ import { PlanEditorPage } from '../../admin/plans/PlanEditorPage';
 import { PlanAssignmentsPage } from '../../admin/assignments/PlanAssignmentsPage';
 import { MyPlansPage } from '../../user/plans/MyPlansPage';
 import { MyPlanDetailPage } from '../../user/plans/MyPlanDetailPage';
+import { SchedulePage } from '../../user/schedule/SchedulePage';
 import { UserHomePage } from '../../user/UserHomePage';
 import { NotFoundPage } from './AccessDeniedPage';
 import { ADMIN_NAV, USER_NAV } from './navigation';
@@ -56,6 +57,7 @@ export const routes: RouteObject[] = [
       { index: true, element: <UserHomePage /> },
       { path: 'plans', element: <MyPlansPage /> },
       { path: 'plans/:assignmentId', element: <MyPlanDetailPage /> },
+      { path: 'schedule', element: <SchedulePage /> },
     ],
   },
   { path: '*', element: <NotFoundPage /> },
