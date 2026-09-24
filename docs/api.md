@@ -114,3 +114,32 @@ updatedAt, deletedAt, version, executable, sessions:[{id, title, position, secti
 muscleGroupId, muscleGroupName, muscleGroupActive, position, exercises:[{id, exerciseId,
 exerciseName, exerciseActive, position, setsCount, reps, toFailure, restSeconds, customized,
 sets:[{setIndex, reps, toFailure, restSeconds}]}]}]}]}`. `sets` contiene sempre le N serie effettive.
+
+## Assegnazioni (ADMIN)
+
+| Metodo | Endpoint | Funzione | Errori principali |
+| --- | --- | --- | --- |
+| GET | `/api/admin/plans/{id}/assignments` | assegnatari della scheda | 404 |
+| GET | `/api/admin/users/{id}/assignments` | assegnazioni dell'utente | 404 |
+| POST | `/api/admin/assignments` | assegna a uno o più USER (tutto o niente) | 422 `USER_NOT_ASSIGNABLE`, `PLAN_NOT_EXECUTABLE`, `PLAN_DELETED`; 409 `ASSIGNMENT_ALREADY_ACTIVE` |
+| POST | `/api/admin/assignments/{id}/activate` | attiva un'assegnazione in attesa `{copySchedule?}` | 422 `ASSIGNMENT_CLOSED`, `PLAN_NOT_EXECUTABLE` |
+| POST | `/api/admin/assignments/{id}/close` | chiude (`active=false`, `endDate`) | |
+
+```json
+{ "planId": "uuid", "userIds": ["uuid-1", "uuid-2"], "startDate": "2026-10-01", "activate": true, "copySchedule": true }
+```
+
+L'attivazione avviene in un'unica transazione: chiude l'eventuale assegnazione attiva precedente
+(e interrompe l'allenamento in corso collegato), attiva la nuova, imposta l'ancoraggio della rotazione
+al giorno più tardo fra `startDate` e oggi e, con `copySchedule` (O-07, default `true`), copia i giorni
+settimanali della precedente.
+
+`Assignment`: `{id, userId, userFullName, username, planId, planName, planDeleted, startDate, endDate, active, status, createdAt}`
+con `status` ∈ `PENDING`, `ACTIVE`, `CLOSED`.
+
+## Area USER - schede
+
+| Metodo | Endpoint | Funzione |
+| --- | --- | --- |
+| GET | `/api/me/assignments` | le proprie assegnazioni (attiva riconoscibile da `status`) |
+| GET | `/api/me/assignments/{id}/plan` | struttura della scheda in sola lettura; 404 se l'assegnazione non è propria |
