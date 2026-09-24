@@ -7,6 +7,8 @@ import { AdminDashboardPage } from '../../admin/AdminDashboardPage';
 import { UsersPage } from '../../admin/users/UsersPage';
 import { UserDetailPage } from '../../admin/users/UserDetailPage';
 import { CatalogPage } from '../../admin/catalog/CatalogPage';
+import { PlansPage } from '../../admin/plans/PlansPage';
+import { PlanEditorPage } from '../../admin/plans/PlanEditorPage';
 import { UserHomePage } from '../../user/UserHomePage';
 import { NotFoundPage } from './AccessDeniedPage';
 import { ADMIN_NAV, USER_NAV } from './navigation';
@@ -35,6 +37,8 @@ export const routes: RouteObject[] = [
       { path: 'users/:id', element: <UserDetailPage /> },
       { path: 'catalog/muscle-groups', element: <CatalogPage key="muscle-groups" kind="muscle-groups" /> },
       { path: 'catalog/exercises', element: <CatalogPage key="exercises" kind="exercises" /> },
+      { path: 'plans', element: <PlansPage /> },
+      { path: 'plans/:id/edit', element: <PlanEditorPage /> },
     ],
   },
   {
