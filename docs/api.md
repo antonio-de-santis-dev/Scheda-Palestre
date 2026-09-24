@@ -160,3 +160,35 @@ l'ancora `a` (inclusa) e `d` (esclusa), calcolato come settimane intere × giorn
 Il ri-ancoraggio (cambio dei giorni, sessioni aggiunte/eliminate/riordinate, nuova attivazione)
 sposta l'ancora a oggi, oppure a domani se oggi era già un giorno di allenamento, e mantiene come
 prossima la stessa sessione che sarebbe stata proposta. Gli allenamenti esistenti non cambiano.
+
+## Area USER - oggi, calendario ed esecuzione
+
+| Metodo | Endpoint | Funzione | Errori principali |
+| --- | --- | --- | --- |
+| GET | `/api/me/today?date=YYYY-MM-DD` | giornata: `status` ∈ `NO_ACTIVE_ASSIGNMENT`, `NOT_STARTED_YET`, `NO_SCHEDULE`, `PLAN_NOT_READY`, `REST_DAY`, `TRAINING_DAY`; anteprima `session`, `workout` del giorno, `pendingWorkout` (O-04), `nextTraining`, `canStart` | |
+| GET | `/api/me/calendar?from=&to=` | giorni (`TRAINING`/`REST`/`NONE`) con sessione ed esito; massimo 62 giorni | 400 `RANGE_TOO_LARGE`, `VALIDATION_ERROR` |
+| POST | `/api/me/workouts` | avvia l'allenamento pianificato `{date}` e crea lo snapshot | 422 `NO_ACTIVE_ASSIGNMENT`, `DATE_NOT_ALLOWED`, `NOT_A_TRAINING_DAY`, `PLAN_NOT_EXECUTABLE`; 409 `WORKOUT_ALREADY_EXISTS`, `WORKOUT_ALREADY_IN_PROGRESS` |
+| GET | `/api/me/workouts/current` | allenamento in corso (204 se nessuno) | |
+| GET | `/api/me/workouts/{id}` | stato completo di un proprio allenamento | 404 |
+| POST | `/api/me/workouts/{id}/sets/{setId}/complete` | **Fine serie**, idempotente | 422 `SET_NOT_CURRENT`, `WORKOUT_NOT_IN_PROGRESS`; 404 |
+| POST | `/api/me/workouts/{id}/exercises/{exerciseId}/skip` | salta l'esercizio in corso (idempotente) | 422 `EXERCISE_NOT_IN_PROGRESS` |
+| POST | `/api/me/workouts/{id}/interrupt` | interrompe (idempotente) | 422 `WORKOUT_NOT_IN_PROGRESS` |
+
+Ogni risposta di esecuzione restituisce lo stato completo:
+
+```json
+{
+  "workoutId": "uuid", "status": "IN_PROGRESS", "scheduledDate": "2026-10-05",
+  "planName": "Scheda principianti", "sessionTitle": "Giorno 1",
+  "startedAt": "...", "finishedAt": null,
+  "exercises": [{"id": "uuid", "position": 1, "status": "IN_PROGRESS", "exerciseName": "Panca piana",
+                 "muscleGroupName": "Petto", "setsPlanned": 3, "setsCompleted": 1,
+                 "sets": [{"id": "uuid", "setIndex": 1, "repsPlanned": 10, "toFailure": false,
+                           "restSeconds": 90, "completedAt": "2026-10-05T17:29:30Z"}]}],
+  "currentExerciseId": "uuid", "currentSetId": "uuid",
+  "restEndsAt": "2026-10-05T17:31:00Z", "restSeconds": 90,
+  "serverTime": "2026-10-05T17:30:15Z", "nextAction": "WAIT_FOR_REST"
+}
+```
+
+`nextAction` ∈ `COMPLETE_SET`, `WAIT_FOR_REST` (il timer è informativo, O-06), `FINISHED`.

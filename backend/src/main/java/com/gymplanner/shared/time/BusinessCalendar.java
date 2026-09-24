@@ -23,8 +23,9 @@ public class BusinessCalendar {
         this.zone = ZoneId.of(zone);
     }
 
+    /** Current instant truncated to milliseconds (stable across JSON and PostgreSQL). */
     public Instant now() {
-        return clock.instant();
+        return clock.instant().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
     }
 
     public LocalDate today() {
