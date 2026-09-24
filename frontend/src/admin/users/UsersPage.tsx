@@ -132,8 +132,12 @@ export function UsersPage() {
                   </div>
                   <UserStatusBadges user={user} />
                   <div className="list-item__actions">
-                    <Link className="btn btn--secondary btn--sm" to={`/admin/users/${user.id}`}>
-                      Apri<span className="visually-hidden"> {user.username}</span>
+                    <Link
+                      className="btn btn--secondary btn--sm"
+                      to={`/admin/users/${user.id}`}
+                      aria-label={`Apri ${user.firstName} ${user.lastName}`}
+                    >
+                      Apri
                     </Link>
                   </div>
                 </li>

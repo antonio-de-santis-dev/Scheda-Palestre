@@ -1,10 +1,12 @@
-import { LayoutDashboard, Users } from 'lucide-react';
+import { Dumbbell, LayoutDashboard, Target, Users } from 'lucide-react';
 import type { ComponentType } from 'react';
 import type { NavItem } from '../layouts/AppLayout';
 
 export const ADMIN_NAV: NavItem[] = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/users', label: 'Utenti', icon: Users },
+  { to: '/admin/catalog/muscle-groups', label: 'Gruppi', icon: Target },
+  { to: '/admin/catalog/exercises', label: 'Esercizi', icon: Dumbbell },
 ];
 
 export const USER_NAV: NavItem[] = [{ to: '/app', label: 'Home', icon: LayoutDashboard, end: true }];
@@ -18,4 +20,6 @@ export interface Shortcut {
 
 export const ADMIN_SHORTCUTS: Shortcut[] = [
   { to: '/admin/users', label: 'Utenti', description: 'Crea account, disattiva, reset password.', icon: Users },
+  { to: '/admin/catalog/muscle-groups', label: 'Gruppi muscolari', description: 'Catalogo dei gruppi muscolari.', icon: Target },
+  { to: '/admin/catalog/exercises', label: 'Esercizi', description: 'Catalogo degli esercizi.', icon: Dumbbell },
 ];
