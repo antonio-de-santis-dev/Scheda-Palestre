@@ -3,6 +3,7 @@
 | Incremento | Branch | Stato | User story | Verifica |
 | --- | --- | --- | --- | --- |
 | 0 - Fondamenta | `chore/increment-0-foundation` | Completato | — | Backend 19 test, frontend 10 test, build OK, login/logout manuale con curl |
+| 1 - Account e cataloghi | `feat/identity-accounts`, `feat/catalog-management` | Completato | US-01, US-02, US-25, US-04, US-05, US-21 (ruoli), US-22 | Backend 67 test, frontend 19 test, lint/build OK |
 
 ## Incremento 0 - Fondamenta
 
@@ -18,3 +19,19 @@
 
 **Prova manuale.** Avviare PostgreSQL e il backend con `GYM_ADMIN_*`, poi il frontend.
 Accedere come `admin`: viene chiesto il cambio password; dopo il cambio si arriva alla dashboard.
+
+## Incremento 1 - Account e cataloghi
+
+- ADMIN: elenco utenti paginato con ricerca e filtro di stato, creazione di account USER con
+  password temporanea mostrata una sola volta, modifica, disattivazione (con invalidazione
+  immediata delle sessioni), riattivazione e reset password. Non può disattivare sé stesso e
+  deve sempre restare un ADMIN attivo.
+- Cataloghi di gruppi muscolari ed esercizi: ricerca, creazione, rinomina, attivazione e
+  disattivazione, con unicità dei nomi senza distinzione fra maiuscole e minuscole (anche a livello di database).
+- Migrazione `V2__create_catalog.sql`.
+- Errori chiari (US-22): codici applicativi tradotti in italiano ed errori mostrati accanto ai
+  campi, conservando i dati inseriti.
+
+**Prova manuale.** Da ADMIN: *Utenti → Nuovo utente*, annotare la password temporanea, uscire,
+accedere con il nuovo utente e cambiare la password. Da ADMIN: *Gruppi* ed *Esercizi*, creare
+"Petto" e "Panca piana", poi provare a ricrearli in minuscolo (errore "Nome già in uso").

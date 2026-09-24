@@ -50,3 +50,19 @@ Corpo di creazione/modifica:
 
 `User`: `{id, firstName, lastName, username, email, phone, role, active, mustChangePassword, locked, createdAt, updatedAt}`.
 Il campo `passwordHash` non è mai esposto. `Page<T>`: `{content, page, size, totalElements, totalPages}`.
+
+## Cataloghi (ADMIN)
+
+Stessa forma per `muscle-groups` ed `exercises`:
+
+| Metodo | Endpoint | Funzione | Risposte |
+| --- | --- | --- | --- |
+| GET | `/api/admin/{catalog}?q=&active=&page=&size=` | ricerca paginata (attivi e disattivati) | 200 `Page<Item>` |
+| POST | `/api/admin/{catalog}` | crea `{name}` | 201; 409 `NAME_TAKEN` |
+| PUT | `/api/admin/{catalog}/{id}` | rinomina `{name}` | 200; 409 `NAME_TAKEN`; 404 |
+| POST | `/api/admin/{catalog}/{id}/activate` | riattiva | 200 |
+| POST | `/api/admin/{catalog}/{id}/deactivate` | disattiva (cancellazione logica) | 200 |
+
+`Item`: `{id, name, active, createdAt, updatedAt}`. I nomi sono univoci senza distinzione fra
+maiuscole e minuscole e gli spazi multipli sono normalizzati. Un elemento disattivato resta visibile nelle schede
+che lo usano, ma non può essere inserito in nuove configurazioni (`422 CATALOG_ITEM_INACTIVE`).
