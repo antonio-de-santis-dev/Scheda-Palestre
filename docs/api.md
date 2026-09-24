@@ -192,3 +192,20 @@ Ogni risposta di esecuzione restituisce lo stato completo:
 ```
 
 `nextAction` ∈ `COMPLETE_SET`, `WAIT_FOR_REST` (il timer è informativo, O-06), `FINISHED`.
+
+## Area USER - storico
+
+| Metodo | Endpoint | Funzione |
+| --- | --- | --- |
+| GET | `/api/me/workouts?page=&size=` | storico paginato, dal più recente: `{id, scheduledDate, status, planName, sessionTitle, startedAt, finishedAt, totalExercises, completedExercises, skippedExercises}` |
+| GET | `/api/me/workouts/{id}` | dettaglio con esercizi (`COMPLETED`/`SKIPPED`/…) e serie dello snapshot; 404 se non proprio |
+
+## Profilo (USER e ADMIN)
+
+| Metodo | Endpoint | Funzione | Errori |
+| --- | --- | --- | --- |
+| GET | `/api/me/profile` | `{id, firstName, lastName, username, email, phone, role}` | |
+| PUT | `/api/me/profile` | modifica solo `{phone}` (vuoto = nessun telefono); gli altri campi vengono ignorati | 400 `VALIDATION_ERROR` |
+
+Il cambio password usa `POST /api/auth/change-password` (password attuale obbligatoria) e chiude
+le altre sessioni aperte dell'utente.

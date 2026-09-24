@@ -4,6 +4,7 @@
 | --- | --- | --- | --- | --- |
 | 0 - Fondamenta | `chore/increment-0-foundation` | Completato | — | Backend 19 test, frontend 10 test, build OK, login/logout manuale con curl |
 | 1 - Account e cataloghi | `feat/identity-accounts`, `feat/catalog-management` | Completato | US-01, US-02, US-25, US-04, US-05, US-21 (ruoli), US-22 | Backend 67 test, frontend 19 test, lint/build OK |
+| 4 - Rifiniture | `feat/workout-history` (+ US-14/US-26 in `feat/workout-plans`) | Completato | US-24, US-03, US-14, US-26 | Backend 189 test, frontend 51 test, compilazione senza warning |
 | 3 - Calendario ed esecuzione | `feat/calendar-rotation`, `feat/workout-execution` | Completato | US-15, US-16, US-17, US-18, US-20, US-23 | Backend 185 test, frontend 48 test, lint/build OK, percorso completo nel browser a 360 px |
 | 2 - Schede e assegnazioni | `feat/workout-plans`, `feat/plan-assignments` | Completato | US-06, US-07, US-08, US-09, US-10, US-11, US-12, US-13, US-21 (assegnazioni); anticipate US-14 e US-26 lato backend/editor | Backend 96 test, frontend 33 test, lint/build OK |
 
@@ -73,3 +74,15 @@ utenti. Accedere come uno dei due utenti: *Schede* mostra la scheda attiva in so
 **Prova manuale.** Da USER: *Giorni*, selezionare i giorni che includono oggi; *Oggi → Inizia
 allenamento*; *Fine serie* avvia il timer; ricaricare la pagina: il timer continua; completare o
 saltare gli esercizi fino al riepilogo; *Calendario* mostra l'esito.
+
+## Incremento 4 - Rifiniture della prima versione
+
+- Storico essenziale (US-24): elenco paginato e dettaglio con valori dello snapshot, esercizi
+  saltati visibili, invariato anche se la scheda viene modificata o eliminata.
+- Profilo (US-03): dati in sola lettura, telefono modificabile, cambio password con password
+  attuale; disponibile anche per l'ADMIN.
+- Serie personalizzate (US-14) e duplicazione (US-26): implementate nell'Incremento 2.
+- Pulizia: classi del catalogo separate per file (nessun warning del compilatore).
+
+**Prova manuale.** Da USER: svolgere o saltare esercizi, poi *Storico* → dettaglio: gli esercizi
+saltati mostrano "Saltato". *Profilo*: salvare un telefono e cambiare la password.
