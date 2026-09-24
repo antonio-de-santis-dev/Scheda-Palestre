@@ -4,6 +4,7 @@
 | --- | --- | --- | --- | --- |
 | 0 - Fondamenta | `chore/increment-0-foundation` | Completato | — | Backend 19 test, frontend 10 test, build OK, login/logout manuale con curl |
 | 1 - Account e cataloghi | `feat/identity-accounts`, `feat/catalog-management` | Completato | US-01, US-02, US-25, US-04, US-05, US-21 (ruoli), US-22 | Backend 67 test, frontend 19 test, lint/build OK |
+| Finale - Verifica e rilascio | `test/integration-e2e`, `fix/nginx-forwarded-host`, `perf/route-code-splitting`, `docs/final-documentation` | Completato | Tutte | Backend 189, frontend 51, E2E 5/5 (6 flussi) su Vite e su stack Docker |
 | 4 - Rifiniture | `feat/workout-history` (+ US-14/US-26 in `feat/workout-plans`) | Completato | US-24, US-03, US-14, US-26 | Backend 189 test, frontend 51 test, compilazione senza warning |
 | 3 - Calendario ed esecuzione | `feat/calendar-rotation`, `feat/workout-execution` | Completato | US-15, US-16, US-17, US-18, US-20, US-23 | Backend 185 test, frontend 48 test, lint/build OK, percorso completo nel browser a 360 px |
 | 2 - Schede e assegnazioni | `feat/workout-plans`, `feat/plan-assignments` | Completato | US-06, US-07, US-08, US-09, US-10, US-11, US-12, US-13, US-21 (assegnazioni); anticipate US-14 e US-26 lato backend/editor | Backend 96 test, frontend 33 test, lint/build OK |
@@ -86,3 +87,13 @@ saltare gli esercizi fino al riepilogo; *Calendario* mostra l'esito.
 
 **Prova manuale.** Da USER: svolgere o saltare esercizi, poi *Storico* → dettaglio: gli esercizi
 saltati mostrano "Saltato". *Profilo*: salvare un telefono e cambiare la password.
+
+## Verifica finale e rilascio
+
+- Suite Playwright dei sei flussi della specifica (§16) a 360 px: 5/5 su Vite + backend (database nuovo
+  e riutilizzato) e 5/5 sullo stack Docker di produzione (nginx + backend + PostgreSQL).
+- Correzione emersa dagli E2E su Docker: nginx inoltra `Host` con la porta (prima: 403 al login).
+- Code splitting per rotta: bundle iniziale da 585 kB a 368 kB.
+- Database ricreato da zero solo con Flyway; `./mvnw clean verify` 189/189; `npm test` 51/51;
+  lint, typecheck e build senza errori né warning; nessun segreto nella cronologia Git.
+- Documentazione: `DOCUMENTAZIONE_IMPLEMENTAZIONE_COMPLETA.md`, `GUIDA_TEST_MANUALE.md`, `CLAUDE.md`.

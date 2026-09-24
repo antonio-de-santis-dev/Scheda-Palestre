@@ -58,7 +58,18 @@ src/
 └── test/       setup Vitest + MSW
 ```
 
+- Le pagine sono caricate su richiesta (`lazy` di React Router): lo USER non scarica l'editor ADMIN.
 - I dati del server vivono solo nella cache di TanStack Query, senza uno store globale duplicato.
 - I moduli usano React Hook Form + Zod con le stesse regole del backend.
 - Gli errori sono gestiti in un unico punto: `ApiError` costruito dai Problem Details, messaggi
   italiani in `shared/errors/messages.ts`, errori di campo riportati sul form.
+
+## Esecuzione
+
+```text
+Sviluppo:   browser → Vite :5173 ──/api──▶ Spring Boot :8080 ──▶ PostgreSQL :5432 (Docker)
+Docker app: browser → nginx :8081 ──/api──▶ backend :8080 ──▶ postgres (rete compose)
+```
+
+Test: unit e integrazione con Testcontainers (backend), Vitest + MSW (frontend), Playwright
+(sistema completo). Dettagli in `DOCUMENTAZIONE_IMPLEMENTAZIONE_COMPLETA.md`.
