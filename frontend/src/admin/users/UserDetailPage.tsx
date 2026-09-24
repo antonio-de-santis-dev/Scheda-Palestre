@@ -12,6 +12,7 @@ import { usersApi, useUser, useUserMutation, type UserWithPassword } from './api
 import { UserForm } from './UserForm';
 import { TemporaryPasswordNotice } from './TemporaryPasswordNotice';
 import { UserStatusBadges } from './UserStatusBadges';
+import { UserAssignmentsSection } from '../assignments/UserAssignmentsSection';
 
 type Pending = 'deactivate' | 'reset' | null;
 
@@ -109,6 +110,7 @@ export function UserDetailPage() {
               />
             </section>
 
+            {user.role === 'USER' ? <UserAssignmentsSection userId={user.id} /> : null}
           </div>
         ) : null}
       </QueryState>

@@ -10,7 +10,10 @@ export const ADMIN_NAV: NavItem[] = [
   { to: '/admin/plans', label: 'Schede', icon: ClipboardList },
 ];
 
-export const USER_NAV: NavItem[] = [{ to: '/app', label: 'Home', icon: LayoutDashboard, end: true }];
+export const USER_NAV: NavItem[] = [
+  { to: '/app', label: 'Home', icon: LayoutDashboard, end: true },
+  { to: '/app/plans', label: 'Schede', icon: ClipboardList },
+];
 
 export interface Shortcut {
   to: string;

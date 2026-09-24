@@ -9,6 +9,9 @@ import { UserDetailPage } from '../../admin/users/UserDetailPage';
 import { CatalogPage } from '../../admin/catalog/CatalogPage';
 import { PlansPage } from '../../admin/plans/PlansPage';
 import { PlanEditorPage } from '../../admin/plans/PlanEditorPage';
+import { PlanAssignmentsPage } from '../../admin/assignments/PlanAssignmentsPage';
+import { MyPlansPage } from '../../user/plans/MyPlansPage';
+import { MyPlanDetailPage } from '../../user/plans/MyPlanDetailPage';
 import { UserHomePage } from '../../user/UserHomePage';
 import { NotFoundPage } from './AccessDeniedPage';
 import { ADMIN_NAV, USER_NAV } from './navigation';
@@ -39,6 +42,7 @@ export const routes: RouteObject[] = [
       { path: 'catalog/exercises', element: <CatalogPage key="exercises" kind="exercises" /> },
       { path: 'plans', element: <PlansPage /> },
       { path: 'plans/:id/edit', element: <PlanEditorPage /> },
+      { path: 'plans/:id/assignments', element: <PlanAssignmentsPage /> },
     ],
   },
   {
@@ -48,7 +52,11 @@ export const routes: RouteObject[] = [
         <AppLayout home="/app" areaLabel="utente" items={USER_NAV} />
       </RequireAuth>
     ),
-    children: [{ index: true, element: <UserHomePage /> }],
+    children: [
+      { index: true, element: <UserHomePage /> },
+      { path: 'plans', element: <MyPlansPage /> },
+      { path: 'plans/:assignmentId', element: <MyPlanDetailPage /> },
+    ],
   },
   { path: '*', element: <NotFoundPage /> },
 ];
