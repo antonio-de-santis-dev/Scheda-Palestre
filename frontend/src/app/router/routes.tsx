@@ -16,6 +16,8 @@ import { SchedulePage } from '../../user/schedule/SchedulePage';
 import { TodayPage } from '../../user/today/TodayPage';
 import { WorkoutPage } from '../../user/workout/WorkoutPage';
 import { CalendarPage } from '../../user/calendar/CalendarPage';
+import { HistoryDetailPage, HistoryPage } from '../../user/history/HistoryPages';
+import { ProfilePage } from '../../user/profile/ProfilePage';
 import { NotFoundPage } from './AccessDeniedPage';
 import { ADMIN_NAV, USER_NAV } from './navigation';
 
@@ -46,6 +48,7 @@ export const routes: RouteObject[] = [
       { path: 'plans', element: <PlansPage /> },
       { path: 'plans/:id/edit', element: <PlanEditorPage /> },
       { path: 'plans/:id/assignments', element: <PlanAssignmentsPage /> },
+      { path: 'profile', element: <ProfilePage /> },
     ],
   },
   {
@@ -63,6 +66,9 @@ export const routes: RouteObject[] = [
       { path: 'plans', element: <MyPlansPage /> },
       { path: 'plans/:assignmentId', element: <MyPlanDetailPage /> },
       { path: 'schedule', element: <SchedulePage /> },
+      { path: 'history', element: <HistoryPage /> },
+      { path: 'history/:workoutId', element: <HistoryDetailPage /> },
+      { path: 'profile', element: <ProfilePage /> },
     ],
   },
   { path: '*', element: <NotFoundPage /> },
