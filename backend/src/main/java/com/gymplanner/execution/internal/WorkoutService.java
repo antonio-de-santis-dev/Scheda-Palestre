@@ -107,6 +107,13 @@ class WorkoutService {
                 .map(w -> WorkoutStateMapper.toState(w, calendar.now()));
     }
 
+    /** Essential history (US-24): newest first, values taken from the snapshot. */
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<WorkoutDtos.WorkoutSummary> history(UUID userId,
+            org.springframework.data.domain.Pageable pageable) {
+        return workouts.findByUserId(userId, pageable).map(WorkoutDtos.WorkoutSummary::of);
+    }
+
     @Transactional(readOnly = true)
     public WorkoutState get(UUID userId, UUID workoutId) {
         Workout workout = workouts.findByIdAndUserId(workoutId, userId)

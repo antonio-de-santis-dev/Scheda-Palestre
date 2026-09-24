@@ -21,6 +21,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @IntegrationTest
+@SuppressWarnings({"unchecked", "cast"})
 class AssignmentIntegrationTest {
 
     private static final LocalDate TODAY = LocalDate.of(2026, 10, 5);

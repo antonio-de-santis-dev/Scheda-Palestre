@@ -26,9 +26,3 @@ interface CatalogRepository<T extends CatalogItem> extends JpaRepository<T, UUID
 
     List<T> findByIdIn(Collection<UUID> ids);
 }
-
-interface MuscleGroupRepository extends CatalogRepository<MuscleGroup> {
-}
-
-interface ExerciseRepository extends CatalogRepository<Exercise> {
-}

@@ -21,6 +21,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @IntegrationTest
+@SuppressWarnings({"unchecked", "cast"})
 @Import(PlanIntegrationTest.EventRecorder.class)
 class PlanIntegrationTest {
 
