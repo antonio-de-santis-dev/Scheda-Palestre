@@ -4,6 +4,7 @@
 | --- | --- | --- | --- | --- |
 | 0 - Fondamenta | `chore/increment-0-foundation` | Completato | — | Backend 19 test, frontend 10 test, build OK, login/logout manuale con curl |
 | 1 - Account e cataloghi | `feat/identity-accounts`, `feat/catalog-management` | Completato | US-01, US-02, US-25, US-04, US-05, US-21 (ruoli), US-22 | Backend 67 test, frontend 19 test, lint/build OK |
+| 3 - Calendario ed esecuzione | `feat/calendar-rotation`, `feat/workout-execution` | Completato | US-15, US-16, US-17, US-18, US-20, US-23 | Backend 185 test, frontend 48 test, lint/build OK, percorso completo nel browser a 360 px |
 | 2 - Schede e assegnazioni | `feat/workout-plans`, `feat/plan-assignments` | Completato | US-06, US-07, US-08, US-09, US-10, US-11, US-12, US-13, US-21 (assegnazioni); anticipate US-14 e US-26 lato backend/editor | Backend 96 test, frontend 33 test, lint/build OK |
 
 ## Incremento 0 - Fondamenta
@@ -54,3 +55,21 @@ accedere con il nuovo utente e cambiare la password. Da ADMIN: *Gruppi* ed *Eser
 **Prova manuale.** Creare gruppi ed esercizi, poi *Schede → Nuova scheda*, aggiungere "Giorno 1"
 e "Giorno 2" con almeno un esercizio ciascuno (uno a cedimento: compare "MAX"). *Assegna* a due
 utenti. Accedere come uno dei due utenti: *Schede* mostra la scheda attiva in sola lettura.
+
+## Incremento 3 - Calendario ed esecuzione
+
+- Decisioni O-01…O-07 chiuse con le proposte consigliate (ADR 0004).
+- Migrazioni `V5__create_weekly_schedules.sql` e `V6__create_workouts.sql`.
+- Rotazione in tempo costante (`RotationCalculator`), ri-ancoraggio al cambio dei giorni e delle
+  sessioni, copia dei giorni alla nuova attivazione.
+- Avvio con snapshot immutabile, *Fine serie* idempotente (lock pessimistico, provato con 4 richieste
+  concorrenti), salto, interruzione, ripresa dopo il ricaricamento, un solo allenamento in corso
+  per utente (indice parziale).
+- Timer derivato da `restEndsAt`/`serverTime`, corretto per lo scarto di orologio e riallineato
+  con `visibilitychange`; tentativi automatici di nuovo invio solo per le azioni idempotenti.
+- Schermate *Oggi*, *Allenamento*, *Calendario*, *Giorni*. Verifica manuale nel browser a 360×740:
+  il pulsante *Fine serie* (64 px) è visibile senza scorrere, non c'è scorrimento orizzontale.
+
+**Prova manuale.** Da USER: *Giorni*, selezionare i giorni che includono oggi; *Oggi → Inizia
+allenamento*; *Fine serie* avvia il timer; ricaricare la pagina: il timer continua; completare o
+saltare gli esercizi fino al riepilogo; *Calendario* mostra l'esito.
