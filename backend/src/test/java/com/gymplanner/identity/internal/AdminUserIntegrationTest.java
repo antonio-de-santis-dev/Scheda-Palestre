@@ -65,7 +65,8 @@ class AdminUserIntegrationTest {
         assertThat((String) JsonPath.read(json, "$.user.role")).isEqualTo("USER");
         assertThat((Boolean) JsonPath.read(json, "$.user.mustChangePassword")).isTrue();
         assertThat((String) JsonPath.read(json, "$.user.firstName")).isEqualTo("Mario");
-        assertThat((Object) JsonPath.read(json, "$.user.phone")).isNull();
+        Object phone = JsonPath.read(json, "$.user.phone");
+        assertThat(phone).isNull();
         assertThat(json).doesNotContain("passwordHash");
         String temporary = JsonPath.read(json, "$.temporaryPassword");
         assertThat(temporary).hasSize(12);

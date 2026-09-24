@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 @IntegrationTest
+@SuppressWarnings({"unchecked", "cast"})
 class HistoryIntegrationTest {
 
     private static final LocalDate MONDAY = LocalDate.of(2026, 10, 5);

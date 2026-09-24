@@ -8,22 +8,6 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 @Service
-class MuscleGroupService extends CatalogService<MuscleGroup> {
-
-    MuscleGroupService(MuscleGroupRepository repository) {
-        super(repository, "Muscle group", MuscleGroup::new);
-    }
-}
-
-@Service
-class ExerciseService extends CatalogService<Exercise> {
-
-    ExerciseService(ExerciseRepository repository) {
-        super(repository, "Exercise", Exercise::new);
-    }
-}
-
-@Service
 class CatalogLookupService implements CatalogLookup {
 
     private final MuscleGroupService muscleGroups;

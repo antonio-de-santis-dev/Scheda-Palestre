@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 @IntegrationTest
+@SuppressWarnings({"unchecked", "cast"})
 class CalendarIntegrationTest {
 
     /** Monday. */

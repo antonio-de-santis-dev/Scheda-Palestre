@@ -28,6 +28,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @IntegrationTest
+@SuppressWarnings({"unchecked", "cast"})
 class ExecutionIntegrationTest {
 
     /** Monday 5 October 2026, 10:00 Europe/Rome. */
