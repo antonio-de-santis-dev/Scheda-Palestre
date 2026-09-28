@@ -5,6 +5,21 @@ Stato: fonte di verità per analisi tecnica e sviluppo incrementale
 Lingua della documentazione: italiano  
 Lingua di codice, classi, API e database: inglese
 
+> **Aggiornamento (branch `modifiche`, settembre 2026).** Alcune regole di questo documento sono
+> state superate da nuovi requisiti del proprietario. Dove c'è conflitto valgono le ADR in
+> `docs/decisions/`:
+>
+> - **ADR 0007:** ogni esercizio appartiene a un solo gruppo muscolare; catalogo unico.
+> - **ADR 0008:** uno USER può avere **più schede attive**. Un giorno della settimana appartiene a
+>   una sola scheda attiva. La regola "al massimo una scheda attiva" non vale più. `copySchedule`
+>   è `false` di default e copia solo i giorni liberi (O-07 superata).
+> - **ADR 0009:** `expiresOn` è la fine della *durata consigliata*: avviso dal giorno dopo, nessun
+>   blocco.
+> - **ADR 0010:** eliminazione logica degli utenti con anonimizzazione, e report attività ADMIN.
+> - **O-06 superata:** durante il recupero la serie successiva è bloccata (`REST_NOT_FINISHED`).
+>
+> Le righe interessate sono marcate con **[superato]**.
+
 ---
 
 ## 0. Istruzioni obbligatorie per Claude Code
@@ -68,7 +83,7 @@ Lo USER:
 
 - accede con l'account ricevuto;
 - visualizza una o più schede assegnate;
-- ha al massimo una scheda attiva;
+- ~~ha al massimo una scheda attiva;~~ **[superato: può avere più schede attive, ADR 0008]**
 - sceglie i giorni settimanali nei quali si allena;
 - riceve automaticamente le sessioni della scheda in rotazione;
 - svolge l'allenamento serie per serie;
@@ -114,7 +129,7 @@ La prima versione deve includere:
 - serie, ripetizioni, allenamento a cedimento e recupero;
 - serie personalizzate;
 - assegnazione di una scheda a uno o più utenti;
-- una sola assegnazione attiva per USER;
+- ~~una sola assegnazione attiva per USER;~~ **[superato: una sola assegnazione attiva per USER e scheda, ADR 0008]**
 - selezione dei giorni settimanali;
 - rotazione automatica delle sessioni;
 - vista dell'allenamento odierno;
@@ -185,7 +200,9 @@ Regole:
 4. Lo USER vede esclusivamente le schede assegnate.
 5. Una scheda può essere assegnata a più utenti.
 6. Un utente può ricevere più schede nel tempo.
-7. Ogni USER ha al massimo una sola assegnazione attiva.
+7. ~~Ogni USER ha al massimo una sola assegnazione attiva.~~ **[superato]** Ogni USER ha al massimo
+   un'assegnazione attiva **per scheda**; i giorni della settimana non si sovrappongono fra schede
+   attive (ADR 0008).
 8. Le modifiche a una scheda condivisa valgono per tutti gli assegnatari futuri e
    per gli allenamenti non ancora avviati.
 9. Gli allenamenti già avviati o conclusi non cambiano, perché usano uno snapshot.
@@ -435,7 +452,7 @@ visibile nelle schede che lo utilizzano.
 | `id` | UUID | PK |
 | `name` | String(100) | obbligatorio |
 | `description` | Text | facoltativo |
-| `expiresOn` | LocalDate | facoltativo, informativo |
+| `expiresOn` | LocalDate | facoltativo, fine della **durata consigliata** (avviso dal giorno dopo, ADR 0009) |
 | `createdBy` | User | ADMIN obbligatorio |
 | `copiedFromPlan` | WorkoutPlan | facoltativo |
 | `createdAt` | Instant | generato |
@@ -535,7 +552,8 @@ Regola tutto-o-niente:
 
 Vincoli:
 
-- indice unico parziale su `user_id` dove `active = true`;
+- ~~indice unico parziale su `user_id` dove `active = true`;~~ **[superato: V8, indice unico parziale su
+  `(user_id, workout_plan_id)` dove `active = true`, ADR 0008]**
 - `end_date` non può precedere `start_date`;
 - se `active = true`, `end_date` deve essere null;
 - chiudere un'assegnazione imposta `active = false` e `end_date`;
@@ -1352,13 +1370,13 @@ l'allenamento `IN_PROGRESS` e richiedere una scelta esplicita alla successiva ap
 
 Proposta attuale: non consentirlo nella prima versione.
 
-### O-06 - Timer bloccante
+### O-06 - Timer bloccante **[superato: ora il timer blocca la serie successiva]**
 
 Proposta attuale: il timer è informativo. Il backend non deve rifiutare la serie
 successiva soltanto perché il recupero non è arrivato a zero. Il frontend può
 evidenziare il recupero in corso senza togliere il controllo allo USER.
 
-### O-07 - Copia dei giorni al cambio scheda
+### O-07 - Copia dei giorni al cambio scheda **[superato da ADR 0008]**
 
 Proposta attuale: copiare i giorni dalla precedente assegnazione attiva; lo USER
 può modificarli successivamente.
@@ -1519,7 +1537,7 @@ Prima di dichiarare il progetto pronto:
 - [ ] nessuna registrazione pubblica;
 - [ ] nessuno USER modifica cataloghi o schede;
 - [ ] una scheda è condivisibile fra più USER;
-- [ ] una sola assegnazione attiva per USER;
+- [ ] ~~una sola assegnazione attiva per USER;~~ **[superato]** una sola assegnazione attiva per USER e scheda, giorni senza sovrapposizione;
 - [ ] nessun `@ManyToMany` diretto User-WorkoutPlan;
 - [ ] tabelle al plurale e nessuna tabella `user`;
 - [ ] `customSets` non persistito;
