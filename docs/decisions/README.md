@@ -14,3 +14,4 @@ motivazione, conseguenze. Le decisioni aperte della specifica (§17) sono in `00
 | [0007](0007-exercise-muscle-group.md) | Ogni esercizio appartiene a un solo gruppo muscolare (V7) | Accettata |
 | [0008](0008-multiple-active-plans.md) | Più schede attive per utente, giorni senza sovrapposizione (V8, lock per utente) | Accettata |
 | [0009](0009-recommended-duration.md) | Durata consigliata della scheda (`expires_on` ≠ `end_date`) | Accettata |
+| [0010](0010-user-deletion-and-report.md) | Eliminazione logica con anonimizzazione e report attività (V9) | Accettata |

@@ -1359,3 +1359,61 @@ svg {
   font-size: var(--text-sm);
   font-weight: 600;
 }
+
+/* ---------- Data tables (report) ---------- */
+.table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.table caption {
+  text-align: left;
+  font-weight: 700;
+  padding-bottom: var(--space-2);
+}
+
+.table th,
+.table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table thead th {
+  white-space: nowrap;
+}
+
+.table tbody th {
+  font-weight: 600;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 8rem;
+}
+
+.bar__fill {
+  display: inline-block;
+  height: 0.75rem;
+  min-width: 2px;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+}
+
+.bar__value {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Destructive zone, visually separated from the save buttons. */
+.danger-zone {
+  border: 2px solid var(--color-danger);
+}

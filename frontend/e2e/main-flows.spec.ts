@@ -237,6 +237,38 @@ test('5b. ADMIN assigns a second plan and USER shares the week between the two',
   await expect(athlete.getByRole('region', { name: 'Schede attive (2)' })).toBeVisible();
 });
 
+test('5c. ADMIN reads the activity report and deletes an account with two confirmations', async () => {
+  // Report of the athlete: only recorded data.
+  await admin.goto('/admin/users');
+  await admin.getByRole('link', { name: `Apri Elena Test ${RUN}` }).click();
+  const report = admin.getByRole('region', { name: 'Report attività' });
+  await expect(report.getByRole('table', { name: 'Totale allenamenti ed esercizi' })).toBeVisible();
+  await expect(report.getByText("L'app non registra carichi, peso corporeo o progressi fisici.", { exact: false })).toBeVisible();
+
+  // A throwaway account is deleted and can no longer log in.
+  const victim = `del_${RUN}`;
+  await admin.goto('/admin/users');
+  await admin.getByRole('button', { name: 'Nuovo utente' }).click();
+  await admin.getByLabel(/^Nome/).fill('Da');
+  await admin.getByLabel(/^Cognome/).fill(`Eliminare ${RUN}`);
+  await admin.getByLabel(/^Username/).fill(victim);
+  await admin.getByLabel(/^Email/).fill(`${victim}@example.test`);
+  await admin.getByRole('button', { name: 'Crea utente' }).click();
+  const temporary = (await admin.getByTestId('temporary-password').textContent())?.trim() ?? '';
+  await admin.getByRole('link', { name: `Apri Da Eliminare ${RUN}` }).click();
+  await admin.getByRole('button', { name: `Elimina account di Da Eliminare ${RUN}` }).click();
+  await admin.getByRole('dialog').getByRole('button', { name: 'Continua' }).click();
+  await admin.getByRole('dialog').getByLabel(/Per confermare scrivi lo username/).fill(victim);
+  await admin.getByRole('dialog').getByRole('button', { name: `Elimina definitivamente ${victim}` }).click();
+  await expect(admin).toHaveURL(/\/admin\/users$/);
+  await expect(admin.getByText('Account eliminato')).toBeVisible();
+
+  const page = await admin.context().browser()!.newPage({ viewport: { width: 360, height: 740 } });
+  await login(page, victim, temporary);
+  await expect(page.getByText('Credenziali non valide.')).toBeVisible();
+  await page.close();
+});
+
 test('6. ADMIN edits the plan and past history stays unchanged', async () => {
   await admin.goto(planEditorUrl);
   await admin.getByRole('button', { name: 'Elimina Giorno 1' }).click();

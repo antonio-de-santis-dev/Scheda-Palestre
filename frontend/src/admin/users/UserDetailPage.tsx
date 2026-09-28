@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useParams } from 'react-router';
-import { KeyRound, Power, PowerOff } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate, useParams } from 'react-router';
+import { KeyRound, Power, PowerOff, Trash2 } from 'lucide-react';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
 import { Alert, ErrorAlert } from '../../shared/components/Alert';
@@ -13,8 +14,11 @@ import { UserForm } from './UserForm';
 import { TemporaryPasswordNotice } from './TemporaryPasswordNotice';
 import { UserStatusBadges } from './UserStatusBadges';
 import { UserAssignmentsSection } from '../assignments/UserAssignmentsSection';
+import { DeleteUserDialog } from './DeleteUserDialog';
+import { ActivityReportSection } from './ActivityReportSection';
+import { flashState } from '../../shared/flash/flash';
 
-type Pending = 'deactivate' | 'reset' | null;
+type Pending = 'deactivate' | 'reset' | 'delete' | null;
 
 export function UserDetailPage() {
   const { id = '' } = useParams();
@@ -24,6 +28,9 @@ export function UserDetailPage() {
   const activate = useUserMutation(() => usersApi.activate(id));
   const deactivate = useUserMutation(() => usersApi.deactivate(id));
   const reset = useUserMutation(() => usersApi.resetPassword(id));
+  const remove = useMutation({ mutationFn: () => usersApi.remove(id) });
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [confirm, setConfirm] = useState<Pending>(null);
   const [saved, setSaved] = useState(false);
   const [temporary, setTemporary] = useState<UserWithPassword | null>(null);
@@ -49,7 +56,13 @@ export function UserDetailPage() {
               />
             ) : null}
             {actionError ? <ErrorAlert error={actionError} /> : null}
+            {user.deleted ? (
+              <Alert tone="info" title="Account eliminato">
+                <p>I dati personali sono stati anonimizzati; lo storico resta disponibile in forma anonima.</p>
+              </Alert>
+            ) : null}
 
+            {user.deleted ? null : (
             <section className="card" aria-labelledby="status-title">
               <h2 id="status-title" className="card__title">
                 Stato account
@@ -84,7 +97,9 @@ export function UserDetailPage() {
                 </Button>
               </div>
             </section>
+            )}
 
+            {user.deleted ? null : (
             <section className="card" aria-labelledby="data-title">
               <h2 id="data-title" className="card__title">
                 Dati anagrafici
@@ -109,12 +124,66 @@ export function UserDetailPage() {
                 }}
               />
             </section>
+            )}
 
             {user.role === 'USER' ? <UserAssignmentsSection userId={user.id} /> : null}
+            {user.role === 'USER' ? <ActivityReportSection userId={user.id} /> : null}
+
+            {user.deleted ? null : (
+              <section className="card danger-zone" aria-labelledby="danger-title">
+                <h2 id="danger-title" className="card__title">
+                  Eliminazione account
+                </h2>
+                {isSelf ? (
+                  <p>Non puoi eliminare il tuo account.</p>
+                ) : user.protectedAccount ? (
+                  <p>Questo è l'account ADMIN iniziale della palestra e non può essere eliminato.</p>
+                ) : (
+                  <>
+                    <p>
+                      Revoca gli accessi, chiude le schede assegnate e anonimizza i dati personali. Lo storico degli
+                      allenamenti resta conservato in forma anonima. Non si può annullare.
+                    </p>
+                    <Button
+                      variant="danger"
+                      icon={<Trash2 size={18} aria-hidden="true" />}
+                      onClick={() => {
+                        remove.reset();
+                        setConfirm('delete');
+                      }}
+                    >
+                      Elimina account di {user.firstName} {user.lastName}
+                    </Button>
+                  </>
+                )}
+              </section>
+            )}
           </div>
         ) : null}
       </QueryState>
 
+      <DeleteUserDialog
+        open={confirm === 'delete'}
+        username={user?.username ?? ''}
+        pending={remove.isPending}
+        error={remove.error}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() =>
+          remove.mutate(undefined, {
+            onSuccess: () => {
+              void queryClient.invalidateQueries({ queryKey: ['admin'] });
+              void navigate('/admin/users', {
+                replace: true,
+                state: flashState({
+                  tone: 'success',
+                  title: 'Account eliminato',
+                  message: `L'account @${user?.username ?? ''} è stato eliminato e i suoi dati personali anonimizzati.`,
+                }),
+              });
+            },
+          })
+        }
+      />
       <ConfirmDialog
         open={confirm === 'deactivate'}
         title="Disattivare l'account?"

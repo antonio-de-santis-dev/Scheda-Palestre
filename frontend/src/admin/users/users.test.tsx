@@ -19,6 +19,25 @@ const mario: AdminUser = {
   locked: false,
   createdAt: '2026-09-01T10:00:00Z',
   updatedAt: '2026-09-01T10:00:00Z',
+  deleted: false,
+  protectedAccount: false,
+};
+
+const emptyReport = {
+  userId: mario.id,
+  generatedOn: '2026-10-05',
+  totals: {
+    workoutsCompleted: 0,
+    workoutsInterrupted: 0,
+    workoutsInProgress: 0,
+    setsCompleted: 0,
+    exercisesCompleted: 0,
+    exercisesSkipped: 0,
+    firstWorkoutDate: null,
+    lastWorkoutDate: null,
+  },
+  plans: [],
+  weeks: [{ weekStart: '2026-10-05', workoutsCompleted: 0, workoutsInterrupted: 0, setsCompleted: 0 }],
 };
 
 function asAdmin() {
@@ -128,6 +147,61 @@ describe('users page', () => {
 });
 
 describe('user detail', () => {
+  it('deletes an account only after two distinct confirmations and returns to the list', async () => {
+    asAdmin();
+    let deleted = 0;
+    server.use(
+      http.get('*/api/admin/users/:id', () => HttpResponse.json(mario)),
+      http.get('*/api/admin/users/:id/assignments', () => HttpResponse.json([])),
+      http.get('*/api/admin/users/:id/activity-report', () => HttpResponse.json(emptyReport)),
+      http.get('*/api/admin/users', () => HttpResponse.json(page([]))),
+      http.delete('*/api/admin/users/:id', () => {
+        deleted++;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const { router } = renderApp(`/admin/users/${mario.id}`);
+    const user = userEvent.setup();
+    const zone = await screen.findByRole('region', { name: 'Eliminazione account' });
+    await user.click(within(zone).getByRole('button', { name: 'Elimina account di Mario Rossi' }));
+
+    // First confirmation: effects explained, no deletion yet.
+    let dialog = await screen.findByRole('dialog', { name: "Eliminare l'account @mario?" });
+    expect(dialog).toHaveTextContent('Storico: allenamenti, serie e assegnazioni restano conservati in forma anonima.');
+    expect(within(dialog).getByRole('button', { name: 'Annulla' })).not.toHaveClass('btn--danger');
+    await user.click(within(dialog).getByRole('button', { name: 'Continua' }));
+
+    // Second confirmation: the username must be typed.
+    dialog = await screen.findByRole('dialog', { name: 'Conferma definitiva' });
+    const confirm = within(dialog).getByRole('button', { name: 'Elimina definitivamente mario' });
+    await user.click(confirm);
+    expect(await within(dialog).findByText('Lo username non corrisponde')).toBeInTheDocument();
+    expect(deleted).toBe(0);
+    await user.type(within(dialog).getByLabelText(/Per confermare scrivi lo username/), 'mario');
+    await user.click(confirm);
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/admin/users'));
+    expect(deleted).toBe(1);
+    expect(await screen.findByText('Account eliminato')).toBeInTheDocument();
+  });
+
+  it('does not offer deletion for the protected ADMIN and shows an empty report without ambiguous zeros', async () => {
+    asAdmin();
+    server.use(
+      http.get('*/api/admin/users/:id', () => HttpResponse.json({ ...mario, protectedAccount: true })),
+      http.get('*/api/admin/users/:id/assignments', () => HttpResponse.json([])),
+      http.get('*/api/admin/users/:id/activity-report', () => HttpResponse.json(emptyReport)),
+    );
+    renderApp(`/admin/users/${mario.id}`);
+    const zone = await screen.findByRole('region', { name: 'Eliminazione account' });
+    expect(within(zone).queryByRole('button')).not.toBeInTheDocument();
+    expect(zone).toHaveTextContent('non può essere eliminato');
+    const report = screen.getByRole('region', { name: 'Report attività' });
+    expect(await within(report).findByText('Nessun allenamento registrato.')).toBeInTheDocument();
+    expect(within(report).getByRole('table', { name: /Andamento nelle ultime/ })).toBeInTheDocument();
+  });
+
+
   it('asks confirmation before deactivating and shows the new state', async () => {
     asAdmin();
     let deactivated = false;
