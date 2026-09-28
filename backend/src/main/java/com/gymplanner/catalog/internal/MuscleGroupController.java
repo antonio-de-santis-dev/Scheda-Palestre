@@ -41,6 +41,11 @@ class MuscleGroupController {
         return PageResponse.of(result, g -> CatalogItemResponse.of(g, counts.get(g.getId())));
     }
 
+    @GetMapping("/{id}")
+    CatalogItemResponse get(@PathVariable UUID id) {
+        return respond(service.get(id));
+    }
+
     @PostMapping
     ResponseEntity<CatalogItemResponse> create(@Valid @RequestBody CatalogItemRequest body) {
         MuscleGroup group = service.create(body.name());

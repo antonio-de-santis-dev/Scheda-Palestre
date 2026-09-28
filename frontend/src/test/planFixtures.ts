@@ -10,6 +10,7 @@ export function exercise(overrides: Partial<PlanExercise> = {}): PlanExercise {
     exerciseId: 'ex-1',
     exerciseName: 'Panca piana',
     exerciseActive: true,
+    exerciseInSectionGroup: true,
     position: 1,
     setsCount,
     reps,

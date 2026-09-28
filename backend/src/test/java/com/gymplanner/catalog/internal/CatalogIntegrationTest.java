@@ -185,6 +185,11 @@ class CatalogIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(2))
                 .andExpect(jsonPath("$.content[0].muscleGroupId").value(chest.toString()));
+        mvc.perform(get("/api/admin/muscle-groups/" + chest).with(fixtures.as(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.exerciseCount").value(2));
+        mvc.perform(get("/api/admin/muscle-groups/" + UUID.randomUUID()).with(fixtures.as(admin)))
+                .andExpect(status().isNotFound());
         mvc.perform(get("/api/admin/muscle-groups").param("q", "Petto").param("size", "200").with(fixtures.as(admin)))
                 .andExpect(jsonPath("$.content[?(@.id == '" + chest + "')].exerciseCount").value(2))
                 .andExpect(jsonPath("$.content[?(@.id == '" + chest + "')].activeExerciseCount").value(2));

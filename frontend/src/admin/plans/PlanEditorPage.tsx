@@ -5,12 +5,13 @@ import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
 import { Alert, ErrorAlert } from '../../shared/components/Alert';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
-import { SelectField, TextField } from '../../shared/components/Field';
+import { TextField } from '../../shared/components/Field';
 import { QueryState } from '../../shared/components/States';
 import { StatusBadge } from '../../shared/components/StatusBadge';
 import { restText } from '../../shared/utils/format';
 import { describeSets, type PlanSection, type PlanSession, type PlanStructure } from '../../shared/api/planTypes';
-import { useActiveCatalog } from '../catalog/api';
+import { useActiveMuscleGroups } from '../catalog/api';
+import { Combobox } from '../../shared/components/Combobox';
 import { moved, plansApi, usePlan, usePlanMutation, type PlanExerciseInput } from './api';
 import { PlanMetadataForm } from './PlanMetadataForm';
 import { PlanStatusBadge } from './PlanStatusBadge';
@@ -181,8 +182,8 @@ function SessionCard({ session, index, total, readOnly, onMove, run, ask }: Sess
   const [renaming, setRenaming] = useState(false);
   const [title, setTitle] = useState(session.title);
   const [renameError, setRenameError] = useState<string | undefined>();
-  const groups = useActiveCatalog('muscle-groups');
-  const [groupId, setGroupId] = useState('');
+  const groups = useActiveMuscleGroups();
+  const [groupId, setGroupId] = useState<string | null>(null);
   const available = (groups.data?.content ?? []).filter((g) => !session.sections.some((s) => s.muscleGroupId === g.id));
   const titleId = `session-${session.id}`;
 
@@ -272,18 +273,18 @@ function SessionCard({ session, index, total, readOnly, onMove, run, ask }: Sess
             onSubmit={(e) => {
               e.preventDefault();
               if (groupId) {
-                void run(() => plansApi.addSection(session.id, groupId)).then(() => setGroupId(''));
+                void run(() => plansApi.addSection(session.id, groupId)).then(() => setGroupId(null));
               }
             }}
           >
-            <SelectField label={`Nuova sezione in ${session.title}`} value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-              <option value="">Scegli un gruppo muscolare…</option>
-              {available.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </SelectField>
+            <Combobox
+              label={`Nuova sezione in ${session.title}`}
+              placeholder="Cerca un gruppo muscolare…"
+              options={available.map((g) => ({ id: g.id, label: g.name }))}
+              value={groupId}
+              onChange={setGroupId}
+              emptyText="Nessun gruppo muscolare disponibile"
+            />
             <Button type="submit" variant="secondary" disabled={!groupId} icon={<Plus size={18} aria-hidden="true" />}>
               Aggiungi sezione
             </Button>
@@ -361,6 +362,8 @@ function SectionBlock({ section, index, total, readOnly, onMove, run, ask }: Sec
           <ExerciseEditor
             key={exercise.id}
             initial={exercise}
+            muscleGroupId={section.muscleGroupId}
+            muscleGroupName={section.muscleGroupName}
             pending={pending}
             error={error}
             onSubmit={(input: PlanExerciseInput) => save(() => plansApi.updateExercise(exercise.id, input))}
@@ -374,6 +377,12 @@ function SectionBlock({ section, index, total, readOnly, onMove, run, ask }: Sec
                 <>
                   {' '}
                   <StatusBadge tone="neutral">disattivato</StatusBadge>
+                </>
+              ) : null}
+              {!exercise.exerciseInSectionGroup ? (
+                <>
+                  {' '}
+                  <StatusBadge tone="warning">ora in un altro gruppo</StatusBadge>
                 </>
               ) : null}
             </span>
@@ -418,6 +427,8 @@ function SectionBlock({ section, index, total, readOnly, onMove, run, ask }: Sec
       {!readOnly ? (
         editing === 'new' ? (
           <ExerciseEditor
+            muscleGroupId={section.muscleGroupId}
+            muscleGroupName={section.muscleGroupName}
             pending={pending}
             error={error}
             onSubmit={(input) => save(() => plansApi.addExercise(section.id, input))}

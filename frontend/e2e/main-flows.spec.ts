@@ -58,17 +58,29 @@ test('1. ADMIN creates a USER who changes the password at first access', async (
   await expect(athlete.getByRole('heading', { name: 'Accesso negato' })).toBeVisible();
 });
 
-async function addCatalogItem(page: Page, kind: 'muscle-groups' | 'exercises', name: string) {
-  await page.goto(`/admin/catalog/${kind}`);
-  await page.getByLabel(kind === 'exercises' ? /^Nuovo esercizio/ : /^Nuovo gruppo muscolare/).fill(name);
-  await page.getByRole('button', { name: 'Aggiungi' }).click();
-  await expect(page.getByRole('list').getByText(name, { exact: true })).toBeVisible();
+/** Unified catalog: groups on the list, exercises inside the selected group. */
+async function addGroup(page: Page, name: string) {
+  await page.goto('/admin/catalog');
+  await page.getByLabel(/^Nuovo gruppo muscolare/).fill(name);
+  await page.getByRole('button', { name: 'Aggiungi gruppo' }).click();
+  await expect(page.getByRole('list', { name: 'Elenco gruppi muscolari' }).getByText(name, { exact: true })).toBeVisible();
+}
+
+async function addExercisesToGroup(page: Page, group: string, exercises: string[]) {
+  await page.goto('/admin/catalog');
+  await page.getByRole('list', { name: 'Elenco gruppi muscolari' }).getByRole('link', { name: new RegExp(group) }).click();
+  for (const name of exercises) {
+    await page.getByLabel(new RegExp(`^Nuovo esercizio in ${group}`)).fill(name);
+    await page.getByRole('button', { name: 'Aggiungi esercizio' }).click();
+    await expect(page.getByRole('list', { name: `Esercizi di ${group}` }).getByText(name, { exact: true })).toBeVisible();
+  }
 }
 
 async function addExercise(page: Page, group: string, exercise: string, sets: number, reps: number | 'MAX', rest: number) {
   await page.getByRole('button', { name: `Aggiungi esercizio a ${group}` }).click();
   const form = page.getByRole('form', { name: 'Nuovo esercizio' });
-  await form.getByLabel(/^Esercizio/).selectOption({ label: exercise });
+  await form.getByRole('combobox', { name: 'Esercizio' }).fill(exercise);
+  await form.getByRole('option', { name: exercise }).click();
   await form.getByRole('spinbutton', { name: 'Serie' }).fill(String(sets));
   await form.getByLabel(/^Recupero/).fill(String(rest));
   if (reps === 'MAX') {
@@ -81,11 +93,13 @@ async function addExercise(page: Page, group: string, exercise: string, sets: nu
 }
 
 test('2. ADMIN builds catalog and plan, then assigns it', async () => {
-  await addCatalogItem(admin, 'muscle-groups', names.chest);
-  await addCatalogItem(admin, 'muscle-groups', names.back);
-  await addCatalogItem(admin, 'exercises', names.bench);
-  await addCatalogItem(admin, 'exercises', names.pullUp);
-  await addCatalogItem(admin, 'exercises', names.row);
+  await addGroup(admin, names.chest);
+  await addGroup(admin, names.back);
+  await addExercisesToGroup(admin, names.chest, [names.bench, names.pullUp]);
+  await addExercisesToGroup(admin, names.back, [names.row]);
+  // Refresh on a deep link of the catalog keeps the selected group (SPA fallback + URL state).
+  await admin.reload();
+  await expect(admin.getByRole('list', { name: `Esercizi di ${names.back}` }).getByText(names.row, { exact: true })).toBeVisible();
 
   await admin.goto('/admin/plans');
   await admin.getByRole('button', { name: 'Nuova scheda' }).click();
@@ -100,12 +114,14 @@ test('2. ADMIN builds catalog and plan, then assigns it', async () => {
   await admin.getByRole('button', { name: 'Aggiungi sessione' }).click();
   await expect(admin.getByRole('heading', { name: '2. Giorno 2' })).toBeVisible();
 
-  await admin.getByLabel('Nuova sezione in Giorno 1').selectOption({ label: names.chest });
+  await admin.getByRole('combobox', { name: 'Nuova sezione in Giorno 1' }).fill(names.chest);
+  await admin.getByRole('option', { name: names.chest }).click();
   await admin.getByRole('button', { name: 'Aggiungi sezione' }).first().click();
   await addExercise(admin, names.chest, names.bench, 2, 10, 3);
   await addExercise(admin, names.chest, names.pullUp, 1, 'MAX', 0);
 
-  await admin.getByLabel('Nuova sezione in Giorno 2').selectOption({ label: names.back });
+  await admin.getByRole('combobox', { name: 'Nuova sezione in Giorno 2' }).fill(names.back);
+  await admin.getByRole('option', { name: names.back }).click();
   await admin.getByRole('button', { name: 'Aggiungi sezione' }).nth(1).click();
   await addExercise(admin, names.back, names.row, 3, 12, 45);
 

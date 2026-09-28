@@ -11,3 +11,4 @@ motivazione, conseguenze. Le decisioni aperte della specifica (§17) sono in `00
 | [0004](0004-open-decisions.md) | Decisioni aperte O-01…O-07 | Accettata |
 | [0005](0005-frontend-styling.md) | Frontend: design system CSS globale a token | Accettata |
 | [0006](0006-git-branching.md) | Strategia Git e branch | Accettata |
+| [0007](0007-exercise-muscle-group.md) | Ogni esercizio appartiene a un solo gruppo muscolare (V7) | Accettata |

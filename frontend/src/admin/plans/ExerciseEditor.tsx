@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useFieldArray, useForm } from 'react-hook-form';
+import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Save } from 'lucide-react';
 import { Button } from '../../shared/components/Button';
-import { Checkbox, SelectField, TextField } from '../../shared/components/Field';
+import { Checkbox, TextField } from '../../shared/components/Field';
+import { Combobox, type ComboboxOption } from '../../shared/components/Combobox';
 import { ErrorAlert } from '../../shared/components/Alert';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
-import { useActiveCatalog } from '../catalog/api';
+import { useActiveExercisesOfGroup } from '../catalog/api';
 import type { PlanExercise } from '../../shared/api/planTypes';
 import type { PlanExerciseInput } from './api';
 
@@ -43,14 +44,17 @@ type FormValues = z.infer<typeof schema>;
 
 interface ExerciseEditorProps {
   initial?: PlanExercise;
+  /** Only exercises of the section's group can be chosen (ADR 0007). */
+  muscleGroupId: string;
+  muscleGroupName: string;
   pending: boolean;
   error: unknown;
   onSubmit: (input: PlanExerciseInput) => Promise<unknown>;
   onCancel: () => void;
 }
 
-export function ExerciseEditor({ initial, pending, error, onSubmit, onCancel }: ExerciseEditorProps) {
-  const exercises = useActiveCatalog('exercises');
+export function ExerciseEditor({ initial, muscleGroupId, muscleGroupName, pending, error, onSubmit, onCancel }: ExerciseEditorProps) {
+  const exercises = useActiveExercisesOfGroup(muscleGroupId);
   const [pendingValues, setPendingValues] = useState<PlanExerciseInput | null>(null);
 
   const {
@@ -96,9 +100,16 @@ export function ExerciseEditor({ initial, pending, error, onSubmit, onCancel }: 
     }
   }, [custom, setsCount, fields.length, append, remove, getValues]);
 
-  // The inactive exercise currently configured stays selectable (spec 8.4).
-  const options = exercises.data?.content ?? [];
-  const showInitialInactive = initial && !initial.exerciseActive && !options.some((o) => o.id === initial.exerciseId);
+  // The exercise currently configured stays selectable even when deactivated or moved to another
+  // group (historic data, spec 8.4 / ADR 0007); new choices come from the active exercises of the group.
+  const options: ComboboxOption[] = (exercises.data?.content ?? []).map((o) => ({ id: o.id, label: o.name }));
+  if (initial && !options.some((o) => o.id === initial.exerciseId)) {
+    options.unshift({
+      id: initial.exerciseId,
+      label: initial.exerciseName,
+      note: !initial.exerciseActive ? 'disattivato' : 'ora in un altro gruppo',
+    });
+  }
 
   const toInput = (values: FormValues): PlanExerciseInput => ({
     exerciseId: values.exerciseId,
@@ -130,17 +141,23 @@ export function ExerciseEditor({ initial, pending, error, onSubmit, onCancel }: 
     <div className="editor-panel">
       <form className="form" onSubmit={submit} noValidate aria-label={initial ? 'Modifica esercizio' : 'Nuovo esercizio'}>
         {error ? <ErrorAlert error={error} /> : null}
-        <SelectField label="Esercizio" required error={errors.exerciseId?.message} {...register('exerciseId')}>
-          <option value="">Scegli…</option>
-          {showInitialInactive ? (
-            <option value={initial.exerciseId}>{initial.exerciseName} (disattivato)</option>
-          ) : null}
-          {options.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.name}
-            </option>
-          ))}
-        </SelectField>
+        <Controller
+          control={control}
+          name="exerciseId"
+          render={({ field }) => (
+            <Combobox
+              label="Esercizio"
+              required
+              placeholder={`Cerca tra gli esercizi di ${muscleGroupName}…`}
+              options={options}
+              value={field.value || null}
+              onChange={(id) => field.onChange(id ?? '')}
+              emptyText="Nessun esercizio trovato in questo gruppo"
+              hint={`Solo esercizi attivi del gruppo ${muscleGroupName}.`}
+              error={errors.exerciseId?.message}
+            />
+          )}
+        />
         <div className="form-grid form-grid--2">
           <TextField
             label="Serie"

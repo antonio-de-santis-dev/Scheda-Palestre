@@ -40,11 +40,23 @@ const MESSAGES: Record<string, string> = {
   SET_NOT_CURRENT: 'Questa serie non è quella corrente. La schermata è stata aggiornata.',
   EXERCISE_NOT_IN_PROGRESS: 'Solo l’esercizio in corso può essere saltato.',
   RANGE_TOO_LARGE: "L'intervallo richiesto è troppo ampio (massimo 62 giorni).",
+  EXERCISE_GROUP_MISMATCH: 'L’esercizio scelto non appartiene al gruppo muscolare di questa sezione.',
+};
+
+const text = (value: unknown): string | null => (typeof value === 'string' && value.trim() ? value : null);
+
+/** Messages that use the extra Problem Details members to say exactly what is wrong. */
+const DETAILED: Record<string, (problem: Record<string, unknown>) => string | null> = {
+  EXERCISE_GROUP_MISMATCH: (p) => {
+    const exercise = text(p.exerciseName);
+    const group = text(p.muscleGroupName);
+    return exercise && group ? `“${exercise}” non appartiene al gruppo ${group}: scegli un esercizio di questo gruppo.` : null;
+  },
 };
 
 export function errorMessage(error: unknown, fallback = MESSAGES.INTERNAL_ERROR): string {
   if (isApiError(error)) {
-    return MESSAGES[error.code] ?? error.detail ?? fallback ?? 'Errore';
+    return DETAILED[error.code]?.(error.problem) ?? MESSAGES[error.code] ?? error.detail ?? fallback ?? 'Errore';
   }
   return fallback ?? 'Errore';
 }
