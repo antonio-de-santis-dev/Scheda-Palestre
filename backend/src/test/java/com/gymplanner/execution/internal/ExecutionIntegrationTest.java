@@ -106,8 +106,16 @@ class ExecutionIntegrationTest {
         assertThat((String) state.read("$.nextAction")).isEqualTo("WAIT_FOR_REST");
         assertThat((Integer) state.read("$.exercises[0].setsCompleted")).isEqualTo(1);
 
-        // O-06: the timer is informative, the next set can be completed during the rest.
+        // Fase F (supersedes O-06): the next set is refused while the rest is running...
         clock.advance(Duration.ofSeconds(20));
+        Api.Response early = complete(user, state).expectCode(422, "REST_NOT_FINISHED");
+        assertThat((String) early.read("$.restEndsAt")).isEqualTo(state.read("$.restEndsAt"));
+        // ...but repeating the already completed set is still idempotent (200, same state).
+        String firstSet = (String) state.read("$.exercises[0].sets[0].id");
+        api.post(user, "/api/me/workouts/" + state.read("$.workoutId") + "/sets/" + firstSet + "/complete", null)
+                .expect(200);
+        // At the exact end of the rest the next set is accepted.
+        clock.advance(Duration.ofSeconds(40));
         state = complete(user, state).expect(200);
         assertThat((List<String>) state.read("$.exercises[*].status")).containsExactly("COMPLETED", "IN_PROGRESS");
         // O-03: rest also runs between exercises.
@@ -115,6 +123,7 @@ class ExecutionIntegrationTest {
 
         clock.advance(Duration.ofSeconds(90));
         state = complete(user, state).expect(200);
+        clock.advance(Duration.ofSeconds(60));
         state = complete(user, state).expect(200);
         assertThat((String) state.read("$.status")).isEqualTo("COMPLETED");
         assertThat((String) state.read("$.nextAction")).isEqualTo("FINISHED");
@@ -124,6 +133,18 @@ class ExecutionIntegrationTest {
         assertThat(jdbc.queryForObject("select count(*) from workout_sets ws join workout_exercises we on we.id = ws.workout_exercise_id "
                 + "where we.workout_id = ? and ws.completed_at is not null", Integer.class,
                 UUID.fromString(state.read("$.workoutId")))).isEqualTo(4);
+    }
+
+    @Test
+    void skipAndInterruptStayAllowedDuringTheRest() {
+        Api.Response state = start(user, MONDAY).expect(201);
+        state = complete(user, state).expect(200);
+        assertThat((String) state.read("$.nextAction")).isEqualTo("WAIT_FOR_REST");
+        String workoutId = state.read("$.workoutId");
+        state = api.post(user, "/api/me/workouts/" + workoutId + "/exercises/" + state.read("$.currentExerciseId")
+                + "/skip", null).expect(200);
+        assertThat((List<String>) state.read("$.exercises[*].status")).containsExactly("SKIPPED", "IN_PROGRESS");
+        api.post(user, "/api/me/workouts/" + workoutId + "/interrupt", null).expect(200);
     }
 
     @Test
@@ -148,6 +169,7 @@ class ExecutionIntegrationTest {
         String workoutId = state.read("$.workoutId");
         // Last set of the first exercise: a double advance would also complete exercise 2.
         state = complete(user, state).expect(200);
+        clock.advance(Duration.ofSeconds(60));
         String setId = state.read("$.currentSetId");
         String url = "/api/me/workouts/" + workoutId + "/sets/" + setId + "/complete";
 

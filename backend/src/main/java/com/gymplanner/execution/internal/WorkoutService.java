@@ -145,6 +145,17 @@ class WorkoutService {
         if (!isCurrent) {
             throw new BusinessRuleException("SET_NOT_CURRENT", "Only the current set can be completed");
         }
+        // Fase F (supersedes O-06): the next set cannot start while the rest is running. A repeated
+        // request for an already completed set was answered above (idempotency is preserved).
+        Optional<Instant> restEndsAt = workout.lastCompletedSet()
+                .filter(last -> last.getRestSeconds() > 0)
+                .map(last -> last.getCompletedAt().plusSeconds(last.getRestSeconds()))
+                .filter(now::isBefore);
+        if (restEndsAt.isPresent()) {
+            throw new BusinessRuleException("REST_NOT_FINISHED", "The rest period is not over yet")
+                    .with("restEndsAt", restEndsAt.get())
+                    .with("serverTime", now);
+        }
         set.complete(now);
         if (exercise.nextSet().isEmpty()) {
             exercise.markCompleted();

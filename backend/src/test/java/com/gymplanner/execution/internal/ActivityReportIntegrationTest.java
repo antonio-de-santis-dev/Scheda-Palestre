@@ -66,6 +66,7 @@ class ActivityReportIntegrationTest {
         clock.setDate(date);
         Api.Response state = api.post(user, "/api/me/workouts", "{\"date\":\"" + date + "\"}").expect(201);
         while ("IN_PROGRESS".equals(state.read("$.status"))) {
+            clock.advance(java.time.Duration.ofMinutes(10));
             state = api.post(user, "/api/me/workouts/" + state.read("$.workoutId") + "/sets/"
                     + state.read("$.currentSetId") + "/complete", null).expect(200);
         }
