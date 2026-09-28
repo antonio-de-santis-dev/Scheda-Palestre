@@ -41,12 +41,36 @@ const MESSAGES: Record<string, string> = {
   EXERCISE_NOT_IN_PROGRESS: 'Solo l’esercizio in corso può essere saltato.',
   RANGE_TOO_LARGE: "L'intervallo richiesto è troppo ampio (massimo 62 giorni).",
   EXERCISE_GROUP_MISMATCH: 'L’esercizio scelto non appartiene al gruppo muscolare di questa sezione.',
+  SCHEDULE_DAY_CONFLICT: 'Alcuni giorni sono già usati da un’altra tua scheda attiva.',
+  ASSIGNMENT_NOT_ACTIVE: 'La scheda non è attiva: non puoi sceglierne i giorni.',
 };
+
+const DAY_NAMES = ['', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];
+
+/** "lunedì e venerdì", "lunedì, martedì e giovedì". */
+function joinItalian(items: string[]): string {
+  return items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} e ${items[items.length - 1]}`;
+}
+
+interface DayConflict {
+  weekday: number;
+  planName: string;
+}
 
 const text = (value: unknown): string | null => (typeof value === 'string' && value.trim() ? value : null);
 
 /** Messages that use the extra Problem Details members to say exactly what is wrong. */
 const DETAILED: Record<string, (problem: Record<string, unknown>) => string | null> = {
+  SCHEDULE_DAY_CONFLICT: (p) => {
+    const conflicts = Array.isArray(p.conflicts) ? (p.conflicts as DayConflict[]) : [];
+    if (conflicts.length === 0) {
+      return null;
+    }
+    const byPlan = new Map<string, string[]>();
+    conflicts.forEach((c) => byPlan.set(c.planName, [...(byPlan.get(c.planName) ?? []), DAY_NAMES[c.weekday] ?? '?']));
+    const parts = [...byPlan].map(([plan, days]) => `${joinItalian(days)} ${days.length === 1 ? 'è già usato' : 'sono già usati'} da “${plan}”`);
+    return `${parts.join('; ')}. Scegli altri giorni oppure libera prima quelli dell’altra scheda.`.replace(/^./, (c) => c.toUpperCase());
+  },
   EXERCISE_GROUP_MISMATCH: (p) => {
     const exercise = text(p.exerciseName);
     const group = text(p.muscleGroupName);

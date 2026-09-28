@@ -16,6 +16,9 @@ export interface Assignment {
   active: boolean;
   status: AssignmentStatus;
   createdAt: string;
+  /** Filled only by an activation that asked to copy the days (ADR 0008). */
+  copiedWeekdays?: number[];
+  skippedWeekdays?: number[];
 }
 
 export interface AssignInput {

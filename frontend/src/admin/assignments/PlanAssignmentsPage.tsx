@@ -26,7 +26,7 @@ export function PlanAssignmentsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [startDate, setStartDate] = useState(todayIso());
   const [activate, setActivate] = useState(true);
-  const [copySchedule, setCopySchedule] = useState(true);
+  const [copySchedule, setCopySchedule] = useState(false);
   const navigate = useNavigate();
   const [formError, setFormError] = useState<string | null>(null);
   const [toClose, setToClose] = useState<Assignment | null>(null);
@@ -68,7 +68,12 @@ export function PlanAssignmentsPage() {
             state: flashState({
               tone: 'success',
               title: 'Scheda assegnata',
-              message: `“${plan.data?.name ?? 'Scheda'}” assegnata a ${usersCount(result.length)}${activate ? '' : ' (in attesa di attivazione)'}.`,
+              message: [
+                `“${plan.data?.name ?? 'Scheda'}” assegnata a ${usersCount(result.length)}${activate ? '' : ' (in attesa di attivazione)'}.`,
+                skippedNotice(result),
+              ]
+                .filter(Boolean)
+                .join(' '),
             }),
           }),
       },
@@ -133,7 +138,7 @@ export function PlanAssignmentsPage() {
               <div className="stack stack--sm">
                 <Checkbox label="Attiva subito" checked={activate} onChange={(e) => setActivate(e.target.checked)} />
                 <Checkbox
-                  label="Mantieni i giorni di allenamento della scheda precedente"
+                  label="Copia i giorni liberi dall'ultima scheda chiusa dell'utente"
                   checked={copySchedule}
                   disabled={!activate}
                   onChange={(e) => setCopySchedule(e.target.checked)}
@@ -142,7 +147,9 @@ export function PlanAssignmentsPage() {
             </div>
             {activate ? (
               <p className="muted small">
-                Se un utente ha già un'altra scheda attiva, questa verrà chiusa e l'eventuale allenamento in corso interrotto.
+                Le altre schede attive dell'utente restano attive e un eventuale allenamento in corso prosegue. Ogni giorno della
+                settimana può appartenere a una sola scheda: se copi i giorni, quelli già usati da un'altra scheda attiva vengono
+                saltati e l'utente sceglierà gli altri.
               </p>
             ) : null}
             <div className="form-actions">
@@ -225,4 +232,15 @@ export function PlanAssignmentsPage() {
       </ConfirmDialog>
     </>
   );
+}
+
+/** Days not copied because another active plan of the user already uses them. */
+function skippedNotice(result: Assignment[]): string {
+  const withSkipped = result.filter((a) => (a.skippedWeekdays?.length ?? 0) > 0).length;
+  if (withSkipped === 0) {
+    return '';
+  }
+  return withSkipped === 1
+    ? "Per 1 utente alcuni giorni erano già usati da un'altra scheda attiva e non sono stati copiati."
+    : `Per ${withSkipped} utenti alcuni giorni erano già usati da un'altra scheda attiva e non sono stati copiati.`;
 }

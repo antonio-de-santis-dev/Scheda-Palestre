@@ -33,6 +33,17 @@ function TodayContent({ today }: { today: Today }) {
     <div className="stack">
       {today.pendingWorkout ? <PendingWorkout today={today} /> : null}
 
+      {today.status !== 'NO_SCHEDULE'
+        ? today.plansWithoutDays.map((p) => (
+            <Alert key={p.assignmentId} tone="info" title="Scegli i giorni della nuova scheda">
+              <p>
+                La scheda “{p.planName}” non ha ancora giorni di allenamento.{' '}
+                <Link to={`/app/schedule?assignment=${p.assignmentId}`}>Scegli i giorni di {p.planName}</Link>
+              </p>
+            </Alert>
+          ))
+        : null}
+
       {today.status === 'NO_ACTIVE_ASSIGNMENT' ? (
         <EmptyState title="Nessuna scheda attiva" icon={<ClipboardList size={40} />}>
           <p>La palestra non ti ha ancora assegnato una scheda attiva.</p>
@@ -41,8 +52,21 @@ function TodayContent({ today }: { today: Today }) {
 
       {today.status === 'NO_SCHEDULE' ? (
         <EmptyState title="Scegli i tuoi giorni" icon={<CalendarClock size={40} />}>
-          <p>Indica in quali giorni ti alleni: le sessioni di “{today.planName}” verranno distribuite automaticamente.</p>
-          <Link to="/app/schedule" className="btn btn--primary">
+          {today.plansWithoutDays.length === 1 ? (
+            <p>
+              Indica in quali giorni ti alleni: le sessioni di “{today.plansWithoutDays[0]!.planName}” verranno distribuite
+              automaticamente.
+            </p>
+          ) : (
+            <p>
+              Hai {today.plansWithoutDays.length} schede senza giorni: scegli per ognuna in quali giorni ti alleni. Ogni giorno
+              può appartenere a una sola scheda.
+            </p>
+          )}
+          <Link
+            to={today.plansWithoutDays.length === 1 ? `/app/schedule?assignment=${today.plansWithoutDays[0]!.assignmentId}` : '/app/schedule'}
+            className="btn btn--primary"
+          >
             Scegli i giorni
           </Link>
         </EmptyState>
@@ -61,7 +85,8 @@ function TodayContent({ today }: { today: Today }) {
         >
           {today.nextTraining ? (
             <p>
-              Prossimo allenamento: <strong>{today.nextTraining.sessionTitle}</strong>, {formatLongDate(today.nextTraining.date)}.
+              Prossimo allenamento: <strong>{today.nextTraining.sessionTitle}</strong>
+              {today.activePlanCount > 1 ? ` di “${today.nextTraining.planName}”` : ''}, {formatLongDate(today.nextTraining.date)}.
             </p>
           ) : null}
           <Link to="/app/calendar" className="btn btn--secondary">

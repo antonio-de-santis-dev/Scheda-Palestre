@@ -76,14 +76,21 @@ export interface Today {
   session: PlanSession | null;
   workout: WorkoutSummary | null;
   pendingWorkout: WorkoutSummary | null;
-  nextTraining: { date: string; sessionTitle: string } | null;
+  nextTraining: { date: string; sessionTitle: string; planName: string } | null;
   canStart: boolean;
+  /** A USER can have several active plans (ADR 0008). */
+  activePlanCount: number;
+  /** Active plans that still have no weekdays: the USER is guided to choose them. */
+  plansWithoutDays: { assignmentId: string; planName: string }[];
 }
 
 export interface CalendarDay {
   date: string;
   type: 'TRAINING' | 'REST' | 'NONE';
   sessionTitle: string | null;
+  /** Plan that trains on that day (null on rest days). */
+  assignmentId: string | null;
+  planName: string | null;
   workout: WorkoutSummary | null;
 }
 

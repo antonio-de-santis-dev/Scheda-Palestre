@@ -158,7 +158,7 @@ test('3. USER chooses the days and sees today workout', async () => {
   for (const day of ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica']) {
     await athlete.getByRole('checkbox', { name: day }).check();
   }
-  await athlete.getByRole('button', { name: 'Salva giorni' }).click();
+  await athlete.getByRole('button', { name: `Salva giorni di ${names.plan}` }).click();
   await expect(athlete.getByText(/Giorni salvati/)).toBeVisible();
 
   await athlete.goto('/app/today');
@@ -200,6 +200,41 @@ test('4-5. USER completes sets with rest timer, skips an exercise and sees it in
   await list.getByRole('link').first().click();
   await expect(athlete.getByRole('region', { name: names.pullUp }).getByText('Saltato')).toBeVisible();
   await expect(athlete.getByRole('region', { name: names.bench }).getByText('Completato')).toBeVisible();
+});
+
+test('5b. ADMIN assigns a second plan and USER shares the week between the two', async () => {
+  const copyName = `${names.plan} (copia)`;
+  await admin.goto('/admin/plans');
+  await admin.getByRole('button', { name: `Duplica ${names.plan}` }).click();
+  await expect(admin).toHaveURL(/\/edit$/);
+  await admin.getByRole('button', { name: 'Salva dati' }).click();
+  await expect(admin.getByText('Nuova scheda creata')).toBeVisible();
+  await admin.getByRole('link', { name: `Assegnazioni di ${copyName}` }).click();
+  await admin.getByLabel(new RegExp(`\\(@${user.username}\\)`)).check();
+  await admin.getByRole('button', { name: 'Assegna' }).click();
+  await expect(admin.getByText('Scheda assegnata', { exact: true })).toBeVisible();
+
+  // The first plan stays active: today the USER is guided to choose the days of the new one.
+  await athlete.goto('/app/today');
+  await athlete.getByRole('link', { name: `Scegli i giorni di ${copyName}` }).click();
+  const copyForm = athlete.getByRole('region', { name: copyName });
+  const monday = copyForm.getByRole('checkbox', { name: /Lunedì/ });
+  await expect(monday).toHaveAttribute('aria-disabled', 'true');
+  await expect(copyForm.getByText(`Occupato da “${names.plan}”`).first()).toBeVisible();
+
+  // Free Sunday in the first plan, then give it to the new plan.
+  const firstForm = athlete.getByRole('region', { name: names.plan, exact: true });
+  await firstForm.getByRole('checkbox', { name: 'Domenica' }).uncheck();
+  await firstForm.getByRole('button', { name: `Salva giorni di ${names.plan}` }).click();
+  await expect(firstForm.getByText(/Giorni salvati/)).toBeVisible();
+  await copyForm.getByRole('checkbox', { name: 'Domenica' }).check();
+  await copyForm.getByRole('button', { name: `Salva giorni di ${copyName}` }).click();
+  await expect(copyForm.getByText(/Giorni salvati/)).toBeVisible();
+
+  await athlete.goto('/app/calendar');
+  await expect(athlete.getByRole('list', { name: 'Giorni' }).getByText(copyName).first()).toBeVisible();
+  await athlete.goto('/app/plans');
+  await expect(athlete.getByRole('region', { name: 'Schede attive (2)' })).toBeVisible();
 });
 
 test('6. ADMIN edits the plan and past history stays unchanged', async () => {

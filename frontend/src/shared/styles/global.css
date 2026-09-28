@@ -861,7 +861,7 @@ svg {
   cursor: pointer;
 }
 
-.weekday span {
+.weekday > span {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -882,6 +882,28 @@ svg {
 .weekday input:focus-visible + span {
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+/* A day used by another plan: still focusable (aria-disabled), reason written next to it. */
+.weekday--taken input {
+  cursor: not-allowed;
+}
+
+.weekday--taken > span {
+  border-style: dashed;
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+}
+
+.weekday__text {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) 0;
+}
+
+.weekday__reason {
+  font-size: var(--text-sm);
+  font-weight: 400;
 }
 
 /* ---------- Plan structure (read-only & editor) ---------- */
@@ -1263,4 +1285,67 @@ svg {
   .catalog__back {
     display: none;
   }
+}
+
+/* ---------- Plan cards (USER): the title link is stretched over the whole card ---------- */
+.plan-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+}
+
+.plan-card {
+  position: relative;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.plan-card:hover {
+  border-color: var(--color-primary-hover);
+}
+
+.plan-card:focus-within {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.plan-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.plan-card__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+}
+
+.plan-card__link {
+  color: var(--color-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.plan-card__link:focus-visible {
+  outline: none;
+}
+
+.plan-card__link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.plan-card__meta {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
 }

@@ -70,7 +70,7 @@ describe('plan assignments (ADMIN)', () => {
       userIds: ['u-1', 'u-2'],
       startDate: '2026-10-05',
       activate: true,
-      copySchedule: true,
+      copySchedule: false,
     });
     expect(usersQuery).toContain('role=USER');
     expect(usersQuery).toContain('active=true');
@@ -105,22 +105,34 @@ describe('plan assignments (ADMIN)', () => {
 });
 
 describe('my plans (USER)', () => {
-  it('lists own assignments and recognises the active one', async () => {
+  it('lists several active plans as fully clickable cards with their days', async () => {
     server.use(
       http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
       http.get('*/api/me/assignments', () =>
         HttpResponse.json([
           assignment({ id: 'old', planName: 'Vecchia', status: 'CLOSED', active: false, endDate: '2026-09-30' }),
           assignment(),
+          assignment({ id: 'as-2', planId: 'plan-2', planName: 'Cardio' }),
+        ]),
+      ),
+      http.get('*/api/me/schedules', () =>
+        HttpResponse.json([
+          { assignmentId: 'as-1', planId: 'plan-1', planName: 'Scheda principianti', startDate: '2026-10-01', weekdays: [1, 3] },
+          { assignmentId: 'as-2', planId: 'plan-2', planName: 'Cardio', startDate: '2026-10-01', weekdays: [] },
         ]),
       ),
     );
     renderApp('/app/plans');
-    const list = await screen.findByRole('list', { name: 'Schede assegnate' });
-    const items = within(list).getAllByRole('listitem');
-    expect(items[0]).toHaveTextContent('Scheda principianti');
-    expect(items[0]).toHaveTextContent('Attiva');
-    expect(items[1]).toHaveTextContent('Chiusa');
+    const active = await screen.findByRole('region', { name: 'Schede attive (2)' });
+    const link = within(active).getByRole('link', { name: 'Scheda principianti' });
+    expect(link).toHaveAttribute('href', '/app/plans/as-1');
+    const card = link.closest('li')!;
+    expect(card).toHaveTextContent('Attiva');
+    expect(await within(card).findByText('Giorni: Lun, Mer')).toBeInTheDocument();
+    expect(within(active).getByText('Giorni non ancora scelti')).toBeInTheDocument();
+    const others = screen.getByRole('region', { name: 'Altre schede' });
+    expect(within(others).getByRole('link', { name: 'Vecchia' })).toBeInTheDocument();
+    expect(others).toHaveTextContent('Chiusa');
   });
 
   it('shows the plan read-only with MAX values', async () => {
