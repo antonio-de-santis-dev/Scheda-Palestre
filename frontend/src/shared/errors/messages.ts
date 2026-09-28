@@ -42,6 +42,10 @@ const MESSAGES: Record<string, string> = {
   RANGE_TOO_LARGE: "L'intervallo richiesto è troppo ampio (massimo 62 giorni).",
   EXERCISE_GROUP_MISMATCH: 'L’esercizio scelto non appartiene al gruppo muscolare di questa sezione.',
   SCHEDULE_DAY_CONFLICT: 'Alcuni giorni sono già usati da un’altra tua scheda attiva.',
+  REST_NOT_FINISHED: 'Il recupero non è ancora finito: la schermata è stata allineata al server.',
+  CANNOT_DELETE_SELF: 'Non puoi eliminare il tuo account.',
+  PROTECTED_ACCOUNT: "L'account ADMIN iniziale non può essere eliminato.",
+  ACCOUNT_DELETED: "L'account è stato eliminato e non può essere modificato.",
   ASSIGNMENT_NOT_ACTIVE: 'La scheda non è attiva: non puoi sceglierne i giorni.',
 };
 

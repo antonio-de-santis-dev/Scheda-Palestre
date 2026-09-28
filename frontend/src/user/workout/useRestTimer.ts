@@ -51,15 +51,20 @@ export function useRestTimer(input: TimerInput | undefined, onVisible: () => voi
     };
   }, [restEndsAt, serverTime, receivedAt]);
 
+  // Back from background, another tab or a sleeping phone: realign with the server.
   useEffect(() => {
-    const handler = () => {
+    const realign = () => {
       if (document.visibilityState === 'visible') {
         setNow(Date.now());
         callbacks.current.onVisible();
       }
     };
-    document.addEventListener('visibilitychange', handler);
-    return () => document.removeEventListener('visibilitychange', handler);
+    document.addEventListener('visibilitychange', realign);
+    window.addEventListener('focus', realign);
+    return () => {
+      document.removeEventListener('visibilitychange', realign);
+      window.removeEventListener('focus', realign);
+    };
   }, []);
 
   const remainingMs = restEndsAt && serverTime ? remainingRestMs(restEndsAt, serverTime, receivedAt, now) : 0;

@@ -181,13 +181,18 @@ test('4-5. USER completes sets with rest timer, skips an exercise and sees it in
   await finish.click();
   const timer = athlete.getByRole('timer');
   await expect(timer).toBeVisible();
+  // During the rest the button stays focusable but waits for the end of the timer.
+  await expect(finish).toHaveAttribute('aria-disabled', 'true');
 
   // The timer survives a reload (state comes from the server).
   await athlete.reload();
   await expect(athlete.getByText('2/2')).toBeVisible();
   await expect(athlete.getByText('Recupero terminato').or(athlete.getByRole('timer'))).toBeVisible();
 
+  // The 3 s rest ends: the button becomes available again.
+  await expect(athlete.getByRole('button', { name: 'Fine serie' })).not.toHaveAttribute('aria-disabled', { timeout: 10_000 });
   await athlete.getByRole('button', { name: 'Fine serie' }).click();
+  await expect(athlete.getByText(`Esercizio completato: ${names.bench}.`)).toBeVisible();
   await expect(athlete.getByRole('heading', { name: names.pullUp })).toBeVisible();
 
   await athlete.getByRole('button', { name: 'Salta esercizio' }).click();

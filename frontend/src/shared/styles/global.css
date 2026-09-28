@@ -1417,3 +1417,36 @@ svg {
 .danger-zone {
   border: 2px solid var(--color-danger);
 }
+
+/* ---------- Workout: waiting button and celebrations ---------- */
+.btn--waiting,
+.btn--waiting:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+  cursor: not-allowed;
+}
+
+.btn__sub {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.celebration--workout {
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .celebration {
+    animation: celebration-in 300ms ease-out;
+  }
+}
+
+@keyframes celebration-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}

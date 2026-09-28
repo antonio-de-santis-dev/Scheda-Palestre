@@ -1,14 +1,29 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { problem, server } from '../../test/server';
 import { normalUser, renderApp } from '../../test/render';
 import { workoutState } from '../../test/workoutFixtures';
 import { remainingRestMs } from './useRestTimer';
 
+const confetti = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+vi.mock('canvas-confetti', () => ({ default: confetti }));
+
+beforeEach(() => {
+  confetti.mockClear();
+  try {
+    window.localStorage.clear();
+  } catch {
+    // ignore
+  }
+});
+
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
+  // @ts-expect-error test cleanup of the optional browser API
+  delete window.matchMedia;
 });
 
 describe('remainingRestMs', () => {
@@ -66,9 +81,15 @@ describe('workout screen', () => {
     const timer = await screen.findByRole('timer');
     expect(calledUrl).toBe('/api/me/workouts/w-1/sets/s-1/complete');
     expect(timer).toHaveTextContent(/1:00|0:59/);
-    // The next set can still be completed during the rest (O-06).
-    expect(screen.getByRole('button', { name: 'Fine serie' })).toBeEnabled();
     expect(screen.getByText('2/2')).toBeInTheDocument();
+    // During the rest the button stays focusable but is not activatable, and says why.
+    const finish = screen.getByRole('button', { name: 'Fine serie' });
+    expect(finish).toHaveAttribute('aria-disabled', 'true');
+    expect(finish).not.toBeDisabled();
+    expect(finish).toHaveAccessibleDescription(/Disponibile al termine del recupero/);
+    calledUrl = '';
+    await user.click(finish);
+    expect(calledUrl).toBe('');
   });
 
   it('counts down and re-aligns with the server when the page becomes visible', async () => {
@@ -102,6 +123,143 @@ describe('workout screen', () => {
       document.dispatchEvent(new Event('visibilitychange'));
     });
     await waitFor(() => expect(fetches).toBeGreaterThan(before));
+  });
+
+  it('re-enables Fine serie at zero with one status announcement (no rest: always available)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const start = Date.now();
+    server.use(
+      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
+      http.get('*/api/me/workouts/:id', () =>
+        HttpResponse.json(
+          workoutState({
+            currentSetId: 's-2',
+            restEndsAt: new Date(start + 5_000).toISOString(),
+            restSeconds: 5,
+            serverTime: new Date(start).toISOString(),
+            nextAction: 'WAIT_FOR_REST',
+          }),
+        ),
+      ),
+    );
+    // Opening the page mid-rest (refresh) keeps the button blocked: the state comes from the server.
+    renderApp('/app/workout/w-1');
+    const finish = await screen.findByRole('button', { name: 'Fine serie' });
+    expect(finish).toHaveAttribute('aria-disabled', 'true');
+    // The countdown is not a live region.
+    expect(screen.getByRole('timer')).toHaveAttribute('aria-live', 'off');
+    await act(async () => {
+      vi.advanceTimersByTime(6_000);
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Fine serie' })).not.toHaveAttribute('aria-disabled'));
+    expect(screen.getAllByText('Recupero terminato: puoi completare la prossima serie.')).toHaveLength(1);
+  });
+
+  it('realigns with the server when the window regains focus', async () => {
+    let fetches = 0;
+    server.use(
+      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
+      http.get('*/api/me/workouts/:id', () => {
+        fetches++;
+        return HttpResponse.json(workoutState());
+      }),
+    );
+    renderApp('/app/workout/w-1');
+    await screen.findByRole('button', { name: 'Fine serie' });
+    const before = fetches;
+    act(() => {
+      window.dispatchEvent(new Event('focus'));
+    });
+    await waitFor(() => expect(fetches).toBeGreaterThan(before));
+  });
+
+  it('celebrates a completed exercise and a new muscle group once, never on refetch', async () => {
+    const done = workoutState({ currentExerciseId: 'e-2', currentSetId: 's-3' });
+    done.exercises[0]!.status = 'COMPLETED';
+    done.exercises[0]!.setsCompleted = 2;
+    done.exercises[1]!.status = 'IN_PROGRESS';
+    let fetches = 0;
+    server.use(
+      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
+      http.get('*/api/me/workouts/:id', () => {
+        fetches++;
+        return HttpResponse.json(fetches === 1 ? workoutState({ currentSetId: 's-2' }) : done);
+      }),
+      http.post('*/api/me/workouts/:id/sets/:setId/complete', () => HttpResponse.json(done)),
+    );
+    renderApp('/app/workout/w-1');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Fine serie' }));
+    expect(await screen.findByText('Esercizio completato: Panca. Nuovo gruppo muscolare: Dorso.')).toBeInTheDocument();
+    await waitFor(() => expect(confetti).toHaveBeenCalledTimes(1));
+
+    // A refetch (tab back in foreground) does not celebrate again.
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await waitFor(() => expect(fetches).toBeGreaterThan(1));
+    expect(confetti).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByText(/Esercizio completato: Panca/)).toHaveLength(1);
+  });
+
+  it('keeps the message but skips the animation with prefers-reduced-motion', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('reduce'), media: query, addEventListener: () => {}, removeEventListener: () => {} }));
+    const finished = workoutState({ status: 'COMPLETED', currentExerciseId: null, currentSetId: null, nextAction: 'FINISHED', finishedAt: '2026-10-05T09:00:00Z' });
+    server.use(
+      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
+      http.get('*/api/me/workouts/:id', () => HttpResponse.json(workoutState())),
+      http.post('*/api/me/workouts/:id/sets/:setId/complete', () => HttpResponse.json(finished)),
+    );
+    renderApp('/app/workout/w-1');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Fine serie' }));
+    expect(await screen.findByText('Allenamento completato! Ottimo lavoro.')).toBeInTheDocument();
+    expect(confetti).not.toHaveBeenCalled();
+  });
+
+  it('offers optional Italian voice guidance, off by default and remembered', async () => {
+    const speak = vi.fn();
+    const cancel = vi.fn();
+    class Utterance {
+      lang = '';
+      voice: unknown = null;
+      text: string;
+      constructor(text: string) {
+        this.text = text;
+      }
+    }
+    vi.stubGlobal('speechSynthesis', { speak, cancel, getVoices: () => [], addEventListener: vi.fn(), removeEventListener: vi.fn() });
+    vi.stubGlobal('SpeechSynthesisUtterance', Utterance);
+    server.use(
+      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
+      http.get('*/api/me/workouts/:id', () => HttpResponse.json(workoutState())),
+      http.post('*/api/me/workouts/:id/sets/:setId/complete', () => HttpResponse.json(workoutState({ currentSetId: 's-2' }))),
+    );
+    renderApp('/app/workout/w-1');
+    const user = userEvent.setup();
+    const toggle = await screen.findByRole('button', { name: 'Guida vocale' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await user.click(screen.getByRole('button', { name: 'Fine serie' }));
+    await screen.findByText('2/2');
+    expect(speak).not.toHaveBeenCalled();
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(window.localStorage.getItem('gymplanner.audio')).toBe('on');
+    expect(cancel).toHaveBeenCalled();
+    const spoken = speak.mock.calls.map((c) => (c[0] as Utterance).text);
+    expect(spoken).toEqual(['Audio attivato']);
+    expect((speak.mock.calls[0]![0] as Utterance).lang).toBe('it-IT');
+  });
+
+  it('hides the voice control when the browser has no speech synthesis', async () => {
+    server.use(
+      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
+      http.get('*/api/me/workouts/:id', () => HttpResponse.json(workoutState())),
+    );
+    renderApp('/app/workout/w-1');
+    await screen.findByRole('button', { name: 'Fine serie' });
+    expect(screen.queryByRole('button', { name: 'Guida vocale' })).not.toBeInTheDocument();
   });
 
   it('asks confirmation before skipping and shows the skipped state', async () => {
