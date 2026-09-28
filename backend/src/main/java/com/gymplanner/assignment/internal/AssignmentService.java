@@ -153,6 +153,25 @@ class AssignmentService implements AssignmentQueries {
         }
     }
 
+    /**
+     * ADR 0009: active assignments whose plan's recommended duration has ended, for every user.
+     * Two bulk queries (ended plans, then their active assignments), never one per user.
+     */
+    @Transactional(readOnly = true)
+    public List<AssignmentDtos.EndedDurationResponse> recommendedDurationEnded() {
+        Map<UUID, PlanSummary> ended = plans.findPlansWithRecommendedDurationEnded(calendar.today());
+        if (ended.isEmpty()) {
+            return List.of();
+        }
+        return assignments.findByWorkoutPlanIdInAndActiveTrue(ended.keySet()).stream()
+                .map(a -> {
+                    PlanSummary p = ended.get(a.getWorkoutPlanId());
+                    return new AssignmentDtos.EndedDurationResponse(a.getUserId(), a.getId(), p.id(), p.name(),
+                            p.expiresOn());
+                })
+                .toList();
+    }
+
     // ------------------------------------------------------------------ USER
 
     @Transactional(readOnly = true)
@@ -255,6 +274,7 @@ class AssignmentService implements AssignmentQueries {
     private List<AssignmentResponse> toResponses(Collection<PlanAssignment> list, Map<UUID, CopyResult> copies) {
         Map<UUID, UserSummary> userMap = users.findAll(list.stream().map(PlanAssignment::getUserId).toList());
         Map<UUID, PlanSummary> planMap = plans.findPlans(list.stream().map(PlanAssignment::getWorkoutPlanId).toList());
+        LocalDate today = calendar.today();
         return list.stream().map(a -> {
             UserSummary u = userMap.get(a.getUserId());
             PlanSummary p = planMap.get(a.getWorkoutPlanId());
@@ -262,7 +282,8 @@ class AssignmentService implements AssignmentQueries {
                     u == null ? "?" : u.username(), a.getWorkoutPlanId(), p == null ? "?" : p.name(),
                     p != null && p.deleted(), a.getStartDate(), a.getEndDate(), a.isActive(), a.status().name(),
                     a.getCreatedAt(), copies.getOrDefault(a.getId(), CopyResult.NONE).copied(),
-                    copies.getOrDefault(a.getId(), CopyResult.NONE).skipped());
+                    copies.getOrDefault(a.getId(), CopyResult.NONE).skipped(), p == null ? null : p.expiresOn(),
+                    a.isActive() && p != null && p.recommendedDurationEnded(today));
         }).toList();
     }
 }

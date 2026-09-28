@@ -37,6 +37,12 @@ class AdminAssignmentController {
         return service.listForUser(userId);
     }
 
+    /** Users with at least one active plan past its recommended duration (ADR 0009). */
+    @GetMapping("/api/admin/assignments/recommended-duration-ended")
+    List<AssignmentDtos.EndedDurationResponse> recommendedDurationEnded() {
+        return service.recommendedDurationEnded();
+    }
+
     @PostMapping("/api/admin/assignments")
     ResponseEntity<List<AssignmentResponse>> assign(@Valid @RequestBody AssignRequest body,
             @AuthenticationPrincipal AuthenticatedUser admin) {

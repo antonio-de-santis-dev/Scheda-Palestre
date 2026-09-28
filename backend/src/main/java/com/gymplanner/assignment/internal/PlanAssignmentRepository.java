@@ -17,6 +17,8 @@ interface PlanAssignmentRepository extends JpaRepository<PlanAssignment, UUID> {
 
     List<PlanAssignment> findByWorkoutPlanIdAndActiveTrue(UUID workoutPlanId);
 
+    List<PlanAssignment> findByWorkoutPlanIdInAndActiveTrue(java.util.Collection<UUID> workoutPlanIds);
+
     List<PlanAssignment> findByWorkoutPlanIdOrderByCreatedAtDesc(UUID workoutPlanId);
 
     List<PlanAssignment> findByUserIdOrderByCreatedAtDesc(UUID userId);

@@ -49,6 +49,10 @@ class TodayService {
     record PlanRef(UUID assignmentId, String planName) {
     }
 
+    /** An active plan past its recommended duration (ADR 0009): informative, never blocking. */
+    record EndedPlan(UUID assignmentId, String planName, LocalDate expiresOn) {
+    }
+
     /**
      * {@code assignmentId}/{@code planName} describe the plan resolved for the date: the plan that
      * trains that day (or owns the workout of that day); on other days they are filled only when
@@ -56,7 +60,8 @@ class TodayService {
      */
     record TodayResponse(LocalDate date, TodayStatus status, UUID assignmentId, String planName, List<Integer> weekdays,
             PlanStructure.Session session, WorkoutSummary workout, WorkoutSummary pendingWorkout,
-            NextTraining nextTraining, boolean canStart, int activePlanCount, List<PlanRef> plansWithoutDays) {
+            NextTraining nextTraining, boolean canStart, int activePlanCount, List<PlanRef> plansWithoutDays,
+            List<EndedPlan> recommendedDurationEnded) {
     }
 
     enum DayType {
@@ -100,7 +105,7 @@ class TodayService {
         List<AssignmentView> active = assignments.listActiveForUser(userId);
         if (active.isEmpty()) {
             return new TodayResponse(date, TodayStatus.NO_ACTIVE_ASSIGNMENT, null, null, List.of(), null, null,
-                    pending, null, false, 0, List.of());
+                    pending, null, false, 0, List.of(), List.of());
         }
         Map<UUID, PlanSummary> names = plans.findPlans(active.stream().map(AssignmentView::planId).toList());
         Map<UUID, Set<Integer>> days = new HashMap<>();
@@ -111,6 +116,11 @@ class TodayService {
         }
         List<PlanRef> withoutDays = active.stream().filter(a -> days.get(a.id()).isEmpty())
                 .map(a -> new PlanRef(a.id(), name(names, a))).toList();
+        LocalDate businessToday = calendar.today();
+        List<EndedPlan> ended = active.stream()
+                .filter(a -> names.containsKey(a.planId()) && names.get(a.planId()).recommendedDurationEnded(businessToday))
+                .map(a -> new EndedPlan(a.id(), name(names, a), names.get(a.planId()).expiresOn()))
+                .toList();
 
         // The plan of the day: the one that owns a workout on that date, else the one that trains.
         Map<UUID, Workout> workoutByAssignment = new HashMap<>();
@@ -129,7 +139,7 @@ class TodayService {
             return new TodayResponse(date, status, single == null ? null : single.id(),
                     single == null ? null : name(names, single),
                     single == null ? List.of() : List.copyOf(days.get(single.id())), null, null, pending, next, false,
-                    active.size(), withoutDays);
+                    active.size(), withoutDays, ended);
         }
 
         PlanStructure structure = plans.getStructure(chosen.planId());
@@ -152,7 +162,7 @@ class TodayService {
                 && dateAllowed;
         return new TodayResponse(date, status, chosen.id(), structure.name(), List.copyOf(days.get(chosen.id())),
                 session, workoutOfDay == null ? null : WorkoutSummary.of(workoutOfDay), pending, next, canStart,
-                active.size(), withoutDays);
+                active.size(), withoutDays, ended);
     }
 
     private static TodayStatus aggregateStatus(List<AssignmentView> active, Map<UUID, Set<Integer>> days,

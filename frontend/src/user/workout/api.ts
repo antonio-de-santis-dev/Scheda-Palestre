@@ -82,6 +82,8 @@ export interface Today {
   activePlanCount: number;
   /** Active plans that still have no weekdays: the USER is guided to choose them. */
   plansWithoutDays: { assignmentId: string; planName: string }[];
+  /** Active plans past their recommended duration (informative, ADR 0009). */
+  recommendedDurationEnded: { assignmentId: string; planName: string; expiresOn: string }[];
 }
 
 export interface CalendarDay {

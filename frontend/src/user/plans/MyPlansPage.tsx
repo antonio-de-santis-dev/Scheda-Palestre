@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { ClipboardList } from 'lucide-react';
+import { CalendarX2, ClipboardList } from 'lucide-react';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { EmptyState, QueryState } from '../../shared/components/States';
 import { formatDate, WEEKDAYS } from '../../shared/utils/format';
@@ -71,6 +71,11 @@ function PlanCards({ items, daysOf }: { items: MyAssignment[]; daysOf?: (id: str
             {a.endDate ? ` al ${formatDate(a.endDate)}` : ''}
           </p>
           {daysOf ? <p className="plan-card__meta">{weekdaysText(daysOf(a.id))}</p> : null}
+          {a.recommendedDurationEnded && a.planExpiresOn ? (
+            <p className="plan-card__warning">
+              <CalendarX2 size={16} aria-hidden="true" /> Durata consigliata terminata il {formatDate(a.planExpiresOn)}
+            </p>
+          ) : null}
         </li>
       ))}
     </ul>

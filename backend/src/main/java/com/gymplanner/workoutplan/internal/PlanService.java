@@ -11,6 +11,7 @@ import com.gymplanner.workoutplan.api.WorkoutPlanQueries;
 import com.gymplanner.workoutplan.internal.PlanDtos.CreatePlanRequest;
 import com.gymplanner.workoutplan.internal.PlanDtos.UpdatePlanRequest;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -130,6 +131,13 @@ class PlanService implements WorkoutPlanQueries {
 
     @Override
     @Transactional(readOnly = true)
+    public Map<UUID, PlanSummary> findPlansWithRecommendedDurationEnded(LocalDate today) {
+        return plans.findByDeletedAtIsNullAndExpiresOnBefore(today).stream().map(PlanService::summary)
+                .collect(Collectors.toMap(PlanSummary::id, Function.identity()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Map<UUID, PlanSummary> findPlans(Collection<UUID> planIds) {
         if (planIds.isEmpty()) {
             return Map.of();
@@ -178,7 +186,7 @@ class PlanService implements WorkoutPlanQueries {
     }
 
     private static PlanSummary summary(WorkoutPlan plan) {
-        return new PlanSummary(plan.getId(), plan.getName(), plan.isDeleted());
+        return new PlanSummary(plan.getId(), plan.getName(), plan.isDeleted(), plan.getExpiresOn());
     }
 
     private static String blankToNull(String value) {

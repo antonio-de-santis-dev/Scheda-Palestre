@@ -116,7 +116,7 @@ export function PlansPage() {
                     <div className="list-item__title">{plan.name}</div>
                     <div className="list-item__meta">
                       {plan.sessionCount} {plan.sessionCount === 1 ? 'sessione' : 'sessioni'}
-                      {plan.expiresOn ? ` · scade il ${formatDate(plan.expiresOn)}` : ''} · modificata il{' '}
+                      {plan.expiresOn ? ` · durata consigliata fino al ${formatDate(plan.expiresOn)}` : ''} · modificata il{' '}
                       {formatDateTime(plan.updatedAt)}
                     </div>
                   </div>

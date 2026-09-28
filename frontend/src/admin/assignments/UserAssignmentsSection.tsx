@@ -3,6 +3,8 @@ import { QueryState } from '../../shared/components/States';
 import { formatDate } from '../../shared/utils/format';
 import { useUserAssignments } from './api';
 import { AssignmentStatusBadge } from './AssignmentStatusBadge';
+import { CalendarX2 } from 'lucide-react';
+import { StatusBadge } from '../../shared/components/StatusBadge';
 
 export function UserAssignmentsSection({ userId }: { userId: string }) {
   const query = useUserAssignments(userId);
@@ -27,6 +29,13 @@ export function UserAssignmentsSection({ userId }: { userId: string }) {
                     {a.endDate ? ` al ${formatDate(a.endDate)}` : ''}
                     {a.planDeleted ? ' · scheda eliminata' : ''}
                   </div>
+                  {a.recommendedDurationEnded && a.planExpiresOn ? (
+                    <div className="list-item__meta">
+                      <StatusBadge tone="warning" icon={<CalendarX2 size={14} aria-hidden="true" />}>
+                        Durata consigliata terminata il {formatDate(a.planExpiresOn)}
+                      </StatusBadge>
+                    </div>
+                  ) : null}
                 </div>
                 <AssignmentStatusBadge status={a.status} />
               </li>

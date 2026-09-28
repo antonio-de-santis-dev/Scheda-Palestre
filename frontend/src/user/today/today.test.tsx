@@ -24,6 +24,7 @@ function today(overrides: Partial<Today> = {}): Today {
     canStart: true,
     activePlanCount: 1,
     plansWithoutDays: [],
+    recommendedDurationEnded: [],
     ...overrides,
   };
 }
@@ -59,6 +60,23 @@ describe('today page', () => {
     renderApp('/app/today');
     expect(await screen.findByRole('heading', { name: 'Giorno di riposo' })).toBeInTheDocument();
     expect(screen.getByText('Giorno 2')).toBeInTheDocument();
+  });
+
+  it('shows the end of the recommended duration without blocking the workout', async () => {
+    server.use(
+      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
+      http.get('*/api/me/today', () =>
+        HttpResponse.json(
+          today({ recommendedDurationEnded: [{ assignmentId: 'as-1', planName: 'Scheda principianti', expiresOn: '2026-10-04' }] }),
+        ),
+      ),
+    );
+    renderApp('/app/today');
+    const notice = await screen.findByText('Durata consigliata terminata: “Scheda principianti”');
+    expect(notice.closest('[role="status"]')).toHaveTextContent(
+      'La durata consigliata della scheda è terminata il 4 ottobre 2026. Contatta la palestra per riceverne una nuova.',
+    );
+    expect(screen.getByRole('button', { name: 'Inizia allenamento' })).toBeEnabled();
   });
 
   it('asks to choose the days when none is set', async () => {

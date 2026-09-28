@@ -10,6 +10,7 @@ import { PlanSessionView } from '../../shared/components/PlanSessionView';
 import { formatDate, formatLongDate, todayIso } from '../../shared/utils/format';
 import { useToday, useWorkoutAction, workoutApi, type Today } from '../workout/api';
 import { WorkoutStatusBadge } from '../workout/ExerciseStatusBadge';
+import { RecommendedDurationNotice } from '../../shared/components/RecommendedDurationNotice';
 
 /** US-16: planned workout, rest day, plan in preparation or missing days. */
 export function TodayPage() {
@@ -32,6 +33,10 @@ function TodayContent({ today }: { today: Today }) {
   return (
     <div className="stack">
       {today.pendingWorkout ? <PendingWorkout today={today} /> : null}
+
+      {today.recommendedDurationEnded.map((p) => (
+        <RecommendedDurationNotice key={p.assignmentId} planName={p.planName} expiresOn={p.expiresOn} />
+      ))}
 
       {today.status !== 'NO_SCHEDULE'
         ? today.plansWithoutDays.map((p) => (

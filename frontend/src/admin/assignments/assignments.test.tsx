@@ -20,6 +20,8 @@ const assignment = (overrides: Partial<Assignment> = {}): Assignment => ({
   active: true,
   status: 'ACTIVE',
   createdAt: '2026-10-01T08:00:00Z',
+  planExpiresOn: null,
+  recommendedDurationEnded: false,
   ...overrides,
 });
 

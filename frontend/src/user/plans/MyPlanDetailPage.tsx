@@ -8,6 +8,7 @@ import { AssignmentStatusBadge } from '../../admin/assignments/AssignmentStatusB
 import { useSchedules } from '../schedule/api';
 import { useMyAssignments, useMyPlan } from './api';
 import { weekdaysText } from './MyPlansPage';
+import { RecommendedDurationNotice } from '../../shared/components/RecommendedDurationNotice';
 
 /** Read-only plan: sessions > muscle groups > exercises > sets/reps/rest, with real headings. */
 export function MyPlanDetailPage() {
@@ -39,6 +40,9 @@ export function MyPlanDetailPage() {
                   </>
                 ) : null}
               </div>
+            ) : null}
+            {assignment?.recommendedDurationEnded && assignment.planExpiresOn ? (
+              <RecommendedDurationNotice planName={plan.name} expiresOn={assignment.planExpiresOn} />
             ) : null}
             {plan.description ? <p>{plan.description}</p> : null}
             {plan.sessions.length === 0 ? <p className="muted">La scheda è in preparazione.</p> : null}

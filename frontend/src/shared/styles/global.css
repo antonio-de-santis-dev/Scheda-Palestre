@@ -1349,3 +1349,13 @@ svg {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
+
+.plan-card__warning {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  color: var(--color-warning);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}

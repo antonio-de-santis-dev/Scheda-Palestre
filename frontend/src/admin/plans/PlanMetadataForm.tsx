@@ -63,9 +63,9 @@ export function PlanMetadataForm({ initial, submitLabel, pending, error, disable
         <div className="form-grid form-grid--2">
           <TextField label="Nome scheda" required error={errors.name?.message} {...register('name')} />
           <TextField
-            label="Scadenza"
+            label="Fine durata consigliata"
             type="date"
-            hint="Facoltativa, solo informativa"
+            hint="Facoltativa. Dal giorno dopo l'utente vede un avviso; la scheda resta utilizzabile."
             error={errors.expiresOn?.message}
             {...register('expiresOn')}
           />

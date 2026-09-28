@@ -45,6 +45,22 @@ describe('users page', () => {
     expect(within(list).getByText('Bloccato')).toBeInTheDocument();
   });
 
+  it('marks users with an active plan past its recommended duration', async () => {
+    asAdmin();
+    server.use(
+      http.get('*/api/admin/users', () => HttpResponse.json(page([mario, { ...mario, id: '2', username: 'luigi' }]))),
+      http.get('*/api/admin/assignments/recommended-duration-ended', () =>
+        HttpResponse.json([{ userId: mario.id, assignmentId: 'as-1', planId: 'p-1', planName: 'Forza', expiresOn: '2026-10-04' }]),
+      ),
+    );
+    renderApp('/admin/users');
+    const list = await screen.findByRole('list', { name: 'Elenco utenti' });
+    await waitFor(() => expect(within(list).getAllByText('Scheda da rinnovare')).toHaveLength(1));
+    const [first, second] = within(list).getAllByRole('listitem');
+    expect(first).toHaveTextContent('Scheda da rinnovare');
+    expect(second).not.toHaveTextContent('Scheda da rinnovare');
+  });
+
   it('creates a user and shows the temporary password once', async () => {
     asAdmin();
     let body: unknown = null;
