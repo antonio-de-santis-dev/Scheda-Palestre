@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -54,16 +55,20 @@ class WorkoutService {
     /** Spec 10.7: validation + immutable snapshot in a single transaction. */
     @Transactional
     public WorkoutState start(UUID userId, LocalDate date) {
-        AssignmentView assignment = assignments.findActiveForUser(userId)
-                .orElseThrow(() -> new BusinessRuleException("NO_ACTIVE_ASSIGNMENT", "No active plan assignment"));
+        List<AssignmentView> active = assignments.listActiveForUser(userId);
+        if (active.isEmpty()) {
+            throw new BusinessRuleException("NO_ACTIVE_ASSIGNMENT", "No active plan assignment");
+        }
         LocalDate today = calendar.today();
         if (Math.abs(ChronoUnit.DAYS.between(today, date)) > START_TOLERANCE_DAYS) {
             throw new BusinessRuleException("DATE_NOT_ALLOWED", "Only today's workout can be started");
         }
+        // ADR 0008: a weekday belongs to at most one active plan, so at most one plan trains today.
+        AssignmentView assignment = active.stream()
+                .filter(a -> calendarQueries.dayPlan(a, date).isTraining())
+                .findFirst()
+                .orElseThrow(() -> new BusinessRuleException("NOT_A_TRAINING_DAY", "The date is not a planned training day"));
         DayPlan day = calendarQueries.dayPlan(assignment, date);
-        if (!day.isTraining()) {
-            throw new BusinessRuleException("NOT_A_TRAINING_DAY", "The date is not a planned training day");
-        }
         plans.requireExecutable(assignment.planId());
         if (workouts.existsByPlanAssignmentIdAndScheduledDate(assignment.id(), date)) {
             throw new ConflictException("WORKOUT_ALREADY_EXISTS", "The workout of this day was already started");

@@ -74,27 +74,31 @@ class AssignmentIntegrationTest {
         Api.Response forPlan = api.get(admin, "/api/admin/plans/" + plan.planId() + "/assignments").expect(200);
         assertThat((List<String>) forPlan.read("$[*].userId")).containsExactlyInAnyOrder(a.id().toString(), b.id().toString());
 
-        PlanAssignment stored = repository.findByUserIdAndActiveTrue(a.id()).orElseThrow();
+        PlanAssignment stored = repository.findByUserIdAndActiveTrueOrderByCreatedAtAsc(a.id()).getFirst();
         assertThat(stored.getRotationAnchorDate()).isEqualTo(TODAY);
         assertThat(stored.getRotationAnchorIndex()).isZero();
         assertThat(stored.getAssignedBy()).isEqualTo(admin.id());
     }
 
     @Test
-    void activatingANewPlanClosesThePreviousOne() {
+    void aSecondPlanCanBeActiveTogetherWithTheFirstOneAndItsWorkoutInProgress() {
         BuiltPlan first = factory.executablePlan(admin, "Prima", 1, 1, 2);
         BuiltPlan second = factory.executablePlan(admin, "Seconda", 1, 1, 2);
         AuthenticatedUser user = fixtures.createUser();
         String firstId = api.post(admin, "/api/admin/assignments",
                 assignJson(first.planId(), List.of(user.id()), TODAY.minusDays(10), true)).expect(201).read("$[0].id");
+        // TODAY is a Monday: the user trains the first plan and starts the workout.
+        api.put(user, "/api/me/assignments/" + firstId + "/schedule", "{\"weekdays\":[1]}").expect(200);
+        String workoutId = api.post(user, "/api/me/workouts", "{\"date\":\"" + TODAY + "\"}").expect(201).read("$.workoutId");
+
         api.post(admin, "/api/admin/assignments", assignJson(second.planId(), List.of(user.id()), TODAY, true))
                 .expect(201);
 
         Api.Response mine = api.get(admin, "/api/admin/users/" + user.id() + "/assignments").expect(200);
-        assertThat((List<String>) mine.read("$[*].status")).containsExactly("ACTIVE", "CLOSED");
-        PlanAssignment closed = repository.findById(UUID.fromString(firstId)).orElseThrow();
-        assertThat(closed.isActive()).isFalse();
-        assertThat(closed.getEndDate()).isEqualTo(TODAY);
+        assertThat((List<String>) mine.read("$[*].status")).containsExactly("ACTIVE", "ACTIVE");
+        assertThat(repository.findById(UUID.fromString(firstId)).orElseThrow().isActive()).isTrue();
+        assertThat(jdbc.queryForObject("select status from workouts where id = ?::uuid", String.class, workoutId))
+                .isEqualTo("IN_PROGRESS");
     }
 
     @Test
@@ -107,7 +111,7 @@ class AssignmentIntegrationTest {
     }
 
     @Test
-    void databaseAllowsOnlyOneActiveAssignmentPerUser() {
+    void databaseAllowsOneActiveAssignmentPerUserAndPlan() {
         BuiltPlan p1 = factory.executablePlan(admin, "Indice 1", 1, 1, 2);
         BuiltPlan p2 = factory.executablePlan(admin, "Indice 2", 1, 1, 2);
         AuthenticatedUser user = fixtures.createUser();
@@ -116,7 +120,10 @@ class AssignmentIntegrationTest {
                                               rotation_anchor_date, rotation_anchor_index, created_at)
                 values (?, ?, ?, ?, ?, true, ?, 0, now())""";
         jdbc.update(sql, UUID.randomUUID(), user.id(), p1.planId(), admin.id(), TODAY, TODAY);
-        assertThatThrownBy(() -> jdbc.update(sql, UUID.randomUUID(), user.id(), p2.planId(), admin.id(), TODAY, TODAY))
+        // Another plan can be active at the same time (ADR 0008)...
+        jdbc.update(sql, UUID.randomUUID(), user.id(), p2.planId(), admin.id(), TODAY, TODAY);
+        // ...but never the same plan twice.
+        assertThatThrownBy(() -> jdbc.update(sql, UUID.randomUUID(), user.id(), p1.planId(), admin.id(), TODAY, TODAY))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -167,10 +174,14 @@ class AssignmentIntegrationTest {
     @Test
     void deletingAPlanClosesItsActiveAssignments() {
         BuiltPlan plan = factory.executablePlan(admin, "Chiusura", 1, 1, 2);
+        BuiltPlan other = factory.executablePlan(admin, "Resta attiva", 1, 1, 2);
         AuthenticatedUser user = fixtures.createUser();
+        api.post(admin, "/api/admin/assignments", assignJson(other.planId(), List.of(user.id()), TODAY, true)).expect(201);
         api.post(admin, "/api/admin/assignments", assignJson(plan.planId(), List.of(user.id()), TODAY, true)).expect(201);
         api.delete(admin, "/api/admin/plans/" + plan.planId()).expect(204);
-        assertThat(repository.findByUserIdAndActiveTrue(user.id())).isEmpty();
+        // Only the assignment of the deleted plan is closed (ADR 0008).
+        assertThat(repository.findByUserIdAndActiveTrueOrderByCreatedAtAsc(user.id()))
+                .extracting(PlanAssignment::getWorkoutPlanId).containsExactly(other.planId());
         assertThat((String) api.get(user, "/api/me/assignments").read("$[0].status")).isEqualTo("CLOSED");
         api.post(admin, "/api/admin/assignments", assignJson(plan.planId(), List.of(user.id()), TODAY, true))
                 .expectCode(422, "PLAN_DELETED");

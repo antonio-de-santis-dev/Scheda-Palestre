@@ -14,8 +14,8 @@ final class AssignmentDtos {
     }
 
     /**
-     * Spec 13.5. {@code copySchedule} (O-07, default true) copies the weekly days of the user's
-     * previous active assignment when activating.
+     * Spec 13.5. {@code copySchedule} (ADR 0008, default false): when activating, copy from the
+     * user's most recently closed plan only the weekdays that are still free.
      */
     record AssignRequest(
             @NotNull UUID planId,
@@ -25,19 +25,23 @@ final class AssignmentDtos {
             Boolean copySchedule) {
 
         boolean copy() {
-            return copySchedule == null || copySchedule;
+            return Boolean.TRUE.equals(copySchedule);
         }
     }
 
     record ActivateRequest(Boolean copySchedule) {
 
         boolean copy() {
-            return copySchedule == null || copySchedule;
+            return Boolean.TRUE.equals(copySchedule);
         }
     }
 
+    /**
+     * {@code copiedWeekdays}/{@code skippedWeekdays} are filled only by an activation that asked
+     * for the copy: skipped days were already used by another active plan of the user.
+     */
     record AssignmentResponse(UUID id, UUID userId, String userFullName, String username, UUID planId,
             String planName, boolean planDeleted, LocalDate startDate, LocalDate endDate, boolean active,
-            String status, Instant createdAt) {
+            String status, Instant createdAt, List<Integer> copiedWeekdays, List<Integer> skippedWeekdays) {
     }
 }

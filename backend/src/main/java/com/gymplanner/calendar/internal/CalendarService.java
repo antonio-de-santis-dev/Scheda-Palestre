@@ -1,15 +1,18 @@
 package com.gymplanner.calendar.internal;
 
-import com.gymplanner.assignment.api.AssignmentEvents;
 import com.gymplanner.assignment.api.AssignmentQueries;
 import com.gymplanner.assignment.api.AssignmentView;
 import com.gymplanner.calendar.api.CalendarQueries;
 import com.gymplanner.calendar.api.DayPlan;
 import com.gymplanner.calendar.api.RotationCalculator;
 import com.gymplanner.shared.error.BadRequestException;
+import com.gymplanner.shared.concurrency.UserLock;
 import com.gymplanner.shared.error.BusinessRuleException;
+import com.gymplanner.shared.error.ConflictException;
+import com.gymplanner.shared.error.NotFoundException;
 import com.gymplanner.shared.time.BusinessCalendar;
 import com.gymplanner.workoutplan.api.PlanSessionRef;
+import com.gymplanner.workoutplan.api.PlanSummary;
 import com.gymplanner.workoutplan.api.WorkoutPlanEvents;
 import com.gymplanner.workoutplan.api.WorkoutPlanQueries;
 import java.time.LocalDate;
@@ -17,7 +20,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -28,8 +33,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Weekly days and session rotation (US-15, spec 10.6). The rotation anchor is owned by the
- * assignment module and moved through its public API.
+ * Weekly days and session rotation (US-15, spec 10.6). Days belong to one assignment; a weekday
+ * can be used by only one active plan of the same user (ADR 0008): the check runs under the
+ * per-user advisory lock so concurrent requests from several tabs or devices cannot both win.
+ * The rotation anchor is owned by the assignment module and moved through its public API.
  */
 @Service
 class CalendarService implements CalendarQueries {
@@ -40,32 +47,41 @@ class CalendarService implements CalendarQueries {
     private final AssignmentQueries assignments;
     private final WorkoutPlanQueries plans;
     private final BusinessCalendar calendar;
+    private final UserLock userLock;
 
     CalendarService(WeeklyScheduleRepository schedules, AssignmentQueries assignments, WorkoutPlanQueries plans,
-            BusinessCalendar calendar) {
+            BusinessCalendar calendar, UserLock userLock) {
         this.schedules = schedules;
         this.assignments = assignments;
         this.plans = plans;
         this.calendar = calendar;
+        this.userLock = userLock;
     }
 
-    record Schedule(UUID assignmentId, Set<Integer> weekdays) {
+    /** The days of one active plan of the user. */
+    record PlanSchedule(UUID assignmentId, UUID planId, String planName, LocalDate startDate, Set<Integer> weekdays) {
+    }
+
+    /** A requested day already used by another active plan of the same user. */
+    record DayConflict(int weekday, UUID assignmentId, String planName) {
     }
 
     // ------------------------------------------------------------------ USER
 
+    /** Every active plan of the user with its days (bulk queries, no N+1). */
     @Transactional(readOnly = true)
-    public Schedule mySchedule(UUID userId) {
-        return assignments.findActiveForUser(userId)
-                .map(a -> new Schedule(a.id(), weekdays(a.id())))
-                .orElse(new Schedule(null, Set.of()));
+    public List<PlanSchedule> mySchedules(UUID userId) {
+        return schedulesOf(assignments.listActiveForUser(userId));
     }
 
-    /** Replaces the days and re-anchors the rotation without touching existing workouts. */
+    /**
+     * Replaces the days of one active plan of the user and re-anchors its rotation without touching
+     * existing workouts (a workout in progress keeps running: it belongs to its assignment and the
+     * new days apply to future dates). Days used by another active plan are refused with 409
+     * {@code SCHEDULE_DAY_CONFLICT}.
+     */
     @Transactional
-    public Schedule replaceMySchedule(UUID userId, Collection<Integer> requested) {
-        AssignmentView assignment = assignments.findActiveForUser(userId)
-                .orElseThrow(() -> new BusinessRuleException("NO_ACTIVE_ASSIGNMENT", "No active plan assignment"));
+    public PlanSchedule replaceSchedule(UUID userId, UUID assignmentId, Collection<Integer> requested) {
         Set<Integer> newDays = new TreeSet<>();
         for (Integer day : requested) {
             if (day == null || !RotationCalculator.isValidWeekday(day)) {
@@ -73,34 +89,63 @@ class CalendarService implements CalendarQueries {
             }
             newDays.add(day);
         }
-        Set<Integer> oldDays = weekdays(assignment.id());
-        if (oldDays.equals(newDays)) {
-            return new Schedule(assignment.id(), oldDays);
+        // Other users' assignments are indistinguishable from missing ones.
+        assignments.findForUser(assignmentId, userId).orElseThrow(() -> new NotFoundException("Assignment"));
+
+        userLock.lock(userId);
+        // Re-read inside the lock: the set of active plans and their days is now stable.
+        List<AssignmentView> active = assignments.listActiveForUser(userId);
+        AssignmentView assignment = active.stream().filter(a -> a.id().equals(assignmentId)).findFirst()
+                .orElseThrow(() -> new BusinessRuleException("ASSIGNMENT_NOT_ACTIVE",
+                        "Days can be chosen only for an active plan"));
+        List<DayConflict> conflicts = conflicts(assignment, active, newDays);
+        if (!conflicts.isEmpty()) {
+            throw new ConflictException("SCHEDULE_DAY_CONFLICT",
+                    "Some days are already used by another active plan of the user")
+                    .with("conflicts", conflicts);
         }
-        int sessionCount = plans.sessionsInOrder(assignment.planId()).size();
-        reanchor(assignment, oldDays, sessionCount, index -> index);
-        schedules.deleteByAssignment(assignment.id());
-        newDays.forEach(day -> schedules.save(new WeeklySchedule(assignment.id(), day)));
-        schedules.flush();
-        log.info("Assignment id={} weekly schedule replaced", assignment.id());
-        return new Schedule(assignment.id(), newDays);
+        Set<Integer> oldDays = weekdays(assignment.id());
+        if (!oldDays.equals(newDays)) {
+            int sessionCount = plans.sessionsInOrder(assignment.planId()).size();
+            reanchor(assignment, oldDays, sessionCount, index -> index);
+            schedules.deleteByAssignment(assignment.id());
+            newDays.forEach(day -> schedules.save(new WeeklySchedule(assignment.id(), day)));
+            schedules.flush();
+            log.info("Assignment id={} weekly schedule replaced", assignment.id());
+        }
+        return schedulesOf(List.of(assignment)).getFirst();
     }
 
-    // ------------------------------------------------------------------ events
+    private List<DayConflict> conflicts(AssignmentView target, List<AssignmentView> active, Set<Integer> newDays) {
+        List<AssignmentView> others = active.stream().filter(a -> !a.id().equals(target.id())).toList();
+        if (others.isEmpty() || newDays.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, PlanSummary> names = plans.findPlans(others.stream().map(AssignmentView::planId).toList());
+        Map<UUID, UUID> planOf = others.stream().collect(Collectors.toMap(AssignmentView::id, AssignmentView::planId));
+        return schedules.findByPlanAssignmentIdIn(planOf.keySet()).stream()
+                .filter(s -> newDays.contains(s.getWeekday()))
+                .sorted(java.util.Comparator.comparingInt(WeeklySchedule::getWeekday))
+                .map(s -> {
+                    PlanSummary plan = names.get(planOf.get(s.getPlanAssignmentId()));
+                    return new DayConflict(s.getWeekday(), s.getPlanAssignmentId(), plan == null ? "?" : plan.name());
+                })
+                .toList();
+    }
 
-    /** O-07: copy the days of the replaced assignment (the user can change them later). */
-    @EventListener
-    @Transactional
-    public void onAssignmentActivated(AssignmentEvents.AssignmentActivated event) {
-        if (!event.copySchedule() || event.previousAssignmentId() == null) {
-            return;
+    private List<PlanSchedule> schedulesOf(List<AssignmentView> list) {
+        if (list.isEmpty()) {
+            return List.of();
         }
-        if (!schedules.findByPlanAssignmentIdOrderByWeekday(event.assignmentId()).isEmpty()) {
-            return;
-        }
-        for (Integer day : weekdays(event.previousAssignmentId())) {
-            schedules.save(new WeeklySchedule(event.assignmentId(), day));
-        }
+        Map<UUID, Set<Integer>> days = new TreeMap<>();
+        list.forEach(a -> days.put(a.id(), new TreeSet<>()));
+        schedules.findByPlanAssignmentIdIn(days.keySet())
+                .forEach(s -> days.get(s.getPlanAssignmentId()).add(s.getWeekday()));
+        Map<UUID, PlanSummary> names = plans.findPlans(list.stream().map(AssignmentView::planId).toList());
+        return list.stream().map(a -> {
+            PlanSummary plan = names.get(a.planId());
+            return new PlanSchedule(a.id(), a.planId(), plan == null ? "?" : plan.name(), a.startDate(), days.get(a.id()));
+        }).toList();
     }
 
     /**
