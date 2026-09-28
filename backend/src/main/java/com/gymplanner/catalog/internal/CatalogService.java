@@ -5,7 +5,6 @@ import com.gymplanner.shared.error.BusinessRuleException;
 import com.gymplanner.shared.error.ConflictException;
 import com.gymplanner.shared.error.FieldViolation;
 import com.gymplanner.shared.error.NotFoundException;
-import com.gymplanner.shared.web.Paging;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -13,8 +12,6 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -25,17 +22,10 @@ abstract class CatalogService<T extends CatalogItem> {
 
     private final CatalogRepository<T> repository;
     private final String resourceName;
-    private final Function<String, T> factory;
 
-    protected CatalogService(CatalogRepository<T> repository, String resourceName, Function<String, T> factory) {
+    protected CatalogService(CatalogRepository<T> repository, String resourceName) {
         this.repository = repository;
         this.resourceName = resourceName;
-        this.factory = factory;
-    }
-
-    @Transactional(readOnly = true)
-    public Page<T> search(String q, Boolean active, Pageable pageable) {
-        return repository.search(Paging.likePattern(q), active, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -43,11 +33,10 @@ abstract class CatalogService<T extends CatalogItem> {
         return repository.findById(id).orElseThrow(() -> new NotFoundException(resourceName));
     }
 
-    @Transactional
-    public T create(String name) {
-        String normalized = normalize(name);
-        ensureUnique(normalized, null);
-        return saveUnique(factory.apply(normalized));
+    /** Saves a new item whose name is already normalized. */
+    protected T insert(T item) {
+        ensureUnique(item.getName(), null);
+        return saveUnique(item);
     }
 
     @Transactional

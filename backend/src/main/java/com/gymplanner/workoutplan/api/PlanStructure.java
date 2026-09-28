@@ -35,9 +35,12 @@ public record PlanStructure(
     }
 
     /**
-     * @param customized true when per-set values exist; {@code sets} always holds the N effective sets
+     * @param exerciseInSectionGroup false for a tolerated historic entry whose exercise now belongs
+     *                               to another muscle group (ADR 0007)
+     * @param customized             true when per-set values exist; {@code sets} always holds the N effective sets
      */
-    public record Exercise(UUID id, UUID exerciseId, String exerciseName, boolean exerciseActive, int position,
+    public record Exercise(UUID id, UUID exerciseId, String exerciseName, boolean exerciseActive,
+            boolean exerciseInSectionGroup, int position,
             int setsCount, int reps, boolean toFailure, int restSeconds, boolean customized, List<Set> sets) {
     }
 

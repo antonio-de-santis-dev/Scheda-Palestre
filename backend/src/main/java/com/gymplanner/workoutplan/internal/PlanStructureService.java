@@ -122,7 +122,7 @@ class PlanStructureService {
         WorkoutPlan plan = section.getPlanSession().getWorkoutPlan();
         PlanService.requireEditable(plan);
         ExerciseConfig config = ExerciseConfigValidator.validate(request);
-        catalog.requireSelectableExercise(request.exerciseId());
+        catalog.requireSelectableExercise(request.exerciseId(), section.getMuscleGroupId());
         section.addExercise(request.exerciseId(), config);
         return saved(plan, null);
     }
@@ -136,8 +136,9 @@ class PlanStructureService {
         PlanService.requireEditable(plan);
         ExerciseConfig config = ExerciseConfigValidator.validate(request);
         if (!exercise.getExerciseId().equals(request.exerciseId())) {
-            // Keeping an already used (even deactivated) exercise is allowed; a new one must be active.
-            catalog.requireSelectableExercise(request.exerciseId());
+            // Keeping an already used exercise is allowed even when it was deactivated or moved to
+            // another group (historic data, ADR 0007); a newly chosen one must be active and of this group.
+            catalog.requireSelectableExercise(request.exerciseId(), exercise.getMuscleSection().getMuscleGroupId());
         }
         exercise.apply(request.exerciseId(), config);
         return saved(plan, null);
