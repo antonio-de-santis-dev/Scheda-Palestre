@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { Power, Send, XCircle } from 'lucide-react';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
@@ -14,6 +14,7 @@ import { PlanStatusBadge } from '../plans/PlanStatusBadge';
 import { useUsers } from '../users/api';
 import { assignmentsApi, useAssignmentMutation, usePlanAssignments, type Assignment } from './api';
 import { AssignmentStatusBadge } from './AssignmentStatusBadge';
+import { flashState, usersCount } from '../../shared/flash/flash';
 
 export function PlanAssignmentsPage() {
   const { id = '' } = useParams();
@@ -26,7 +27,7 @@ export function PlanAssignmentsPage() {
   const [startDate, setStartDate] = useState(todayIso());
   const [activate, setActivate] = useState(true);
   const [copySchedule, setCopySchedule] = useState(true);
-  const [done, setDone] = useState<number | null>(null);
+  const navigate = useNavigate();
   const [formError, setFormError] = useState<string | null>(null);
   const [toClose, setToClose] = useState<Assignment | null>(null);
 
@@ -49,7 +50,6 @@ export function PlanAssignmentsPage() {
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    setDone(null);
     if (selected.size === 0) {
       setFormError('Seleziona almeno un utente');
       return;
@@ -62,10 +62,15 @@ export function PlanAssignmentsPage() {
     assign.mutate(
       { planId: id, userIds: [...selected], startDate, activate, copySchedule },
       {
-        onSuccess: (result) => {
-          setDone(result.length);
-          setSelected(new Set());
-        },
+        onSuccess: (result) =>
+          navigate('/admin/plans', {
+            replace: true,
+            state: flashState({
+              tone: 'success',
+              title: 'Scheda assegnata',
+              message: `“${plan.data?.name ?? 'Scheda'}” assegnata a ${usersCount(result.length)}${activate ? '' : ' (in attesa di attivazione)'}.`,
+            }),
+          }),
       },
     );
   };
@@ -102,13 +107,6 @@ export function PlanAssignmentsPage() {
           <form className="form" onSubmit={submit} noValidate>
             {assign.error ? <ErrorAlert error={assign.error} /> : null}
             {formError ? <Alert tone="error">{formError}</Alert> : null}
-            {done !== null ? (
-              <Alert tone="success">
-                <p>
-                  Scheda assegnata a {done} {done === 1 ? 'utente' : 'utenti'}.
-                </p>
-              </Alert>
-            ) : null}
             <TextField label="Cerca utenti" type="search" value={search} onChange={(e) => setSearch(e.target.value)} />
             <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
               <legend className="field__label">Utenti ({selected.size} selezionati)</legend>

@@ -40,6 +40,7 @@ describe('plan assignments (ADMIN)', () => {
     let usersQuery = '';
     server.use(
       http.get('*/api/auth/me', () => HttpResponse.json(adminUser)),
+      http.get('*/api/admin/plans', () => HttpResponse.json({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 })),
       http.get('*/api/admin/plans/:id', () => HttpResponse.json(planStructure())),
       http.get('*/api/admin/plans/:id/assignments', () => HttpResponse.json([])),
       http.get('*/api/admin/users', ({ request }) => {
@@ -51,7 +52,7 @@ describe('plan assignments (ADMIN)', () => {
         return HttpResponse.json([assignment(), assignment({ id: 'as-2', userId: 'u-2' })], { status: 201 });
       }),
     );
-    renderApp('/admin/plans/plan-1/assignments');
+    const { router } = renderApp('/admin/plans/plan-1/assignments');
     const user = userEvent.setup();
     await user.click(await screen.findByLabelText('Rossi Mario (@mario)'));
     await user.click(screen.getByLabelText('Bianchi Anna (@anna)'));
@@ -60,7 +61,10 @@ describe('plan assignments (ADMIN)', () => {
     await user.type(date, '2026-10-05');
     await user.click(screen.getByRole('button', { name: 'Assegna' }));
 
-    expect(await screen.findByText('Scheda assegnata a 2 utenti.')).toBeInTheDocument();
+    // Back to the plan list with the flash message and the number of users.
+    expect(await screen.findByText('Scheda assegnata')).toBeInTheDocument();
+    expect(screen.getByText('“Scheda principianti” assegnata a 2 utenti.')).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/admin/plans');
     expect(body).toEqual({
       planId: 'plan-1',
       userIds: ['u-1', 'u-2'],

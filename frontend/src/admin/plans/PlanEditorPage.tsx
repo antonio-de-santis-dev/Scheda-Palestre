@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { useParams } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from 'lucide-react';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
@@ -16,6 +16,8 @@ import { PlanMetadataForm } from './PlanMetadataForm';
 import { PlanStatusBadge } from './PlanStatusBadge';
 import { ExerciseEditor } from './ExerciseEditor';
 import { ActiveAssigneesNotice } from '../assignments/ActiveAssigneesNotice';
+import { flashState } from '../../shared/flash/flash';
+import { isNewPlan } from './editorState';
 
 type Confirm = { title: string; body: ReactNode; label: string; run: () => Promise<unknown> } | null;
 
@@ -26,7 +28,9 @@ export function PlanEditorPage() {
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [confirmPending, setConfirmPending] = useState(false);
   const [confirmError, setConfirmError] = useState<unknown>(null);
-  const [savedMeta, setSavedMeta] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const newPlan = isNewPlan(location.state);
 
   const updateMeta = usePlanMutation(id, (values: Parameters<typeof plansApi.update>[1]) => plansApi.update(id, values));
   const addSession = usePlanMutation(id, (title: string) => plansApi.addSession(id, title));
@@ -67,12 +71,11 @@ export function PlanEditorPage() {
                   sessione.
                 </p>
               ) : null}
-              {savedMeta ? (
-                <div style={{ marginBottom: 'var(--space-3)' }}>
-                  <Alert tone="success">
-                    <p>Dati salvati.</p>
-                  </Alert>
-                </div>
+              {newPlan && !plan.deletedAt ? (
+                <p className="muted small">
+                  Componi sessioni ed esercizi qui sotto: ogni modifica alla struttura viene salvata subito. Quando hai finito
+                  premi “Salva dati” per tornare all'elenco delle schede.
+                </p>
               ) : null}
               <PlanMetadataForm
                 key={plan.version}
@@ -81,11 +84,25 @@ export function PlanEditorPage() {
                 disabled={plan.deletedAt !== null}
                 pending={updateMeta.isPending}
                 error={updateMeta.error}
-                onSubmit={async (values) => {
-                  setSavedMeta(false);
-                  await updateMeta.mutateAsync({ ...values, version: plan.version });
-                  setSavedMeta(true);
-                }}
+                onSubmit={(values) =>
+                  // Navigate only after a successful save: on error the form stays open with the message.
+                  updateMeta.mutateAsync(
+                    { ...values, version: plan.version },
+                    {
+                      onSuccess: (saved) =>
+                        navigate('/admin/plans', {
+                          replace: true,
+                          state: flashState({
+                            tone: 'success',
+                            title: newPlan ? 'Nuova scheda creata' : 'Scheda modificata',
+                            message: saved.executable
+                              ? `“${saved.name}” è pronta per essere assegnata.`
+                              : `“${saved.name}” non è ancora assegnabile: serve almeno una sessione con un esercizio in ogni sessione.`,
+                          }),
+                        }),
+                    },
+                  )
+                }
               />
             </section>
 

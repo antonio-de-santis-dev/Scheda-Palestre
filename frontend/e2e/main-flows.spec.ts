@@ -91,6 +91,7 @@ test('2. ADMIN builds catalog and plan, then assigns it', async () => {
   await admin.getByRole('button', { name: 'Nuova scheda' }).click();
   await admin.getByLabel(/^Nome scheda/).fill(names.plan);
   await admin.getByRole('button', { name: "Crea e apri l'editor" }).click();
+  await expect(admin).toHaveURL(/\/admin\/plans\/[0-9a-f-]+\/edit$/);
   await expect(admin.getByText('Incompleta')).toBeVisible();
   planEditorUrl = admin.url();
 
@@ -111,10 +112,26 @@ test('2. ADMIN builds catalog and plan, then assigns it', async () => {
   await expect(admin.getByText('Pronta')).toBeVisible();
   await expect(admin.getByText(/1 × MAX/)).toBeVisible();
 
+  // "Salva dati" confirms the creation: back to the list with a one-shot notification.
+  await admin.getByRole('button', { name: 'Salva dati' }).click();
+  await expect(admin).toHaveURL(/\/admin\/plans$/);
+  await expect(admin.getByText('Nuova scheda creata')).toBeVisible();
+  await admin.reload();
+  await expect(admin.getByRole('heading', { name: 'Schede' })).toBeVisible();
+  await expect(admin.getByText('Nuova scheda creata')).toBeHidden();
+
+  // Editing an existing plan says "Scheda modificata".
+  await admin.goto(planEditorUrl);
+  await admin.getByRole('button', { name: 'Salva dati' }).click();
+  await expect(admin.getByText('Scheda modificata')).toBeVisible();
+
   await admin.goto(planEditorUrl.replace('/edit', '/assignments'));
   await admin.getByLabel(new RegExp(`\\(@${user.username}\\)`)).check();
   await admin.getByRole('button', { name: 'Assegna' }).click();
-  await expect(admin.getByText('Scheda assegnata a 1 utente.')).toBeVisible();
+  await expect(admin).toHaveURL(/\/admin\/plans$/);
+  await expect(admin.getByText('Scheda assegnata', { exact: true })).toBeVisible();
+  await expect(admin.getByText(/assegnata a 1 utente\./)).toBeVisible();
+  await admin.goto(planEditorUrl.replace('/edit', '/assignments'));
   await expect(admin.getByRole('list', { name: 'Assegnatari' }).getByText('Attiva')).toBeVisible();
 });
 

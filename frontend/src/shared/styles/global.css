@@ -547,6 +547,30 @@ svg {
   color: var(--color-text);
 }
 
+/* One-shot navigation notice (FlashOutlet). */
+.flash {
+  margin-bottom: var(--space-4);
+  align-items: center;
+}
+
+.flash__close {
+  flex: none;
+  color: var(--color-text);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .flash {
+    animation: flash-in 200ms ease-out;
+  }
+}
+
+@keyframes flash-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
 .alert__title {
   font-weight: 700;
   margin-bottom: var(--space-1);
