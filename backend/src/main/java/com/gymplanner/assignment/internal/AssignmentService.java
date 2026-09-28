@@ -8,6 +8,7 @@ import com.gymplanner.assignment.api.ScheduleCopyPort.CopyResult;
 import com.gymplanner.assignment.internal.AssignmentDtos.AssignRequest;
 import com.gymplanner.assignment.internal.AssignmentDtos.AssignmentResponse;
 import com.gymplanner.identity.api.UserDirectory;
+import com.gymplanner.identity.api.UserEvents;
 import com.gymplanner.identity.api.UserRole;
 import com.gymplanner.identity.api.UserSummary;
 import com.gymplanner.shared.error.BusinessRuleException;
@@ -83,7 +84,7 @@ class AssignmentService implements AssignmentQueries {
         Map<UUID, UserSummary> found = users.findAll(userIds);
         for (UUID userId : userIds) {
             UserSummary user = found.get(userId);
-            if (user == null || user.role() != UserRole.USER) {
+            if (user == null || user.role() != UserRole.USER || user.deleted()) {
                 throw new BusinessRuleException("USER_NOT_ASSIGNABLE", "Plans can only be assigned to USER accounts");
             }
         }
@@ -172,6 +173,19 @@ class AssignmentService implements AssignmentQueries {
                 .toList();
     }
 
+    /**
+     * ADR 0010: a deleted account keeps its history, but its active and pending assignments are
+     * closed (the in-progress workout is interrupted through {@code AssignmentClosed}).
+     */
+    @EventListener
+    @Transactional
+    public void onUserDeleted(UserEvents.UserDeleted event) {
+        List<PlanAssignment> open = assignments.findByUserIdOrderByCreatedAtDesc(event.userId()).stream()
+                .filter(a -> a.status() != PlanAssignment.Status.CLOSED).toList();
+        open.forEach(this::closeInternal);
+        log.info("Account id={} deleted: {} assignment(s) closed", event.userId(), open.size());
+    }
+
     // ------------------------------------------------------------------ USER
 
     @Transactional(readOnly = true)
@@ -194,6 +208,12 @@ class AssignmentService implements AssignmentQueries {
     public List<AssignmentView> listActiveForUser(UUID userId) {
         return assignments.findByUserIdAndActiveTrueOrderByCreatedAtAsc(userId).stream()
                 .map(AssignmentService::view).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AssignmentView> listAllForUser(UUID userId) {
+        return assignments.findByUserIdOrderByCreatedAtDesc(userId).stream().map(AssignmentService::view).toList();
     }
 
     @Override

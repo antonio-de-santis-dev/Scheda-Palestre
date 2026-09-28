@@ -59,6 +59,9 @@ public class User {
     @Column(nullable = false)
     private int sessionVersion;
 
+    /** Logical deletion (ADR 0010): the row stays, personal data are anonymized. */
+    private Instant deletedAt;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
@@ -123,6 +126,34 @@ public class User {
 
     public void activate() {
         this.active = true;
+    }
+
+    /**
+     * ADR 0010: replaces personal data with deterministic placeholders (unique by id), makes the
+     * account unusable and invalidates every open session.
+     */
+    public void anonymizeAndDelete(Instant now, String unusablePasswordHash) {
+        String key = id.toString().replace("-", "");
+        this.firstName = "Utente";
+        this.lastName = "eliminato";
+        this.username = "deleted-" + key;
+        this.email = "deleted-" + key + "@deleted.invalid";
+        this.phone = null;
+        this.passwordHash = unusablePasswordHash;
+        this.active = false;
+        this.mustChangePassword = false;
+        this.failedLoginCount = 0;
+        this.lockedUntil = null;
+        this.sessionVersion++;
+        this.deletedAt = now;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    public Instant getDeletedAt() {
+        return deletedAt;
     }
 
     public void updateDetails(String firstName, String lastName, String username, String email, String phone) {

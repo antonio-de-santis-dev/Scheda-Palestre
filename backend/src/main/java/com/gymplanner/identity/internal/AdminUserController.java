@@ -14,6 +14,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -56,7 +57,15 @@ class AdminUserController {
 
     @GetMapping("/{id}")
     UserResponse get(@PathVariable UUID id) {
-        return UserResponse.of(service.get(id), clock.instant());
+        User user = service.get(id);
+        return UserResponse.of(user, clock.instant(), service.isProtected(user));
+    }
+
+    /** ADR 0010: 204 also when the account was already deleted (idempotent); 404 if it never existed. */
+    @DeleteMapping("/{id}")
+    ResponseEntity<Void> delete(@PathVariable UUID id, @AuthenticationPrincipal AuthenticatedUser admin) {
+        service.delete(id, admin.id());
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{id}")

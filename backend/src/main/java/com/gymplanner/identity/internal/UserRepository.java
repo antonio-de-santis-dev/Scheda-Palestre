@@ -34,6 +34,7 @@ interface UserRepository extends JpaRepository<User, UUID> {
                 or lower(concat(u.lastName, ' ', u.firstName)) like :pattern escape '\\')
               and (:role is null or u.role = :role)
               and (:active is null or u.active = :active)
+              and u.deletedAt is null
             """)
     Page<User> search(@Param("pattern") String pattern, @Param("role") UserRole role,
             @Param("active") Boolean active, Pageable pageable);

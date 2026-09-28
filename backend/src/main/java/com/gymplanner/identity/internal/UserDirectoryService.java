@@ -38,6 +38,6 @@ class UserDirectoryService implements UserDirectory {
 
     static UserSummary toSummary(User user) {
         return new UserSummary(user.getId(), user.getFirstName(), user.getLastName(), user.getUsername(),
-                user.getEmail(), user.getRole(), user.isActive());
+                user.getEmail(), user.getRole(), user.isActive(), user.isDeleted());
     }
 }
