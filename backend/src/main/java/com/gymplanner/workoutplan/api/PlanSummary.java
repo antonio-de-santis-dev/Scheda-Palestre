@@ -3,16 +3,20 @@ package com.gymplanner.workoutplan.api;
 import java.time.LocalDate;
 import java.util.UUID;
 
-/**
- * Minimal plan data for other modules.
- *
- * @param expiresOn end of the <em>recommended duration</em> of the plan (ADR 0009); it is not the
- *                  end of an assignment ({@code plan_assignments.end_date}) and it never blocks anything
- */
-public record PlanSummary(UUID id, String name, boolean deleted, LocalDate expiresOn) {
+/** Shared plan; each assignment calculates its own date from its start. */
+public record PlanSummary(UUID id, String name, boolean deleted, Integer durationWeeks) {
+    public LocalDate expiresOn(LocalDate startDate) {
+        return durationWeeks == null ? null : startDate.plusWeeks(durationWeeks);
+    }
 
-    /** From the day after {@code expiresOn} (strictly after, never on the same day). */
-    public boolean recommendedDurationEnded(LocalDate today) {
-        return expiresOn != null && today.isAfter(expiresOn);
+    /** Show a reminder during the final seven days, including the exact day of expiry. */
+    public boolean recommendedDurationWarning(LocalDate startDate, LocalDate today) {
+        LocalDate end = expiresOn(startDate);
+        return end != null && !today.isBefore(end.minusWeeks(1));
+    }
+
+    public boolean recommendedDurationEnded(LocalDate startDate, LocalDate today) {
+        LocalDate end = expiresOn(startDate);
+        return end != null && today.isAfter(end);
     }
 }

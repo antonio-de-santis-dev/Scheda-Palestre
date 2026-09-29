@@ -50,7 +50,7 @@ class TodayService {
     }
 
     /** An active plan past its recommended duration (ADR 0009): informative, never blocking. */
-    record EndedPlan(UUID assignmentId, String planName, LocalDate expiresOn) {
+    record EndedPlan(UUID assignmentId, String planName, LocalDate expiresOn, boolean ended) {
     }
 
     /**
@@ -118,8 +118,9 @@ class TodayService {
                 .map(a -> new PlanRef(a.id(), name(names, a))).toList();
         LocalDate businessToday = calendar.today();
         List<EndedPlan> ended = active.stream()
-                .filter(a -> names.containsKey(a.planId()) && names.get(a.planId()).recommendedDurationEnded(businessToday))
-                .map(a -> new EndedPlan(a.id(), name(names, a), names.get(a.planId()).expiresOn()))
+                .filter(a -> names.containsKey(a.planId()) && names.get(a.planId()).recommendedDurationWarning(a.startDate(), businessToday))
+                .map(a -> new EndedPlan(a.id(), name(names, a), names.get(a.planId()).expiresOn(a.startDate()),
+                        names.get(a.planId()).recommendedDurationEnded(a.startDate(), businessToday)))
                 .toList();
 
         // The plan of the day: the one that owns a workout on that date, else the one that trains.

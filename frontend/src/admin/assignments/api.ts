@@ -23,6 +23,7 @@ export interface Assignment {
   planExpiresOn: string | null;
   /** Server-side: active assignment and today > planExpiresOn (gym time zone). */
   recommendedDurationEnded: boolean;
+  recommendedDurationWarning: boolean;
 }
 
 export interface AssignInput {
@@ -60,7 +61,7 @@ export interface EndedDuration {
   expiresOn: string;
 }
 
-/** Active assignments past the recommended duration, for all users (one request). */
+/** Active assignments in the final recommended week or later (one request). */
 export function useRecommendedDurationEnded() {
   return useQuery({
     queryKey: [...assignmentKeys.all, 'recommended-duration-ended'],

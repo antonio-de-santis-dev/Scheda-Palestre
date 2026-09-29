@@ -10,7 +10,7 @@ import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import { EmptyState, QueryState } from '../../shared/components/States';
 import { Pagination } from '../../shared/components/Pagination';
 import { useDebouncedValue } from '../../shared/utils/useDebouncedValue';
-import { formatDate, formatDateTime } from '../../shared/utils/format';
+import { formatDateTime } from '../../shared/utils/format';
 import { plansApi, plansKeys, usePlans, type PlanListItem } from './api';
 import { PlanMetadataForm } from './PlanMetadataForm';
 import { EDITOR_NEW_PLAN } from './editorState';
@@ -116,7 +116,7 @@ export function PlansPage() {
                     <div className="list-item__title">{plan.name}</div>
                     <div className="list-item__meta">
                       {plan.sessionCount} {plan.sessionCount === 1 ? 'sessione' : 'sessioni'}
-                      {plan.expiresOn ? ` · durata consigliata fino al ${formatDate(plan.expiresOn)}` : ''} · modificata il{' '}
+                      {plan.durationWeeks ? ` · durata consigliata ${plan.durationWeeks} ${plan.durationWeeks === 1 ? 'settimana' : 'settimane'}` : ''} · modificata il{' '}
                       {formatDateTime(plan.updatedAt)}
                     </div>
                   </div>

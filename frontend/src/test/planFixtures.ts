@@ -27,7 +27,7 @@ export function planStructure(overrides: Partial<PlanStructure> = {}): PlanStruc
     id: 'plan-1',
     name: 'Scheda principianti',
     description: null,
-    expiresOn: null,
+    durationWeeks: null,
     createdBy: 'admin',
     copiedFromPlanId: null,
     createdAt: '2026-09-01T10:00:00Z',

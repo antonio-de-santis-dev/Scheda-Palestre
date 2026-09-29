@@ -27,7 +27,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class RecommendedDurationIntegrationTest {
 
     /** Monday. */
-    private static final LocalDate EXPIRES_ON = LocalDate.of(2026, 10, 5);
+    private static final LocalDate EXPIRES_ON = LocalDate.of(2026, 1, 22);
 
     @Autowired
     Api api;
@@ -47,14 +47,14 @@ class RecommendedDurationIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        clock.setDate(EXPIRES_ON.minusDays(7));
+        clock.setDate(EXPIRES_ON.minusWeeks(3));
         admin = fixtures.createAdmin();
         user = fixtures.createUser();
         plan = factory.executablePlan(admin, "Durata", 1, 1, 1);
-        jdbc.update("update workout_plans set expires_on = ? where id = ?", EXPIRES_ON, plan.planId());
+        jdbc.update("update workout_plans set duration_weeks = ? where id = ?", 3, plan.planId());
         assignmentId = UUID.fromString(api.post(admin, "/api/admin/assignments",
                 "{\"planId\":\"%s\",\"userIds\":[\"%s\"],\"startDate\":\"%s\",\"activate\":true}"
-                        .formatted(plan.planId(), user.id(), EXPIRES_ON.minusDays(7))).expect(201).read("$[0].id"));
+                        .formatted(plan.planId(), user.id(), EXPIRES_ON.minusWeeks(3))).expect(201).read("$[0].id"));
     }
 
     @AfterEach
@@ -73,13 +73,17 @@ class RecommendedDurationIntegrationTest {
     }
 
     @Test
-    void theDayBeforeAndTheDayItselfNoNotice() {
-        clock.setDate(EXPIRES_ON.minusDays(1));
-        assertThat(endedForUser()).isFalse();
-        clock.setDate(EXPIRES_ON);
+    void oneWeekWarningStartsOnJanuaryFifteenth() {
+        clock.setDate(LocalDate.of(2026, 1, 14));
         assertThat(endedForUser()).isFalse();
         assertThat((List<Object>) api.get(user, "/api/me/today").read("$.recommendedDurationEnded")).isEmpty();
-        assertThat(endedUsersForAdmin()).doesNotContain(user.id().toString());
+        clock.setDate(LocalDate.of(2026, 1, 15));
+        assertThat(endedForUser()).isFalse();
+        assertThat((Boolean) api.get(user, "/api/me/assignments").read("$[0].recommendedDurationWarning")).isTrue();
+        assertThat((Boolean) api.get(user, "/api/me/today").read("$.recommendedDurationEnded[0].ended")).isFalse();
+        assertThat(endedUsersForAdmin()).contains(user.id().toString());
+        clock.setDate(EXPIRES_ON);
+        assertThat(endedForUser()).isFalse();
     }
 
     @Test
@@ -104,7 +108,7 @@ class RecommendedDurationIntegrationTest {
 
     @Test
     void withoutExpiryThereIsNeverANotice() {
-        jdbc.update("update workout_plans set expires_on = null where id = ?", plan.planId());
+        jdbc.update("update workout_plans set duration_weeks = null where id = ?", plan.planId());
         clock.setDate(EXPIRES_ON.plusYears(1));
         Api.Response mine = api.get(user, "/api/me/assignments").expect(200);
         assertThat((Object) mine.read("$[0].planExpiresOn")).isNull();

@@ -198,7 +198,7 @@ describe('plans page', () => {
               id: 'plan-1',
               name: 'Forza',
               description: null,
-              expiresOn: null,
+              durationWeeks: null,
               sessionCount: 2,
               executable: true,
               copiedFromPlanId: null,

@@ -22,6 +22,7 @@ const assignment = (overrides: Partial<Assignment> = {}): Assignment => ({
   createdAt: '2026-10-01T08:00:00Z',
   planExpiresOn: null,
   recommendedDurationEnded: false,
+  recommendedDurationWarning: false,
   ...overrides,
 });
 

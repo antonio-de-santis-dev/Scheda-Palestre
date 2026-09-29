@@ -93,8 +93,8 @@ class ActivityReportService {
             String status = a.active() ? "ACTIVE" : a.endDate() == null ? "PENDING" : "CLOSED";
             planActivities.add(new PlanActivity(a.id(), a.planId(), plan == null ? "?" : plan.name(), status,
                     a.startDate(), a.endDate(), a.active() ? List.copyOf(calendarQueries.weekdays(a.id())) : List.of(),
-                    plan == null ? null : plan.expiresOn(),
-                    a.active() && plan != null && plan.recommendedDurationEnded(today),
+                    plan == null ? null : plan.expiresOn(a.startDate()),
+                    a.active() && plan != null && plan.recommendedDurationEnded(a.startDate(), today),
                     count(w, WorkoutStatus.COMPLETED), count(w, WorkoutStatus.INTERRUPTED),
                     count(w, WorkoutStatus.IN_PROGRESS), sets.getOrDefault(a.id(), 0L),
                     e.getOrDefault(WorkoutExerciseStatus.COMPLETED, 0L), e.getOrDefault(WorkoutExerciseStatus.SKIPPED, 0L),

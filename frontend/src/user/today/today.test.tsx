@@ -67,14 +67,14 @@ describe('today page', () => {
       http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
       http.get('*/api/me/today', () =>
         HttpResponse.json(
-          today({ recommendedDurationEnded: [{ assignmentId: 'as-1', planName: 'Scheda principianti', expiresOn: '2026-10-04' }] }),
+          today({ recommendedDurationEnded: [{ assignmentId: 'as-1', planName: 'Scheda principianti', expiresOn: '2026-10-04', ended: true }] }),
         ),
       ),
     );
     renderApp('/app/today');
     const notice = await screen.findByText('Durata consigliata terminata: “Scheda principianti”');
     expect(notice.closest('[role="status"]')).toHaveTextContent(
-      'La durata consigliata della scheda è terminata il 4 ottobre 2026. Contatta la palestra per riceverne una nuova.',
+      'La durata consigliata è terminata il 4 ottobre 2026. Contatta la palestra per riceverne una nuova.',
     );
     expect(screen.getByRole('button', { name: 'Inizia allenamento' })).toBeEnabled();
   });

@@ -61,10 +61,10 @@ class PlanIntegrationTest {
     @Test
     void emptyPlanExistsButIsNotExecutable() {
         Api.Response plan = api.post(admin, "/api/admin/plans",
-                "{\"name\":\"Principianti\",\"description\":\"  \",\"expiresOn\":\"2026-12-31\"}").expect(201);
+                "{\"name\":\"Principianti\",\"description\":\"  \",\"durationWeeks\":3}").expect(201);
         assertThat((Boolean) plan.read("$.executable")).isFalse();
         assertThat((Object) plan.read("$.description")).isNull();
-        assertThat((String) plan.read("$.expiresOn")).isEqualTo("2026-12-31");
+        assertThat((Integer) plan.read("$.durationWeeks")).isEqualTo(3);
         assertThat((String) plan.read("$.createdBy")).isEqualTo(admin.id().toString());
         assertThat(plan.body()).doesNotContain("userId");
     }

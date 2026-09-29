@@ -21,7 +21,7 @@ export function MyPlanDetailPage() {
     <>
       <PageHeader
         title={plan?.name ?? 'Scheda'}
-        subtitle={plan?.expiresOn ? `Durata consigliata fino al ${formatDate(plan.expiresOn)}` : undefined}
+        subtitle={assignment?.planExpiresOn ? `Durata consigliata fino al ${formatDate(assignment.planExpiresOn)}` : undefined}
         back={{ to: '/app/plans', label: 'Le mie schede' }}
       />
       <QueryState isLoading={query.isLoading} error={query.error} onRetry={() => void query.refetch()}>
@@ -41,8 +41,8 @@ export function MyPlanDetailPage() {
                 ) : null}
               </div>
             ) : null}
-            {assignment?.recommendedDurationEnded && assignment.planExpiresOn ? (
-              <RecommendedDurationNotice planName={plan.name} expiresOn={assignment.planExpiresOn} />
+            {assignment?.recommendedDurationWarning && assignment.planExpiresOn ? (
+              <RecommendedDurationNotice planName={plan.name} expiresOn={assignment.planExpiresOn} ended={assignment.recommendedDurationEnded} />
             ) : null}
             {plan.description ? <p>{plan.description}</p> : null}
             {plan.sessions.length === 0 ? <p className="muted">La scheda è in preparazione.</p> : null}

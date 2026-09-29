@@ -29,10 +29,10 @@ export function UserAssignmentsSection({ userId }: { userId: string }) {
                     {a.endDate ? ` al ${formatDate(a.endDate)}` : ''}
                     {a.planDeleted ? ' · scheda eliminata' : ''}
                   </div>
-                  {a.recommendedDurationEnded && a.planExpiresOn ? (
+                  {a.recommendedDurationWarning && a.planExpiresOn ? (
                     <div className="list-item__meta">
                       <StatusBadge tone="warning" icon={<CalendarX2 size={14} aria-hidden="true" />}>
-                        Durata consigliata terminata il {formatDate(a.planExpiresOn)}
+                        Durata consigliata {a.recommendedDurationEnded ? 'terminata' : 'in scadenza'} il {formatDate(a.planExpiresOn)}
                       </StatusBadge>
                     </div>
                   ) : null}

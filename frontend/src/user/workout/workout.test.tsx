@@ -217,49 +217,31 @@ describe('workout screen', () => {
     expect(confetti).not.toHaveBeenCalled();
   });
 
-  it('offers optional Italian voice guidance, off by default and remembered', async () => {
-    const speak = vi.fn();
-    const cancel = vi.fn();
-    class Utterance {
-      lang = '';
-      voice: unknown = null;
-      text: string;
-      constructor(text: string) {
-        this.text = text;
-      }
-    }
-    vi.stubGlobal('speechSynthesis', { speak, cancel, getVoices: () => [], addEventListener: vi.fn(), removeEventListener: vi.fn() });
-    vi.stubGlobal('SpeechSynthesisUtterance', Utterance);
+  it('lets the user enable and choose one of three rest sounds, saved locally', async () => {
+    const play = vi.fn(() => Promise.resolve());
+    vi.stubGlobal('Audio', class {
+      src: string;
+      preload = '';
+      currentTime = 0;
+      constructor(src: string) { this.src = src; }
+      play = play;
+      pause = vi.fn();
+      load = vi.fn();
+    });
     server.use(
       http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
       http.get('*/api/me/workouts/:id', () => HttpResponse.json(workoutState())),
-      http.post('*/api/me/workouts/:id/sets/:setId/complete', () => HttpResponse.json(workoutState({ currentSetId: 's-2' }))),
     );
     renderApp('/app/workout/w-1');
     const user = userEvent.setup();
-    const toggle = await screen.findByRole('button', { name: 'Guida vocale' });
-    expect(toggle).toHaveAttribute('aria-pressed', 'false');
-    await user.click(screen.getByRole('button', { name: 'Fine serie' }));
-    await screen.findByText('2/2');
-    expect(speak).not.toHaveBeenCalled();
-
+    const toggle = await screen.findByRole('checkbox', { name: 'Suono fine recupero' });
+    expect(toggle).not.toBeChecked();
+    expect(screen.queryByText('Guida vocale')).not.toBeInTheDocument();
     await user.click(toggle);
-    expect(toggle).toHaveAttribute('aria-pressed', 'true');
-    expect(window.localStorage.getItem('gymplanner.audio')).toBe('on');
-    expect(cancel).toHaveBeenCalled();
-    const spoken = speak.mock.calls.map((c) => (c[0] as Utterance).text);
-    expect(spoken).toEqual(['Audio attivato']);
-    expect((speak.mock.calls[0]![0] as Utterance).lang).toBe('it-IT');
-  });
-
-  it('hides the voice control when the browser has no speech synthesis', async () => {
-    server.use(
-      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
-      http.get('*/api/me/workouts/:id', () => HttpResponse.json(workoutState())),
-    );
-    renderApp('/app/workout/w-1');
-    await screen.findByRole('button', { name: 'Fine serie' });
-    expect(screen.queryByRole('button', { name: 'Guida vocale' })).not.toBeInTheDocument();
+    expect(toggle).toBeChecked();
+    expect(play).toHaveBeenCalledOnce();
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Suono di fine recupero' }), 'alert-3');
+    expect(window.localStorage.getItem('gymplanner.rest-alert')).toContain('alert-3');
   });
 
   it('asks confirmation before skipping and shows the skipped state', async () => {

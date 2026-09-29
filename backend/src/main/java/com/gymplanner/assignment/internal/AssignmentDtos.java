@@ -39,17 +39,17 @@ final class AssignmentDtos {
     /**
      * {@code copiedWeekdays}/{@code skippedWeekdays} are filled only by an activation that asked
      * for the copy: skipped days were already used by another active plan of the user.
-     * {@code planExpiresOn} is the end of the plan's recommended duration (ADR 0009) and
-     * {@code recommendedDurationEnded} is computed by the server in the gym's time zone for ACTIVE
-     * assignments ({@code today > planExpiresOn}): the plan stays fully usable.
+     * {@code planExpiresOn} is calculated per assignment from startDate + durationWeeks.
+     * Warning starts seven days before that date; ended starts the day after it.
+     * Both are computed in the gym's time zone, and the plan stays usable.
      */
     record AssignmentResponse(UUID id, UUID userId, String userFullName, String username, UUID planId,
             String planName, boolean planDeleted, LocalDate startDate, LocalDate endDate, boolean active,
             String status, Instant createdAt, List<Integer> copiedWeekdays, List<Integer> skippedWeekdays,
-            LocalDate planExpiresOn, boolean recommendedDurationEnded) {
+            LocalDate planExpiresOn, boolean recommendedDurationEnded, boolean recommendedDurationWarning) {
     }
 
-    /** ADMIN indicator: an active assignment whose plan's recommended duration has ended. */
+    /** ADMIN indicator: an active assignment in its final recommended week or later. */
     record EndedDurationResponse(UUID userId, UUID assignmentId, UUID planId, String planName, LocalDate expiresOn) {
     }
 }

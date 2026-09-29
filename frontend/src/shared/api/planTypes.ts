@@ -42,7 +42,7 @@ export interface PlanStructure {
   id: string;
   name: string;
   description: string | null;
-  expiresOn: string | null;
+  durationWeeks: number | null;
   createdBy: string;
   copiedFromPlanId: string | null;
   createdAt: string;

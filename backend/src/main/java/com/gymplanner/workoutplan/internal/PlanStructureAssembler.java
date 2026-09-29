@@ -44,7 +44,7 @@ class PlanStructureAssembler {
                                 .map(section -> section(section, groups, exercises))
                                 .toList()))
                 .toList();
-        return new PlanStructure(plan.getId(), plan.getName(), plan.getDescription(), plan.getExpiresOn(),
+        return new PlanStructure(plan.getId(), plan.getName(), plan.getDescription(), plan.getDurationWeeks(),
                 plan.getCreatedBy(), plan.getCopiedFromPlanId(), plan.getCreatedAt(), plan.getUpdatedAt(),
                 plan.getDeletedAt(), plan.getVersion(), isExecutable(plan), sessions);
     }

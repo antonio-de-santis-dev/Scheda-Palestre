@@ -12,9 +12,9 @@ import { STALE_STATE_CODES, useWorkout, useWorkoutAction, workoutApi, type Worko
 import { useRestTimer } from './useRestTimer';
 import { ExerciseStatusBadge, WorkoutStatusBadge } from './ExerciseStatusBadge';
 import { celebrate, transitions, type Feedback } from './feedback';
-import { useSpeech } from './useSpeech';
+import { useRestAlert } from './useRestAlert';
 
-/** Guided execution (US-17, US-18, US-20, US-23): usable one-handed from 360 px. */
+/** Workout execution (US-17, US-18, US-20, US-23): usable one-handed from 360 px. */
 export function WorkoutPage() {
   const { id = '' } = useParams();
   const query = useWorkout(id);
@@ -31,14 +31,14 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   // Transitions already celebrated: refetches, retries and StrictMode never repeat them.
   const celebrated = useRef(new Set<string>());
-  const speech = useSpeech();
+  const restAlert = useRestAlert();
   const complete = useWorkoutAction(state.workoutId, (setId: string) => workoutApi.completeSet(state.workoutId, setId), true);
   const skip = useWorkoutAction(state.workoutId, (exerciseId: string) => workoutApi.skip(state.workoutId, exerciseId), true);
   const interrupt = useWorkoutAction(state.workoutId, () => workoutApi.interrupt(state.workoutId), true);
 
   const remaining = useRestTimer(state, refetch, () => {
     setAnnouncement('Recupero terminato: puoi completare la prossima serie.');
-    speech.speak('Recupero terminato');
+    restAlert.play();
     if ('vibrate' in navigator) {
       navigator.vibrate?.(300);
     }
@@ -46,20 +46,16 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
   const resting = remaining > 0;
 
   /** Called only from a successful mutation (never from an effect watching the data). */
-  const onActionSuccess = (before: WorkoutState, after: WorkoutState, spokenFallback?: string) => {
+  const onActionSuccess = (before: WorkoutState, after: WorkoutState) => {
     const fresh = transitions(before, after).filter((t) => !celebrated.current.has(t.key));
     fresh.forEach((t) => celebrated.current.add(t.key));
     if (fresh.length === 0) {
-      if (spokenFallback) {
-        speech.speak(spokenFallback);
-      }
       return;
     }
     const main = fresh.find((t) => t.kind === 'workout') ?? fresh.find((t) => t.kind === 'group') ?? fresh[0]!;
     const message = fresh.map((t) => t.message).join(' ');
     setFeedback({ ...main, message });
     void celebrate(main.kind);
-    speech.speak(message);
   };
 
   const error = complete.error ?? skip.error ?? interrupt.error;
@@ -81,16 +77,21 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
           </p>
         </div>
         <div className="row">
-          {speech.supported ? (
-            <button
-              type="button"
-              className="btn btn--ghost btn--sm"
-              aria-pressed={speech.enabled}
-              onClick={speech.toggle}
-            >
-              {speech.enabled ? <Volume2 size={18} aria-hidden="true" /> : <VolumeX size={18} aria-hidden="true" />}
-              Guida vocale
-            </button>
+          <label className="row small">
+            <input type="checkbox" checked={restAlert.enabled} onChange={(e) => restAlert.setEnabled(e.target.checked)} />
+            {restAlert.enabled ? <Volume2 size={18} aria-hidden="true" /> : <VolumeX size={18} aria-hidden="true" />}
+            Suono fine recupero
+          </label>
+          {restAlert.enabled ? (
+            <label className="row small">
+              Suono
+              <select className="input" aria-label="Suono di fine recupero" value={restAlert.sound}
+                onChange={(e) => restAlert.setSound(e.target.value as 'alert-1' | 'alert-2' | 'alert-3')}>
+                <option value="alert-1">Suono 1</option>
+                <option value="alert-2">Suono 2</option>
+                <option value="alert-3">Suono 3</option>
+              </select>
+            </label>
           ) : null}
           <WorkoutStatusBadge status={state.status} />
         </div>
@@ -183,7 +184,7 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
               setFeedback(null);
               skip.reset();
               const before = state;
-              complete.mutate(currentSet.id, { onSuccess: (after) => onActionSuccess(before, after, 'Serie completata') });
+              complete.mutate(currentSet.id, { onSuccess: (after) => onActionSuccess(before, after) });
             }}
           >
             Fine serie

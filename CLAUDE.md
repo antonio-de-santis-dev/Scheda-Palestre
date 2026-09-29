@@ -19,7 +19,7 @@ GymPlanner è una web app per palestre, **amministrata**: non esiste registrazio
     appartiene a una sola scheda;
   - riceve le sessioni **a rotazione** automatica, per scheda;
   - esegue l'allenamento serie per serie con **timer di recupero**: "Fine serie" è bloccato finché
-    il recupero non finisce; celebrazioni e guida vocale sono opzionali;
+    il recupero non finisce; celebrazioni e avviso sonoro di fine recupero sono opzionali;
   - può saltare esercizi o interrompere;
   - consulta lo **storico** e modifica telefono e password;
   - riceve un avviso quando la durata consigliata di una scheda è terminata.
@@ -76,8 +76,8 @@ Monolite modulare in `backend/src/main/java/com/gymplanner/`:
   `BusinessRuleException` 422, `BadRequestException`, …) → RFC 9457 con campo `code`.
   Risorse di altri utenti → **404**, mai 403.
 - `/api/me/**`: l'utente si ricava **sempre** da `@AuthenticationPrincipal AuthenticatedUser`.
-- Schema DB solo tramite **Flyway** (`backend/src/main/resources/db/migration`, V1…V9).
-  **Non modificare migrazioni esistenti**: aggiungi `V10__...sql`. Hibernate è in `validate`.
+- Schema DB solo tramite **Flyway** (`backend/src/main/resources/db/migration`, V1…V10).
+  **Non modificare migrazioni esistenti**: aggiungi una nuova migrazione. Hibernate è in `validate`.
 - Tabelle al plurale (`users`, mai `user`); nessun `@ManyToMany` utente-scheda.
 
 Punti delicati già risolti (non romperli):
@@ -95,7 +95,7 @@ Punti delicati già risolti (non romperli):
 - durante il recupero la serie successiva è rifiutata (`REST_NOT_FINISHED`), ma ripetere una serie
   già completata resta idempotente;
 - utenti mai cancellati fisicamente: `deleted_at` + anonimizzazione (ADR 0010);
-- `expires_on` è la durata **consigliata**: lo stato è calcolato dal server con `BusinessCalendar`
+- `duration_weeks` è la durata **consigliata**, calcolata dalla data di inizio di ogni assegnazione: lo stato è calcolato dal server con `BusinessCalendar`
   e non blocca nulla (ADR 0009);
 - "Fine serie" idempotente con lock pessimistico sul workout;
 - timer derivato da `restEndsAt`/`serverTime` (mai un contatore), `BusinessCalendar.now()` troncato ai ms;

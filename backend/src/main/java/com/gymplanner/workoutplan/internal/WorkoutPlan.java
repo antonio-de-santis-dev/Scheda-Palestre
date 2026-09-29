@@ -11,7 +11,6 @@ import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -36,7 +35,7 @@ public class WorkoutPlan {
     @Column(columnDefinition = "text")
     private String description;
 
-    private LocalDate expiresOn;
+    private Integer durationWeeks;
 
     @Column(nullable = false, updatable = false)
     private UUID createdBy;
@@ -65,18 +64,18 @@ public class WorkoutPlan {
     protected WorkoutPlan() {
     }
 
-    WorkoutPlan(String name, String description, LocalDate expiresOn, UUID createdBy, UUID copiedFromPlanId) {
+    WorkoutPlan(String name, String description, Integer durationWeeks, UUID createdBy, UUID copiedFromPlanId) {
         this.name = name;
         this.description = description;
-        this.expiresOn = expiresOn;
+        this.durationWeeks = durationWeeks;
         this.createdBy = createdBy;
         this.copiedFromPlanId = copiedFromPlanId;
     }
 
-    void updateMetadata(String name, String description, LocalDate expiresOn) {
+    void updateMetadata(String name, String description, Integer durationWeeks) {
         this.name = name;
         this.description = description;
-        this.expiresOn = expiresOn;
+        this.durationWeeks = durationWeeks;
     }
 
     /** Marks a structural change so that updatedAt and the optimistic version move forward. */
@@ -125,8 +124,8 @@ public class WorkoutPlan {
         return description;
     }
 
-    public LocalDate getExpiresOn() {
-        return expiresOn;
+    public Integer getDurationWeeks() {
+        return durationWeeks;
     }
 
     public UUID getCreatedBy() {

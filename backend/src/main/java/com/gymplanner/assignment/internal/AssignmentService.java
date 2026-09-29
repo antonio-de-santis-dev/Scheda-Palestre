@@ -154,21 +154,19 @@ class AssignmentService implements AssignmentQueries {
         }
     }
 
-    /**
-     * ADR 0009: active assignments whose plan's recommended duration has ended, for every user.
-     * Two bulk queries (ended plans, then their active assignments), never one per user.
-     */
+    /** Active assignments inside their final recommended week or later (one bulk plan lookup). */
     @Transactional(readOnly = true)
     public List<AssignmentDtos.EndedDurationResponse> recommendedDurationEnded() {
-        Map<UUID, PlanSummary> ended = plans.findPlansWithRecommendedDurationEnded(calendar.today());
+        Map<UUID, PlanSummary> ended = plans.findPlansWithRecommendedDuration();
         if (ended.isEmpty()) {
             return List.of();
         }
         return assignments.findByWorkoutPlanIdInAndActiveTrue(ended.keySet()).stream()
+                .filter(a -> ended.get(a.getWorkoutPlanId()).recommendedDurationWarning(a.getStartDate(), calendar.today()))
                 .map(a -> {
                     PlanSummary p = ended.get(a.getWorkoutPlanId());
                     return new AssignmentDtos.EndedDurationResponse(a.getUserId(), a.getId(), p.id(), p.name(),
-                            p.expiresOn());
+                            p.expiresOn(a.getStartDate()));
                 })
                 .toList();
     }
@@ -302,8 +300,9 @@ class AssignmentService implements AssignmentQueries {
                     u == null ? "?" : u.username(), a.getWorkoutPlanId(), p == null ? "?" : p.name(),
                     p != null && p.deleted(), a.getStartDate(), a.getEndDate(), a.isActive(), a.status().name(),
                     a.getCreatedAt(), copies.getOrDefault(a.getId(), CopyResult.NONE).copied(),
-                    copies.getOrDefault(a.getId(), CopyResult.NONE).skipped(), p == null ? null : p.expiresOn(),
-                    a.isActive() && p != null && p.recommendedDurationEnded(today));
+                    copies.getOrDefault(a.getId(), CopyResult.NONE).skipped(), p == null ? null : p.expiresOn(a.getStartDate()),
+                    a.isActive() && p != null && p.recommendedDurationEnded(a.getStartDate(), today),
+                    a.isActive() && p != null && p.recommendedDurationWarning(a.getStartDate(), today));
         }).toList();
     }
 }

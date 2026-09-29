@@ -35,7 +35,7 @@ function TodayContent({ today }: { today: Today }) {
       {today.pendingWorkout ? <PendingWorkout today={today} /> : null}
 
       {today.recommendedDurationEnded.map((p) => (
-        <RecommendedDurationNotice key={p.assignmentId} planName={p.planName} expiresOn={p.expiresOn} />
+        <RecommendedDurationNotice key={p.assignmentId} planName={p.planName} expiresOn={p.expiresOn} ended={p.ended} />
       ))}
 
       {today.status !== 'NO_SCHEDULE'

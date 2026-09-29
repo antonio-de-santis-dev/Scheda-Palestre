@@ -11,7 +11,6 @@ import com.gymplanner.workoutplan.api.WorkoutPlanQueries;
 import com.gymplanner.workoutplan.internal.PlanDtos.CreatePlanRequest;
 import com.gymplanner.workoutplan.internal.PlanDtos.UpdatePlanRequest;
 import java.time.Clock;
-import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -50,7 +49,7 @@ class PlanService implements WorkoutPlanQueries {
     @Transactional(readOnly = true)
     public Page<PlanDtos.PlanListItem> search(String q, boolean deleted, Pageable pageable) {
         return plans.search(Paging.likePattern(q), deleted, pageable)
-                .map(p -> new PlanDtos.PlanListItem(p.getId(), p.getName(), p.getDescription(), p.getExpiresOn(),
+                .map(p -> new PlanDtos.PlanListItem(p.getId(), p.getName(), p.getDescription(), p.getDurationWeeks(),
                         p.getSessions().size(), PlanStructureAssembler.isExecutable(p), p.getCopiedFromPlanId(),
                         p.getCreatedAt(), p.getUpdatedAt(), p.getDeletedAt()));
     }
@@ -58,7 +57,7 @@ class PlanService implements WorkoutPlanQueries {
     @Transactional
     public PlanStructure create(CreatePlanRequest request, UUID adminId) {
         WorkoutPlan plan = new WorkoutPlan(request.name().trim(), blankToNull(request.description()),
-                request.expiresOn(), adminId, null);
+                request.durationWeeks(), adminId, null);
         plans.saveAndFlush(plan);
         return assembler.assemble(plan);
     }
@@ -70,7 +69,7 @@ class PlanService implements WorkoutPlanQueries {
         if (plan.getVersion() != request.version()) {
             throw new ObjectOptimisticLockingFailureException(WorkoutPlan.class, id);
         }
-        plan.updateMetadata(request.name().trim(), blankToNull(request.description()), request.expiresOn());
+        plan.updateMetadata(request.name().trim(), blankToNull(request.description()), request.durationWeeks());
         plans.saveAndFlush(plan);
         return assembler.assemble(plan);
     }
@@ -101,7 +100,7 @@ class PlanService implements WorkoutPlanQueries {
         String name = source.getName();
         int max = 100 - COPY_SUFFIX.length();
         String copyName = (name.length() > max ? name.substring(0, max).trim() : name) + COPY_SUFFIX;
-        WorkoutPlan copy = new WorkoutPlan(copyName, source.getDescription(), source.getExpiresOn(), adminId,
+        WorkoutPlan copy = new WorkoutPlan(copyName, source.getDescription(), source.getDurationWeeks(), adminId,
                 source.getId());
         for (PlanSession session : source.getSessions()) {
             PlanSession sessionCopy = copy.addSession(session.getTitle());
@@ -131,8 +130,8 @@ class PlanService implements WorkoutPlanQueries {
 
     @Override
     @Transactional(readOnly = true)
-    public Map<UUID, PlanSummary> findPlansWithRecommendedDurationEnded(LocalDate today) {
-        return plans.findByDeletedAtIsNullAndExpiresOnBefore(today).stream().map(PlanService::summary)
+    public Map<UUID, PlanSummary> findPlansWithRecommendedDuration() {
+        return plans.findByDeletedAtIsNullAndDurationWeeksIsNotNull().stream().map(PlanService::summary)
                 .collect(Collectors.toMap(PlanSummary::id, Function.identity()));
     }
 
@@ -186,7 +185,7 @@ class PlanService implements WorkoutPlanQueries {
     }
 
     private static PlanSummary summary(WorkoutPlan plan) {
-        return new PlanSummary(plan.getId(), plan.getName(), plan.isDeleted(), plan.getExpiresOn());
+        return new PlanSummary(plan.getId(), plan.getName(), plan.isDeleted(), plan.getDurationWeeks());
     }
 
     private static String blankToNull(String value) {

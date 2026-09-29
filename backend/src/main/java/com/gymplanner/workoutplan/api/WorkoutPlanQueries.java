@@ -1,6 +1,5 @@
 package com.gymplanner.workoutplan.api;
 
-import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -14,8 +13,8 @@ public interface WorkoutPlanQueries {
 
     Map<UUID, PlanSummary> findPlans(Collection<UUID> planIds);
 
-    /** Not deleted plans with {@code expiresOn < today}: one query, for the ADMIN indicator. */
-    Map<UUID, PlanSummary> findPlansWithRecommendedDurationEnded(LocalDate today);
+    /** Not deleted plans with a duration configured, for the ADMIN indicator. */
+    Map<UUID, PlanSummary> findPlansWithRecommendedDuration();
 
     /** @throws com.gymplanner.shared.error.NotFoundException if the plan does not exist */
     PlanStructure getStructure(UUID planId);

@@ -71,9 +71,9 @@ function PlanCards({ items, daysOf }: { items: MyAssignment[]; daysOf?: (id: str
             {a.endDate ? ` al ${formatDate(a.endDate)}` : ''}
           </p>
           {daysOf ? <p className="plan-card__meta">{weekdaysText(daysOf(a.id))}</p> : null}
-          {a.recommendedDurationEnded && a.planExpiresOn ? (
+          {a.recommendedDurationWarning && a.planExpiresOn ? (
             <p className="plan-card__warning">
-              <CalendarX2 size={16} aria-hidden="true" /> Durata consigliata terminata il {formatDate(a.planExpiresOn)}
+              <CalendarX2 size={16} aria-hidden="true" /> Durata consigliata {a.recommendedDurationEnded ? 'terminata' : 'in scadenza'} il {formatDate(a.planExpiresOn)}
             </p>
           ) : null}
         </li>
