@@ -6,9 +6,28 @@ import { problem, server } from '../../test/server';
 import { normalUser, renderApp } from '../../test/render';
 import type { PlanSchedule } from './api';
 
-const strength: PlanSchedule = { assignmentId: 'as-1', planId: 'p-1', planName: 'Forza', startDate: '2026-10-01', weekdays: [1, 5] };
-const cardio: PlanSchedule = { assignmentId: 'as-2', planId: 'p-2', planName: 'Cardio', startDate: '2026-10-01', weekdays: [] };
+const strength: PlanSchedule = {
+  assignmentId: 'as-1',
+  planId: 'p-1',
+  planName: 'Forza',
+  startDate: '2026-10-01',
+  weekdays: [1, 5],
+  sessions: [
+    { id: 'strength-session-1', title: 'Giorno 1' },
+    { id: 'strength-session-2', title: 'Giorno 2' },
+  ],
+};
 
+const cardio: PlanSchedule = {
+  assignmentId: 'as-2',
+  planId: 'p-2',
+  planName: 'Cardio',
+  startDate: '2026-10-01',
+  weekdays: [],
+  sessions: [
+    { id: 'cardio-session-1', title: 'Giorno 1' },
+  ],
+};
 describe('schedule page (several active plans)', () => {
   it('shows every plan and marks the days used by the other plan, with the reason', async () => {
     server.use(

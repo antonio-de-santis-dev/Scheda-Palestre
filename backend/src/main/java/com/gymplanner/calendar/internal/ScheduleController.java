@@ -26,12 +26,32 @@ class ScheduleController {
     record ScheduleRequest(@NotNull @Size(max = 7) List<Integer> weekdays) {
     }
 
-    record PlanScheduleResponse(UUID assignmentId, UUID planId, String planName, LocalDate startDate,
-            List<Integer> weekdays) {
+    record NextSessionRequest(@NotNull UUID sessionId) {
+    }
+
+    record SessionResponse(UUID id, String title) {
+    }
+
+    record PlanScheduleResponse(
+            UUID assignmentId,
+            UUID planId,
+            String planName,
+            LocalDate startDate,
+            List<Integer> weekdays,
+            List<SessionResponse> sessions) {
 
         static PlanScheduleResponse of(CalendarService.PlanSchedule s) {
-            return new PlanScheduleResponse(s.assignmentId(), s.planId(), s.planName(), s.startDate(),
-                    List.copyOf(s.weekdays()));
+            return new PlanScheduleResponse(
+                    s.assignmentId(),
+                    s.planId(),
+                    s.planName(),
+                    s.startDate(),
+                    List.copyOf(s.weekdays()),
+                    s.sessions().stream()
+                            .map(session -> new SessionResponse(
+                                    session.id(),
+                                    session.title()))
+                            .toList());
         }
     }
 
@@ -51,5 +71,18 @@ class ScheduleController {
     PlanScheduleResponse replace(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID assignmentId,
             @Valid @RequestBody ScheduleRequest body) {
         return PlanScheduleResponse.of(service.replaceSchedule(user.id(), assignmentId, body.weekdays()));
+    }
+
+    @PutMapping("/assignments/{assignmentId}/next-session")
+    PlanScheduleResponse setNextSession(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable UUID assignmentId,
+            @Valid @RequestBody NextSessionRequest body) {
+
+        return PlanScheduleResponse.of(
+                service.setNextSession(
+                        user.id(),
+                        assignmentId,
+                        body.sessionId()));
     }
 }

@@ -31,6 +31,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.gymplanner.calendar.api.WorkoutScheduleAvailability;
+import com.gymplanner.calendar.api.WorkoutScheduleAvailability;
 
 /**
  * Weekly days and session rotation (US-15, spec 10.6). Days belong to one assignment; a weekday
@@ -48,14 +50,21 @@ class CalendarService implements CalendarQueries {
     private final WorkoutPlanQueries plans;
     private final BusinessCalendar calendar;
     private final UserLock userLock;
+    private final WorkoutScheduleAvailability workoutAvailability;
 
-    CalendarService(WeeklyScheduleRepository schedules, AssignmentQueries assignments, WorkoutPlanQueries plans,
-            BusinessCalendar calendar, UserLock userLock) {
+    CalendarService(
+            WeeklyScheduleRepository schedules,
+            AssignmentQueries assignments,
+            WorkoutPlanQueries plans,
+            BusinessCalendar calendar,
+            UserLock userLock,
+            WorkoutScheduleAvailability workoutAvailability) {
         this.schedules = schedules;
         this.assignments = assignments;
         this.plans = plans;
         this.calendar = calendar;
         this.userLock = userLock;
+        this.workoutAvailability = workoutAvailability;
     }
 
     /** The days of one active plan of the user. */
@@ -118,6 +127,71 @@ class CalendarService implements CalendarQueries {
             schedules.flush();
             log.info("Assignment id={} weekly schedule replaced", assignment.id());
         }
+        return schedulesOf(List.of(assignment)).getFirst();
+    }
+
+    /**
+     * Sets the session for the next scheduled date without an existing workout.
+     * Existing workouts keep their original session and progress.
+     */
+    @Transactional
+    public PlanSchedule setNextSession(
+            UUID userId,
+            UUID assignmentId,
+            UUID sessionId) {
+
+        userLock.lock(userId);
+
+        AssignmentView assignment = assignments.findForUser(assignmentId, userId)
+                .orElseThrow(() -> new NotFoundException("Assignment"));
+
+        if (!assignment.active()) {
+            throw new BusinessRuleException(
+                    "ASSIGNMENT_NOT_ACTIVE",
+                    "La scheda deve essere attiva");
+        }
+
+        Set<Integer> days = weekdays(assignmentId);
+        if (days.isEmpty()) {
+            throw new BusinessRuleException(
+                    "SCHEDULE_DAYS_REQUIRED",
+                    "Scegli e salva prima i giorni di allenamento");
+        }
+
+        List<PlanSessionRef> sessions =
+                plans.sessionsInOrder(assignment.planId());
+
+        int selectedIndex = -1;
+        for (int i = 0; i < sessions.size(); i++) {
+            if (sessions.get(i).id().equals(sessionId)) {
+                selectedIndex = i;
+                break;
+            }
+        }
+
+        if (selectedIndex < 0) {
+            throw BadRequestException.field(
+                    "sessionId",
+                    "La sessione scelta non appartiene alla scheda");
+        }
+
+        LocalDate nextDate = calendar.today();
+        if (assignment.startDate().isAfter(nextDate)) {
+            nextDate = assignment.startDate();
+        }
+
+        while (!RotationCalculator.isScheduled(days, nextDate)
+                || workoutAvailability.hasWorkout(assignmentId, nextDate)) {
+            nextDate = nextDate.plusDays(1);
+        }
+
+        assignments.updateRotationAnchor(
+                assignmentId, nextDate, selectedIndex);
+
+        log.info(
+                "Assignment id={} next session id={} set for date={}",
+                assignmentId, sessionId, nextDate);
+
         return schedulesOf(List.of(assignment)).getFirst();
     }
 

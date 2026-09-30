@@ -105,8 +105,7 @@ describe('plan editor', () => {
       expect(calls).toContainEqual({
         method: 'POST',
         url: '/api/admin/sections/sec-1/exercises',
-        body: { exerciseId: 'ex-3', setsCount: 3, reps: 0, toFailure: true, restSeconds: 90, customSets: [] },
-      }),
+        body: { exerciseId: 'ex-3', setsCount: 3, reps: 0, toFailure: true, restSeconds: 60, customSets: [] },      }),
     );
     // Only the active exercises of the section's group are offered.
     expect(exerciseQueries.some((q) => q.includes('muscleGroupId=mg-1') && q.includes('active=true'))).toBe(true);
