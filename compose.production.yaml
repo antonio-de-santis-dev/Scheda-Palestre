@@ -1,0 +1,70 @@
+name: gymplanner
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gymplanner}
+      POSTGRES_USER: ${POSTGRES_USER:-gymplanner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Impostare POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-gymplanner}
+      DB_USERNAME: ${POSTGRES_USER:-gymplanner}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Impostare POSTGRES_PASSWORD}
+      GYM_ADMIN_USERNAME: ${GYM_ADMIN_USERNAME:?Impostare GYM_ADMIN_USERNAME}
+      GYM_ADMIN_EMAIL: ${GYM_ADMIN_EMAIL:?Impostare GYM_ADMIN_EMAIL}
+      GYM_ADMIN_PASSWORD: ${GYM_ADMIN_PASSWORD:?Impostare GYM_ADMIN_PASSWORD}
+      GYM_COOKIE_SECURE: "true"
+      GYM_CORS_ALLOWED_ORIGINS: https://${GYM_DOMAIN:?Impostare GYM_DOMAIN}
+      GYM_TIME_ZONE: ${GYM_TIME_ZONE:-Europe/Rome}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      frontend:
+        condition: service_started
+    environment:
+      GYM_DOMAIN: ${GYM_DOMAIN:?Impostare GYM_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
