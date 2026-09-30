@@ -56,8 +56,14 @@ class ExecutionIntegrationTest {
         user = fixtures.createUser();
         // 2 sessions x 2 exercises x 2 sets, 10 reps, 60 s rest.
         plan = factory.executablePlan(admin, "Esecuzione", 2, 2, 2);
-        assignTo(user, plan);
-        api.put(user, "/api/me/schedule", "{\"weekdays\":[1,2,3,4,5,6,7]}").expect(200);
+        assignmentId = assignTo(user, plan);
+        api.put(user, scheduleUrl(assignmentId), "{\"weekdays\":[1,2,3,4,5,6,7]}").expect(200);
+    }
+
+    UUID assignmentId;
+
+    private static String scheduleUrl(UUID id) {
+        return "/api/me/assignments/" + id + "/schedule";
     }
 
     @AfterEach
@@ -65,10 +71,10 @@ class ExecutionIntegrationTest {
         clock.reset();
     }
 
-    private void assignTo(AuthenticatedUser who, BuiltPlan p) {
-        api.post(admin, "/api/admin/assignments", """
+    private UUID assignTo(AuthenticatedUser who, BuiltPlan p) {
+        return UUID.fromString(api.post(admin, "/api/admin/assignments", """
                 {"planId":"%s","userIds":["%s"],"startDate":"%s","activate":true}"""
-                .formatted(p.planId(), who.id(), MONDAY)).expect(201);
+                .formatted(p.planId(), who.id(), MONDAY)).expect(201).read("$[0].id"));
     }
 
     private Api.Response start(AuthenticatedUser who, LocalDate date) {
@@ -100,8 +106,16 @@ class ExecutionIntegrationTest {
         assertThat((String) state.read("$.nextAction")).isEqualTo("WAIT_FOR_REST");
         assertThat((Integer) state.read("$.exercises[0].setsCompleted")).isEqualTo(1);
 
-        // O-06: the timer is informative, the next set can be completed during the rest.
+        // Fase F (supersedes O-06): the next set is refused while the rest is running...
         clock.advance(Duration.ofSeconds(20));
+        Api.Response early = complete(user, state).expectCode(422, "REST_NOT_FINISHED");
+        assertThat((String) early.read("$.restEndsAt")).isEqualTo(state.read("$.restEndsAt"));
+        // ...but repeating the already completed set is still idempotent (200, same state).
+        String firstSet = (String) state.read("$.exercises[0].sets[0].id");
+        api.post(user, "/api/me/workouts/" + state.read("$.workoutId") + "/sets/" + firstSet + "/complete", null)
+                .expect(200);
+        // At the exact end of the rest the next set is accepted.
+        clock.advance(Duration.ofSeconds(40));
         state = complete(user, state).expect(200);
         assertThat((List<String>) state.read("$.exercises[*].status")).containsExactly("COMPLETED", "IN_PROGRESS");
         // O-03: rest also runs between exercises.
@@ -109,6 +123,7 @@ class ExecutionIntegrationTest {
 
         clock.advance(Duration.ofSeconds(90));
         state = complete(user, state).expect(200);
+        clock.advance(Duration.ofSeconds(60));
         state = complete(user, state).expect(200);
         assertThat((String) state.read("$.status")).isEqualTo("COMPLETED");
         assertThat((String) state.read("$.nextAction")).isEqualTo("FINISHED");
@@ -118,6 +133,18 @@ class ExecutionIntegrationTest {
         assertThat(jdbc.queryForObject("select count(*) from workout_sets ws join workout_exercises we on we.id = ws.workout_exercise_id "
                 + "where we.workout_id = ? and ws.completed_at is not null", Integer.class,
                 UUID.fromString(state.read("$.workoutId")))).isEqualTo(4);
+    }
+
+    @Test
+    void skipAndInterruptStayAllowedDuringTheRest() {
+        Api.Response state = start(user, MONDAY).expect(201);
+        state = complete(user, state).expect(200);
+        assertThat((String) state.read("$.nextAction")).isEqualTo("WAIT_FOR_REST");
+        String workoutId = state.read("$.workoutId");
+        state = api.post(user, "/api/me/workouts/" + workoutId + "/exercises/" + state.read("$.currentExerciseId")
+                + "/skip", null).expect(200);
+        assertThat((List<String>) state.read("$.exercises[*].status")).containsExactly("SKIPPED", "IN_PROGRESS");
+        api.post(user, "/api/me/workouts/" + workoutId + "/interrupt", null).expect(200);
     }
 
     @Test
@@ -142,6 +169,7 @@ class ExecutionIntegrationTest {
         String workoutId = state.read("$.workoutId");
         // Last set of the first exercise: a double advance would also complete exercise 2.
         state = complete(user, state).expect(200);
+        clock.advance(Duration.ofSeconds(60));
         String setId = state.read("$.currentSetId");
         String url = "/api/me/workouts/" + workoutId + "/sets/" + setId + "/complete";
 
@@ -225,7 +253,7 @@ class ExecutionIntegrationTest {
         // Tomorrow (time zone tolerance) is allowed only once the current one is closed.
         start(user, MONDAY.plusDays(1)).expectCode(409, "WORKOUT_ALREADY_IN_PROGRESS");
 
-        api.put(user, "/api/me/schedule", "{\"weekdays\":[3]}").expect(200);
+        api.put(user, scheduleUrl(assignmentId), "{\"weekdays\":[3]}").expect(200);
         start(user, MONDAY.plusDays(1)).expectCode(422, "NOT_A_TRAINING_DAY");
 
         AuthenticatedUser noPlan = fixtures.createUser();
@@ -319,7 +347,7 @@ class ExecutionIntegrationTest {
         assertThat((String) today.read("$.session.title")).isEqualTo("Giorno 2");
         assertThat((Boolean) today.read("$.canStart")).isFalse();
 
-        api.put(user, "/api/me/schedule", "{\"weekdays\":[5]}").expect(200);
+        api.put(user, scheduleUrl(assignmentId), "{\"weekdays\":[5]}").expect(200);
         today = api.get(user, "/api/me/today?date=" + MONDAY.plusDays(1)).expect(200);
         assertThat((String) today.read("$.status")).isEqualTo("REST_DAY");
         assertThat((String) today.read("$.nextTraining.date")).isEqualTo(MONDAY.plusDays(4).toString());
@@ -333,6 +361,61 @@ class ExecutionIntegrationTest {
         AuthenticatedUser fresh = fixtures.createUser();
         assignTo(fresh, plan);
         assertThat((String) api.get(fresh, "/api/me/today?date=" + MONDAY).read("$.status")).isEqualTo("NO_SCHEDULE");
+    }
+
+    @Test
+    void todayAndCalendarResolveThePlanOfEachDayWithTwoActivePlans() {
+        api.put(user, scheduleUrl(assignmentId), "{\"weekdays\":[1,3]}").expect(200);
+        BuiltPlan cardio = factory.executablePlan(admin, "Cardio", 3, 1, 1);
+        UUID cardioId = assignTo(user, cardio);
+
+        // The second plan has no days yet: the user is guided to choose them.
+        Api.Response today = api.get(user, "/api/me/today?date=" + MONDAY).expect(200);
+        assertThat((Integer) today.read("$.activePlanCount")).isEqualTo(2);
+        assertThat((List<String>) today.read("$.plansWithoutDays[*].assignmentId")).containsExactly(cardioId.toString());
+        api.put(user, scheduleUrl(cardioId), "{\"weekdays\":[2,4]}").expect(200);
+
+        today = api.get(user, "/api/me/today?date=" + MONDAY).expect(200);
+        assertThat((String) today.read("$.status")).isEqualTo("TRAINING_DAY");
+        assertThat((String) today.read("$.planName")).startsWith("Esecuzione");
+        assertThat((String) today.read("$.assignmentId")).isEqualTo(assignmentId.toString());
+        assertThat((List<Object>) today.read("$.plansWithoutDays")).isEmpty();
+
+        today = api.get(user, "/api/me/today?date=" + MONDAY.plusDays(1)).expect(200);
+        assertThat((String) today.read("$.status")).isEqualTo("TRAINING_DAY");
+        assertThat((String) today.read("$.planName")).startsWith("Cardio");
+        assertThat((String) today.read("$.session.title")).isEqualTo("Giorno 1");
+
+        // Friday: no plan trains; the next training comes from the nearest plan.
+        today = api.get(user, "/api/me/today?date=" + MONDAY.plusDays(4)).expect(200);
+        assertThat((String) today.read("$.status")).isEqualTo("REST_DAY");
+        assertThat((String) today.read("$.nextTraining.date")).isEqualTo(MONDAY.plusDays(7).toString());
+        assertThat((String) today.read("$.nextTraining.planName")).startsWith("Esecuzione");
+
+        Api.Response calendar = api.get(user, "/api/me/calendar?from=" + MONDAY + "&to=" + MONDAY.plusDays(6)).expect(200);
+        assertThat((List<String>) calendar.read("$[*].type"))
+                .containsExactly("TRAINING", "TRAINING", "TRAINING", "TRAINING", "REST", "REST", "REST");
+        assertThat((String) calendar.read("$[1].planName")).startsWith("Cardio");
+        assertThat((String) calendar.read("$[2].planName")).startsWith("Esecuzione");
+        assertThat((List<String>) calendar.read("$[0:4].sessionTitle"))
+                .containsExactly("Giorno 1", "Giorno 1", "Giorno 2", "Giorno 2");
+
+        // Starting on Tuesday uses the cardio plan (snapshot of its name).
+        clock.setDate(MONDAY.plusDays(1));
+        Api.Response state = start(user, MONDAY.plusDays(1)).expect(201);
+        assertThat((String) state.read("$.planName")).startsWith("Cardio");
+    }
+
+    @Test
+    void changingDaysDuringAWorkoutKeepsTheWorkoutRunning() {
+        Api.Response state = start(user, MONDAY).expect(201);
+        api.put(user, scheduleUrl(assignmentId), "{\"weekdays\":[3,5]}").expect(200);
+        Api.Response current = api.get(user, "/api/me/workouts/current").expect(200);
+        assertThat((String) current.read("$.workoutId")).isEqualTo(state.read("$.workoutId"));
+        complete(user, current).expect(200);
+        // The new days apply to future dates only.
+        assertThat((String) api.get(user, "/api/me/today?date=" + MONDAY.plusDays(2)).read("$.status"))
+                .isEqualTo("TRAINING_DAY");
     }
 
     @Test

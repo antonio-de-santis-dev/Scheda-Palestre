@@ -1,7 +1,6 @@
 package com.gymplanner.workoutplan.api;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -13,7 +12,7 @@ public record PlanStructure(
         UUID id,
         String name,
         String description,
-        LocalDate expiresOn,
+        Integer durationWeeks,
         UUID createdBy,
         UUID copiedFromPlanId,
         Instant createdAt,
@@ -35,9 +34,12 @@ public record PlanStructure(
     }
 
     /**
-     * @param customized true when per-set values exist; {@code sets} always holds the N effective sets
+     * @param exerciseInSectionGroup false for a tolerated historic entry whose exercise now belongs
+     *                               to another muscle group (ADR 0007)
+     * @param customized             true when per-set values exist; {@code sets} always holds the N effective sets
      */
-    public record Exercise(UUID id, UUID exerciseId, String exerciseName, boolean exerciseActive, int position,
+    public record Exercise(UUID id, UUID exerciseId, String exerciseName, boolean exerciseActive,
+            boolean exerciseInSectionGroup, int position,
             int setsCount, int reps, boolean toFailure, int restSeconds, boolean customized, List<Set> sets) {
     }
 

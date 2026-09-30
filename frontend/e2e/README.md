@@ -9,6 +9,14 @@ Coprono i flussi principali della specifica (§16), eseguiti su un sistema reale
 5. USER salta un esercizio → lo storico mostra "Saltato"
 6. ADMIN modifica la scheda → lo storico passato resta invariato
 
+Aggiunti nel branch `modifiche`:
+
+- notifiche "Nuova scheda creata" / "Scheda modificata" / "Scheda assegnata" (che non riappaiono dopo il refresh);
+- catalogo unificato con deep link `?group=` e combobox nell'editor;
+- "Fine serie" bloccato durante il recupero e messaggio "Esercizio completato";
+- seconda scheda attiva (duplicazione + assegnazione), giorni divisi fra due schede, giorno occupato non selezionabile;
+- report attività ed eliminazione di un account con doppia conferma (login poi rifiutato).
+
 ## Esecuzione
 
 1. Avvia PostgreSQL, backend e frontend come nel `README.md` (backend su 8080, Vite su 5173).

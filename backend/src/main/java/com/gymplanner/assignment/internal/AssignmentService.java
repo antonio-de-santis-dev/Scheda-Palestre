@@ -3,13 +3,17 @@ package com.gymplanner.assignment.internal;
 import com.gymplanner.assignment.api.AssignmentEvents;
 import com.gymplanner.assignment.api.AssignmentQueries;
 import com.gymplanner.assignment.api.AssignmentView;
+import com.gymplanner.assignment.api.ScheduleCopyPort;
+import com.gymplanner.assignment.api.ScheduleCopyPort.CopyResult;
 import com.gymplanner.assignment.internal.AssignmentDtos.AssignRequest;
 import com.gymplanner.assignment.internal.AssignmentDtos.AssignmentResponse;
 import com.gymplanner.identity.api.UserDirectory;
+import com.gymplanner.identity.api.UserEvents;
 import com.gymplanner.identity.api.UserRole;
 import com.gymplanner.identity.api.UserSummary;
 import com.gymplanner.shared.error.BusinessRuleException;
 import com.gymplanner.shared.error.ConflictException;
+import com.gymplanner.shared.concurrency.UserLock;
 import com.gymplanner.shared.error.NotFoundException;
 import com.gymplanner.shared.time.BusinessCalendar;
 import com.gymplanner.workoutplan.api.PlanStructure;
@@ -19,6 +23,7 @@ import com.gymplanner.workoutplan.api.WorkoutPlanQueries;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -33,9 +38,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Application service of the assignment module (US-06, US-07, US-08 closing). Activation is the
- * orchestration of spec 10.5, executed in one transaction; reactions of other modules
- * (interrupting workouts, copying weekly days) run synchronously through events.
+ * Application service of the assignment module (US-06, US-07, US-08 closing). A USER can have
+ * several active plans (ADR 0008): activating a plan never closes the others; the same plan
+ * cannot be active twice for the same user. Changes of the active set of one user are serialised
+ * by {@link UserLock}; closing reacts in other modules through synchronous events.
  */
 @Service
 class AssignmentService implements AssignmentQueries {
@@ -47,14 +53,19 @@ class AssignmentService implements AssignmentQueries {
     private final WorkoutPlanQueries plans;
     private final BusinessCalendar calendar;
     private final ApplicationEventPublisher events;
+    private final UserLock userLock;
+    private final ScheduleCopyPort scheduleCopy;
 
     AssignmentService(PlanAssignmentRepository assignments, UserDirectory users, WorkoutPlanQueries plans,
-            BusinessCalendar calendar, ApplicationEventPublisher events) {
+            BusinessCalendar calendar, ApplicationEventPublisher events, UserLock userLock,
+            ScheduleCopyPort scheduleCopy) {
         this.assignments = assignments;
         this.users = users;
         this.plans = plans;
         this.calendar = calendar;
         this.events = events;
+        this.userLock = userLock;
+        this.scheduleCopy = scheduleCopy;
     }
 
     // ------------------------------------------------------------------ ADMIN
@@ -73,22 +84,23 @@ class AssignmentService implements AssignmentQueries {
         Map<UUID, UserSummary> found = users.findAll(userIds);
         for (UUID userId : userIds) {
             UserSummary user = found.get(userId);
-            if (user == null || user.role() != UserRole.USER) {
+            if (user == null || user.role() != UserRole.USER || user.deleted()) {
                 throw new BusinessRuleException("USER_NOT_ASSIGNABLE", "Plans can only be assigned to USER accounts");
             }
         }
         List<PlanAssignment> created = new ArrayList<>();
+        Map<UUID, CopyResult> copies = new HashMap<>();
         for (UUID userId : userIds) {
             PlanAssignment assignment = assignments.save(
                     new PlanAssignment(userId, plan.id(), adminId, request.startDate()));
             if (request.activate()) {
-                activateInternal(assignment, request.copySchedule() == null || request.copySchedule());
+                copies.put(assignment.getId(), activateInternal(assignment, request.copy()));
             }
             created.add(assignment);
         }
         assignments.flush();
         log.info("Plan id={} assigned to {} user(s), activate={}", plan.id(), created.size(), request.activate());
-        return toResponses(created);
+        return toResponses(created, copies);
     }
 
     @Transactional
@@ -102,7 +114,9 @@ class AssignmentService implements AssignmentQueries {
                     "A closed assignment cannot be activated again: create a new one");
             case PENDING -> {
                 plans.requireExecutable(assignment.getWorkoutPlanId());
-                activateInternal(assignment, copySchedule);
+                CopyResult copy = activateInternal(assignment, copySchedule);
+                assignments.flush();
+                return toResponses(List.of(assignment), Map.of(assignment.getId(), copy)).getFirst();
             }
         }
         assignments.flush();
@@ -140,6 +154,36 @@ class AssignmentService implements AssignmentQueries {
         }
     }
 
+    /** Active assignments inside their final recommended week or later (one bulk plan lookup). */
+    @Transactional(readOnly = true)
+    public List<AssignmentDtos.EndedDurationResponse> recommendedDurationEnded() {
+        Map<UUID, PlanSummary> ended = plans.findPlansWithRecommendedDuration();
+        if (ended.isEmpty()) {
+            return List.of();
+        }
+        return assignments.findByWorkoutPlanIdInAndActiveTrue(ended.keySet()).stream()
+                .filter(a -> ended.get(a.getWorkoutPlanId()).recommendedDurationWarning(a.getStartDate(), calendar.today()))
+                .map(a -> {
+                    PlanSummary p = ended.get(a.getWorkoutPlanId());
+                    return new AssignmentDtos.EndedDurationResponse(a.getUserId(), a.getId(), p.id(), p.name(),
+                            p.expiresOn(a.getStartDate()));
+                })
+                .toList();
+    }
+
+    /**
+     * ADR 0010: a deleted account keeps its history, but its active and pending assignments are
+     * closed (the in-progress workout is interrupted through {@code AssignmentClosed}).
+     */
+    @EventListener
+    @Transactional
+    public void onUserDeleted(UserEvents.UserDeleted event) {
+        List<PlanAssignment> open = assignments.findByUserIdOrderByCreatedAtDesc(event.userId()).stream()
+                .filter(a -> a.status() != PlanAssignment.Status.CLOSED).toList();
+        open.forEach(this::closeInternal);
+        log.info("Account id={} deleted: {} assignment(s) closed", event.userId(), open.size());
+    }
+
     // ------------------------------------------------------------------ USER
 
     @Transactional(readOnly = true)
@@ -159,8 +203,15 @@ class AssignmentService implements AssignmentQueries {
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<AssignmentView> findActiveForUser(UUID userId) {
-        return assignments.findByUserIdAndActiveTrue(userId).map(AssignmentService::view);
+    public List<AssignmentView> listActiveForUser(UUID userId) {
+        return assignments.findByUserIdAndActiveTrueOrderByCreatedAtAsc(userId).stream()
+                .map(AssignmentService::view).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AssignmentView> listAllForUser(UUID userId) {
+        return assignments.findByUserIdOrderByCreatedAtDesc(userId).stream().map(AssignmentService::view).toList();
     }
 
     @Override
@@ -190,27 +241,27 @@ class AssignmentService implements AssignmentQueries {
     // ------------------------------------------------------------------ internals
 
     /**
-     * Spec 10.5: close the previous active assignment (its in-progress workout is interrupted by
-     * the execution module), activate, initialise the rotation anchor, copy the weekly days.
+     * ADR 0008: under the user lock, refuse a second active assignment of the same plan, activate
+     * (rotation anchor initialised) and optionally copy the free days of the user's last closed plan.
+     * Other active plans and any workout in progress are left untouched.
      */
-    private void activateInternal(PlanAssignment assignment, boolean copySchedule) {
-        UUID previousId = null;
-        Optional<PlanAssignment> previous = assignments.lockActiveByUser(assignment.getUserId());
-        if (previous.isPresent()) {
-            PlanAssignment old = previous.get();
-            if (old.getWorkoutPlanId().equals(assignment.getWorkoutPlanId())) {
-                throw new ConflictException("ASSIGNMENT_ALREADY_ACTIVE",
-                        "The user already has this plan as active assignment");
-            }
-            closeInternal(old);
-            previousId = old.getId();
-            // Flush now: the partial unique index is checked row by row.
-            assignments.flush();
+    private CopyResult activateInternal(PlanAssignment assignment, boolean copySchedule) {
+        UUID userId = assignment.getUserId();
+        userLock.lock(userId);
+        if (assignments.existsByUserIdAndWorkoutPlanIdAndActiveTrue(userId, assignment.getWorkoutPlanId())) {
+            throw new ConflictException("ASSIGNMENT_ALREADY_ACTIVE", "The user already has this plan as active assignment");
         }
+        List<UUID> otherActive = assignments.findByUserIdAndActiveTrueOrderByCreatedAtAsc(userId).stream()
+                .map(PlanAssignment::getId).toList();
         assignment.activate(calendar.today());
         assignments.flush();
-        events.publishEvent(new AssignmentEvents.AssignmentActivated(assignment.getId(), assignment.getUserId(),
-                previousId, copySchedule));
+        if (!copySchedule) {
+            return CopyResult.NONE;
+        }
+        return assignments.findFirstByUserIdAndActiveFalseAndEndDateIsNotNullAndIdNotOrderByCreatedAtDesc(userId,
+                        assignment.getId())
+                .map(source -> scheduleCopy.copyFreeDays(source.getId(), assignment.getId(), otherActive))
+                .orElse(CopyResult.NONE);
     }
 
     private void closeInternal(PlanAssignment assignment) {
@@ -233,17 +284,25 @@ class AssignmentService implements AssignmentQueries {
                 a.isActive(), a.getRotationAnchorDate(), a.getRotationAnchorIndex());
     }
 
-    /** Bulk resolution of user and plan names (no N+1). */
     private List<AssignmentResponse> toResponses(Collection<PlanAssignment> list) {
+        return toResponses(list, Map.of());
+    }
+
+    /** Bulk resolution of user and plan names (no N+1). */
+    private List<AssignmentResponse> toResponses(Collection<PlanAssignment> list, Map<UUID, CopyResult> copies) {
         Map<UUID, UserSummary> userMap = users.findAll(list.stream().map(PlanAssignment::getUserId).toList());
         Map<UUID, PlanSummary> planMap = plans.findPlans(list.stream().map(PlanAssignment::getWorkoutPlanId).toList());
+        LocalDate today = calendar.today();
         return list.stream().map(a -> {
             UserSummary u = userMap.get(a.getUserId());
             PlanSummary p = planMap.get(a.getWorkoutPlanId());
             return new AssignmentResponse(a.getId(), a.getUserId(), u == null ? "?" : u.fullName(),
                     u == null ? "?" : u.username(), a.getWorkoutPlanId(), p == null ? "?" : p.name(),
                     p != null && p.deleted(), a.getStartDate(), a.getEndDate(), a.isActive(), a.status().name(),
-                    a.getCreatedAt());
+                    a.getCreatedAt(), copies.getOrDefault(a.getId(), CopyResult.NONE).copied(),
+                    copies.getOrDefault(a.getId(), CopyResult.NONE).skipped(), p == null ? null : p.expiresOn(a.getStartDate()),
+                    a.isActive() && p != null && p.recommendedDurationEnded(a.getStartDate(), today),
+                    a.isActive() && p != null && p.recommendedDurationWarning(a.getStartDate(), today));
         }).toList();
     }
 }

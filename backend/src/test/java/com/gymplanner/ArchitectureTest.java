@@ -30,7 +30,8 @@ class ArchitectureTest {
             "workoutplan", Set.of("catalog"),
             "assignment", Set.of("identity", "workoutplan"),
             "calendar", Set.of("assignment", "workoutplan"),
-            "execution", Set.of("calendar", "assignment", "workoutplan"));
+            // identity: the ADMIN activity report checks that the user exists (ADR 0010).
+            "execution", Set.of("identity", "calendar", "assignment", "workoutplan"));
 
     private static JavaClasses classes;
 

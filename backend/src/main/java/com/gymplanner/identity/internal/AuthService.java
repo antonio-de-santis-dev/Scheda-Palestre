@@ -57,7 +57,8 @@ class AuthService {
             }
             throw invalidCredentials();
         }
-        if (!user.isActive()) {
+        if (!user.isActive() || user.isDeleted()) {
+            // Same answer as wrong credentials: never reveal that the account was deleted.
             log.info("Login rejected for inactive account id={}", user.getId());
             throw invalidCredentials();
         }

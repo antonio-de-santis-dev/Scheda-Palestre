@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router';
 import { LogOut } from 'lucide-react';
 import { useCurrentUser, useLogout } from '../../auth/useAuth';
 import { BrandMark } from './BrandMark';
+import { FlashOutlet } from '../../shared/flash/FlashOutlet';
 
 export interface NavItem {
   to: string;
@@ -62,6 +63,7 @@ export function AppLayout({ home, areaLabel, items }: AppLayoutProps) {
         </button>
       </header>
       <main id="main" className="main" tabIndex={-1}>
+        <FlashOutlet />
         <Outlet />
       </main>
       {mobileItems.length > 1 ? (

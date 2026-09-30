@@ -10,7 +10,7 @@ public interface CatalogLookup {
     /** Bulk lookup (no N+1). Inactive items are included: they stay visible in existing plans. */
     Map<UUID, CatalogItemView> muscleGroups(Collection<UUID> ids);
 
-    Map<UUID, CatalogItemView> exercises(Collection<UUID> ids);
+    Map<UUID, ExerciseView> exercises(Collection<UUID> ids);
 
     /**
      * Returns the muscle group if it can be used in a new configuration.
@@ -20,5 +20,12 @@ public interface CatalogLookup {
      */
     CatalogItemView requireSelectableMuscleGroup(UUID id);
 
-    CatalogItemView requireSelectableExercise(UUID id);
+    /**
+     * Returns the exercise if it can be added to a section of {@code muscleGroupId}.
+     *
+     * @throws com.gymplanner.shared.error.NotFoundException      if it does not exist
+     * @throws com.gymplanner.shared.error.BusinessRuleException  {@code CATALOG_ITEM_INACTIVE} if deactivated,
+     *                                                            {@code EXERCISE_GROUP_MISMATCH} if it belongs to another group
+     */
+    ExerciseView requireSelectableExercise(UUID id, UUID muscleGroupId);
 }

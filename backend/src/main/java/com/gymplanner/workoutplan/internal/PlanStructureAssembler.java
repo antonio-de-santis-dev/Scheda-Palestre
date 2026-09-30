@@ -2,6 +2,7 @@ package com.gymplanner.workoutplan.internal;
 
 import com.gymplanner.catalog.api.CatalogItemView;
 import com.gymplanner.catalog.api.CatalogLookup;
+import com.gymplanner.catalog.api.ExerciseView;
 import com.gymplanner.workoutplan.api.PlanStructure;
 import java.util.HashSet;
 import java.util.List;
@@ -35,7 +36,7 @@ class PlanStructureAssembler {
             }
         }
         Map<UUID, CatalogItemView> groups = catalog.muscleGroups(groupIds);
-        Map<UUID, CatalogItemView> exercises = catalog.exercises(exerciseIds);
+        Map<UUID, ExerciseView> exercises = catalog.exercises(exerciseIds);
 
         List<PlanStructure.Session> sessions = sorted(plan.getSessions()).stream()
                 .map(session -> new PlanStructure.Session(session.getId(), session.getTitle(), session.getPosition(),
@@ -43,23 +44,26 @@ class PlanStructureAssembler {
                                 .map(section -> section(section, groups, exercises))
                                 .toList()))
                 .toList();
-        return new PlanStructure(plan.getId(), plan.getName(), plan.getDescription(), plan.getExpiresOn(),
+        return new PlanStructure(plan.getId(), plan.getName(), plan.getDescription(), plan.getDurationWeeks(),
                 plan.getCreatedBy(), plan.getCopiedFromPlanId(), plan.getCreatedAt(), plan.getUpdatedAt(),
                 plan.getDeletedAt(), plan.getVersion(), isExecutable(plan), sessions);
     }
 
     private static PlanStructure.Section section(MuscleSection section, Map<UUID, CatalogItemView> groups,
-            Map<UUID, CatalogItemView> exercises) {
+            Map<UUID, ExerciseView> exercises) {
         CatalogItemView group = groups.get(section.getMuscleGroupId());
         return new PlanStructure.Section(section.getId(), section.getMuscleGroupId(),
                 group == null ? "?" : group.name(), group != null && group.active(), section.getPosition(),
-                sorted(section.getExercises()).stream().map(e -> exercise(e, exercises)).toList());
+                sorted(section.getExercises()).stream().map(e -> exercise(e, section.getMuscleGroupId(), exercises))
+                        .toList());
     }
 
-    private static PlanStructure.Exercise exercise(PlanExercise e, Map<UUID, CatalogItemView> exercises) {
-        CatalogItemView item = exercises.get(e.getExerciseId());
+    private static PlanStructure.Exercise exercise(PlanExercise e, UUID sectionGroupId,
+            Map<UUID, ExerciseView> exercises) {
+        ExerciseView item = exercises.get(e.getExerciseId());
         return new PlanStructure.Exercise(e.getId(), e.getExerciseId(), item == null ? "?" : item.name(),
-                item != null && item.active(), e.getPosition(), e.getSetsCount(), e.getReps(), e.isToFailure(),
+                item != null && item.active(), item != null && item.muscleGroupId().equals(sectionGroupId),
+                e.getPosition(), e.getSetsCount(), e.getReps(), e.isToFailure(),
                 e.getRestSeconds(), e.isCustomized(),
                 e.effectiveSets().stream()
                         .map(s -> new PlanStructure.Set(s.setIndex(), s.reps(), s.toFailure(), s.restSeconds()))

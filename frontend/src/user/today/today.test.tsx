@@ -22,6 +22,9 @@ function today(overrides: Partial<Today> = {}): Today {
     pendingWorkout: null,
     nextTraining: null,
     canStart: true,
+    activePlanCount: 1,
+    plansWithoutDays: [],
+    recommendedDurationEnded: [],
     ...overrides,
   };
 }
@@ -51,7 +54,7 @@ describe('today page', () => {
     server.use(
       http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
       http.get('*/api/me/today', () =>
-        HttpResponse.json(today({ status: 'REST_DAY', session: null, canStart: false, nextTraining: { date: '2026-10-07', sessionTitle: 'Giorno 2' } })),
+        HttpResponse.json(today({ status: 'REST_DAY', session: null, canStart: false, nextTraining: { date: '2026-10-07', sessionTitle: 'Giorno 2', planName: 'Scheda principianti' } })),
       ),
     );
     renderApp('/app/today');
@@ -59,13 +62,51 @@ describe('today page', () => {
     expect(screen.getByText('Giorno 2')).toBeInTheDocument();
   });
 
+  it('shows the end of the recommended duration without blocking the workout', async () => {
+    server.use(
+      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
+      http.get('*/api/me/today', () =>
+        HttpResponse.json(
+          today({ recommendedDurationEnded: [{ assignmentId: 'as-1', planName: 'Scheda principianti', expiresOn: '2026-10-04', ended: true }] }),
+        ),
+      ),
+    );
+    renderApp('/app/today');
+    const notice = await screen.findByText('Durata consigliata terminata: “Scheda principianti”');
+    expect(notice.closest('[role="status"]')).toHaveTextContent(
+      'La durata consigliata è terminata il 4 ottobre 2026. Contatta la palestra per riceverne una nuova.',
+    );
+    expect(screen.getByRole('button', { name: 'Inizia allenamento' })).toBeEnabled();
+  });
+
   it('asks to choose the days when none is set', async () => {
     server.use(
       http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
-      http.get('*/api/me/today', () => HttpResponse.json(today({ status: 'NO_SCHEDULE', session: null, canStart: false }))),
+      http.get('*/api/me/today', () =>
+        HttpResponse.json(
+          today({
+            status: 'NO_SCHEDULE',
+            session: null,
+            canStart: false,
+            plansWithoutDays: [{ assignmentId: 'as-1', planName: 'Scheda principianti' }],
+          }),
+        ),
+      ),
     );
     renderApp('/app/today');
-    expect(await screen.findByRole('link', { name: 'Scegli i giorni' })).toHaveAttribute('href', '/app/schedule');
+    expect(await screen.findByRole('link', { name: 'Scegli i giorni' })).toHaveAttribute('href', '/app/schedule?assignment=as-1');
+  });
+
+  it('guides the user to the days of a new plan while showing the training of another plan', async () => {
+    server.use(
+      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
+      http.get('*/api/me/today', () =>
+        HttpResponse.json(today({ activePlanCount: 2, plansWithoutDays: [{ assignmentId: 'as-2', planName: 'Cardio' }] })),
+      ),
+    );
+    renderApp('/app/today');
+    expect(await screen.findByRole('heading', { name: 'Giorno 1', level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Scegli i giorni di Cardio' })).toHaveAttribute('href', '/app/schedule?assignment=as-2');
   });
 
   it('offers to resume or interrupt a workout left open on another day', async () => {

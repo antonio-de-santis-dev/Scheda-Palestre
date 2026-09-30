@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { Power, Send, XCircle } from 'lucide-react';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
@@ -14,6 +14,7 @@ import { PlanStatusBadge } from '../plans/PlanStatusBadge';
 import { useUsers } from '../users/api';
 import { assignmentsApi, useAssignmentMutation, usePlanAssignments, type Assignment } from './api';
 import { AssignmentStatusBadge } from './AssignmentStatusBadge';
+import { flashState, usersCount } from '../../shared/flash/flash';
 
 export function PlanAssignmentsPage() {
   const { id = '' } = useParams();
@@ -25,8 +26,8 @@ export function PlanAssignmentsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [startDate, setStartDate] = useState(todayIso());
   const [activate, setActivate] = useState(true);
-  const [copySchedule, setCopySchedule] = useState(true);
-  const [done, setDone] = useState<number | null>(null);
+  const [copySchedule, setCopySchedule] = useState(false);
+  const navigate = useNavigate();
   const [formError, setFormError] = useState<string | null>(null);
   const [toClose, setToClose] = useState<Assignment | null>(null);
 
@@ -49,7 +50,6 @@ export function PlanAssignmentsPage() {
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    setDone(null);
     if (selected.size === 0) {
       setFormError('Seleziona almeno un utente');
       return;
@@ -62,10 +62,20 @@ export function PlanAssignmentsPage() {
     assign.mutate(
       { planId: id, userIds: [...selected], startDate, activate, copySchedule },
       {
-        onSuccess: (result) => {
-          setDone(result.length);
-          setSelected(new Set());
-        },
+        onSuccess: (result) =>
+          navigate('/admin/plans', {
+            replace: true,
+            state: flashState({
+              tone: 'success',
+              title: 'Scheda assegnata',
+              message: [
+                `“${plan.data?.name ?? 'Scheda'}” assegnata a ${usersCount(result.length)}${activate ? '' : ' (in attesa di attivazione)'}.`,
+                skippedNotice(result),
+              ]
+                .filter(Boolean)
+                .join(' '),
+            }),
+          }),
       },
     );
   };
@@ -102,13 +112,6 @@ export function PlanAssignmentsPage() {
           <form className="form" onSubmit={submit} noValidate>
             {assign.error ? <ErrorAlert error={assign.error} /> : null}
             {formError ? <Alert tone="error">{formError}</Alert> : null}
-            {done !== null ? (
-              <Alert tone="success">
-                <p>
-                  Scheda assegnata a {done} {done === 1 ? 'utente' : 'utenti'}.
-                </p>
-              </Alert>
-            ) : null}
             <TextField label="Cerca utenti" type="search" value={search} onChange={(e) => setSearch(e.target.value)} />
             <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
               <legend className="field__label">Utenti ({selected.size} selezionati)</legend>
@@ -135,7 +138,7 @@ export function PlanAssignmentsPage() {
               <div className="stack stack--sm">
                 <Checkbox label="Attiva subito" checked={activate} onChange={(e) => setActivate(e.target.checked)} />
                 <Checkbox
-                  label="Mantieni i giorni di allenamento della scheda precedente"
+                  label="Copia i giorni liberi dall'ultima scheda chiusa dell'utente"
                   checked={copySchedule}
                   disabled={!activate}
                   onChange={(e) => setCopySchedule(e.target.checked)}
@@ -144,7 +147,9 @@ export function PlanAssignmentsPage() {
             </div>
             {activate ? (
               <p className="muted small">
-                Se un utente ha già un'altra scheda attiva, questa verrà chiusa e l'eventuale allenamento in corso interrotto.
+                Le altre schede attive dell'utente restano attive e un eventuale allenamento in corso prosegue. Ogni giorno della
+                settimana può appartenere a una sola scheda: se copi i giorni, quelli già usati da un'altra scheda attiva vengono
+                saltati e l'utente sceglierà gli altri.
               </p>
             ) : null}
             <div className="form-actions">
@@ -227,4 +232,15 @@ export function PlanAssignmentsPage() {
       </ConfirmDialog>
     </>
   );
+}
+
+/** Days not copied because another active plan of the user already uses them. */
+function skippedNotice(result: Assignment[]): string {
+  const withSkipped = result.filter((a) => (a.skippedWeekdays?.length ?? 0) > 0).length;
+  if (withSkipped === 0) {
+    return '';
+  }
+  return withSkipped === 1
+    ? "Per 1 utente alcuni giorni erano già usati da un'altra scheda attiva e non sono stati copiati."
+    : `Per ${withSkipped} utenti alcuni giorni erano già usati da un'altra scheda attiva e non sono stati copiati.`;
 }

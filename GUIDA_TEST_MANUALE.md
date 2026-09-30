@@ -24,12 +24,13 @@ Per ogni passo è indicato **cosa fare** e **cosa devi vedere**. Spunta le casel
 
 ## Parte B - Cataloghi (ADMIN)
 
-7. [ ] Menu **Gruppi** → aggiungi `Petto`, `Dorso`, `Gambe`. Compaiono nell'elenco con badge "Attivo".
+7. [ ] Menu **Catalogo** → nel riquadro *Gruppi muscolari* aggiungi `Petto`, `Dorso`, `Gambe`.
 8. [ ] Prova ad aggiungere `petto` (minuscolo) → errore **"Nome già in uso."**, il testo resta nel campo.
-9. [ ] Menu **Esercizi** → aggiungi `Panca piana`, `Croci ai cavi`, `Trazioni`, `Rematore`, `Squat`.
+9. [ ] Clicca il gruppo `Petto` → a destra (o a pagina intera sul telefono) vedi *Esercizi di Petto*:
+    aggiungi `Panca piana`, `Croci ai cavi`, `Trazioni`. Nel gruppo `Dorso` aggiungi `Rematore`, in `Gambe` `Squat`.
 10. [ ] Clicca **Modifica** su `Squat`, rinominalo in `Squat bilanciere` → salvato.
-11. [ ] Clicca **Disattiva** su `Croci ai cavi` → badge "Disattivato". Con il filtro *Stato: Disattivati*
-    lo ritrovi; poi **Riattiva**.
+11. [ ] Clicca **Disattiva** su `Croci ai cavi` → badge "Disattivato". Con il filtro *Stato degli esercizi:
+    Disattivati* lo ritrovi; poi **Riattiva**.
 
 ## Parte C - Utenti (ADMIN)
 
@@ -43,11 +44,13 @@ Per ogni passo è indicato **cosa fare** e **cosa devi vedere**. Spunta le casel
 
 ## Parte D - Scheda (ADMIN)
 
-18. [ ] Menu **Schede** → **Nuova scheda**: nome `Principianti` → **Crea e apri l'editor**.
+18. [ ] Menu **Schede** → **Nuova scheda**: nome `Principianti` → **Crea e apri l'editor**. (Quando avrai
+    finito di comporla, **Salva dati** ti riporta all'elenco con "Nuova scheda creata".)
 19. [ ] Il badge dice **"Incompleta"** e un avviso spiega che mancano sessioni/esercizi.
 20. [ ] Premi **Aggiungi sessione** due volte (campo vuoto) → compaiono `1. Giorno 1` e `2. Giorno 2`.
 21. [ ] In *Giorno 1* scegli il gruppo `Petto` → **Aggiungi sezione**.
-22. [ ] **Aggiungi esercizio a Petto**: `Panca piana`, Serie `3`, Ripetizioni `10`, Recupero `60` → salvato,
+22. [ ] **Aggiungi esercizio a Petto**: nel campo *Esercizio* scrivi `pan` e scegli `Panca piana` (compaiono
+    solo gli esercizi di Petto), Serie `3`, Ripetizioni `10`, Recupero `60` → salvato,
     riga "3 × 10 · recupero 1:00".
 23. [ ] Aggiungi `Trazioni` con **A cedimento (MAX)** spuntato, Serie `2`, Recupero `90` → riga "2 × MAX".
 24. [ ] In *Giorno 2* aggiungi la sezione `Dorso` con `Rematore` 3×12, recupero 45.
@@ -66,7 +69,8 @@ Per ogni passo è indicato **cosa fare** e **cosa devi vedere**. Spunta le casel
 
 31. [ ] Menu **Schede** → **Assegna** su `Principianti`.
 32. [ ] Seleziona **Mario** e **Anna**, data di inizio = oggi, *Attiva subito* spuntato → **Assegna**
-    → "Scheda assegnata a 2 utenti." e due righe con badge **"Attiva"**.
+    → torni all'elenco schede con **"Scheda assegnata"** e "… assegnata a 2 utenti."; riaprendo
+    *Assegna* vedi due righe con badge **"Attiva"**.
 33. [ ] Torna nell'editor: in alto l'avviso **"Scheda condivisa: 2 utenti attivi"**.
 34. [ ] Crea una seconda scheda, ad esempio **Duplica** `Principianti` → si apre `Principianti (copia)`
     con la stessa struttura e nessun assegnatario.
@@ -78,7 +82,7 @@ Per ogni passo è indicato **cosa fare** e **cosa devi vedere**. Spunta le casel
 37. [ ] Prova ad aprire http://localhost:5173/admin → pagina **"Accesso negato"**.
 38. [ ] **Schede** → vedi `Principianti` con badge "Attiva"; aprendola la vedi **in sola lettura** (MAX visibile).
 39. [ ] **Giorni** (dal menu in alto o da *Oggi*): seleziona **tutti e 7 i giorni** (così oggi è di
-    allenamento) → **Salva giorni** → "Giorni salvati".
+    allenamento) → **Salva giorni di Principianti** → "Giorni salvati".
 40. [ ] **Calendario** → i giorni alternano `Giorno 1`, `Giorno 2`, `Giorno 1`… (rotazione).
 
 ## Parte G - Allenamento guidato e timer (USER Mario)
@@ -89,7 +93,8 @@ Per ogni passo è indicato **cosa fare** e **cosa devi vedere**. Spunta le casel
 43. [ ] Premi **Fine serie** → parte il **timer "Recupero"** con conto alla rovescia.
 44. [ ] Premi **F5** durante il recupero → il timer continua dal punto giusto (non riparte da capo).
 45. [ ] Cambia scheda del browser per 20 secondi e torna → il timer è riallineato.
-46. [ ] Premi **Fine serie** anche prima che il timer finisca → è permesso (timer indicativo).
+46. [ ] Durante il recupero **Fine serie** è grigio, dice "tra 0:xx" e non fa nulla; resta raggiungibile con
+    Tab. Allo zero torna disponibile e compare (una sola volta) "Recupero terminato".
 47. [ ] Su `Trazioni` premi **Salta esercizio** → conferma → l'esercizio risulta **"Saltato"**.
 48. [ ] Completa le serie rimanenti → schermata **"Allenamento completato!"** con il riepilogo.
 49. [ ] Torna su **Oggi** → per oggi vedi il badge "Completato" e "Vedi il riepilogo"; non puoi
@@ -129,6 +134,43 @@ Per ogni passo è indicato **cosa fare** e **cosa devi vedere**. Spunta le casel
 64. [ ] Con il solo tasto **Tab** si raggiungono tutti i pulsanti, con un contorno di focus visibile.
 65. [ ] Gli stati (Attivo, Saltato, Completato…) hanno sempre **testo e icona**, non solo colore.
 66. [ ] Con il tema scuro del sistema operativo l'app passa automaticamente ai colori scuri.
+
+## Parte L - Nuove funzionalità (branch `modifiche`)
+
+### Più schede attive e giorni senza sovrapposizione
+67. [ ] Da ADMIN **Duplica** `Principianti`, poi *Salva dati* → "Nuova scheda creata". **Assegna** la copia a
+    Mario: la prima scheda di Mario **resta attiva**.
+68. [ ] Da Mario, *Oggi* mostra "Scegli i giorni della nuova scheda" → link **Scegli i giorni di …**.
+69. [ ] In *Giorni* ci sono due riquadri. Nella copia i giorni già usati dalla prima sono tratteggiati, con
+    scritto **"Occupato da “Principianti”"**; cliccarli non li seleziona.
+70. [ ] Togli la *Domenica* dalla prima scheda e salva; poi scegli la *Domenica* nella copia e salva →
+    *Calendario* mostra la copia la domenica; *Le mie schede* mostra "Schede attive (2)" (card cliccabili).
+71. [ ] Con due schede del browser aperte su *Giorni*, prova a dare lo stesso giorno alle due schede →
+    la seconda risposta dice quale giorno è già usato e da quale scheda.
+
+### Durata consigliata
+72. [ ] Da ADMIN imposta *Fine durata consigliata* = ieri su una scheda di Mario → Mario vede su *Oggi* e nella
+    scheda l'avviso "La durata consigliata della scheda è terminata…" ma può allenarsi normalmente.
+    In *Utenti* Mario ha il badge **"Scheda da rinnovare"**. Con la data di oggi l'avviso non compare.
+
+### Eliminazione utente e report
+73. [ ] *Utenti → Anna*: il **Report attività** mostra tabelle con i soli dati registrati (o "Nessun
+    allenamento registrato.").
+74. [ ] *Eliminazione account* → **Elimina account di …** → prima conferma (spiega gli effetti) → **Continua**
+    → scrivi lo username → **Elimina definitivamente anna** → torni a *Utenti* con "Account eliminato".
+    Anna non riesce più ad accedere ("Credenziali non valide."). Sul tuo account e sull'ADMIN iniziale il
+    pulsante non c'è e il motivo è scritto.
+
+### Catalogo
+75. [ ] Deep link: apri direttamente `/admin/catalog/exercises` → sei portato al nuovo *Catalogo*; ricarica una
+    pagina con `?group=` → resta selezionato lo stesso gruppo.
+
+### Allenamento
+76. [ ] Completando l'ultimo set di un esercizio compare "Esercizio completato: …" (e "Nuovo gruppo
+    muscolare: …" se cambia gruppo), con coriandoli leggeri; con "Riduci movimento" attivo nel sistema
+    operativo resta solo il messaggio. A fine allenamento compare un messaggio diverso.
+77. [ ] **Guida vocale** è spenta all'inizio; attivala → dice "Audio attivato", poi annuncia serie ed
+    esercizi completati; la scelta resta dopo il ricaricamento.
 
 ---
 

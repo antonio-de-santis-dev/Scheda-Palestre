@@ -12,6 +12,8 @@ export interface ProblemDetails {
   instance?: string;
   code?: string;
   errors?: FieldError[];
+  /** Extra machine-readable members (e.g. conflicting days, restEndsAt). */
+  [member: string]: unknown;
 }
 
 export class ApiError extends Error {
@@ -19,14 +21,17 @@ export class ApiError extends Error {
   readonly code: string;
   readonly detail: string | undefined;
   readonly fieldErrors: FieldError[];
+  /** The whole Problem Details body: extra members are read by typed helpers in messages.ts. */
+  readonly problem: ProblemDetails;
 
-  constructor(status: number, code: string, detail?: string, fieldErrors: FieldError[] = []) {
+  constructor(status: number, code: string, detail?: string, fieldErrors: FieldError[] = [], problem: ProblemDetails = {}) {
     super(detail ?? code);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.detail = detail;
     this.fieldErrors = fieldErrors;
+    this.problem = problem;
   }
 
   static fromProblem(status: number, problem: ProblemDetails | null): ApiError {
@@ -35,6 +40,7 @@ export class ApiError extends Error {
       problem?.code ?? defaultCode(status),
       problem?.detail,
       Array.isArray(problem?.errors) ? problem.errors : [],
+      problem ?? {},
     );
   }
 

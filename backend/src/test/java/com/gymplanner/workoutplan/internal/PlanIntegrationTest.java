@@ -61,10 +61,10 @@ class PlanIntegrationTest {
     @Test
     void emptyPlanExistsButIsNotExecutable() {
         Api.Response plan = api.post(admin, "/api/admin/plans",
-                "{\"name\":\"Principianti\",\"description\":\"  \",\"expiresOn\":\"2026-12-31\"}").expect(201);
+                "{\"name\":\"Principianti\",\"description\":\"  \",\"durationWeeks\":3}").expect(201);
         assertThat((Boolean) plan.read("$.executable")).isFalse();
         assertThat((Object) plan.read("$.description")).isNull();
-        assertThat((String) plan.read("$.expiresOn")).isEqualTo("2026-12-31");
+        assertThat((Integer) plan.read("$.durationWeeks")).isEqualTo(3);
         assertThat((String) plan.read("$.createdBy")).isEqualTo(admin.id().toString());
         assertThat(plan.body()).doesNotContain("userId");
     }
@@ -142,7 +142,9 @@ class PlanIntegrationTest {
     void failureExerciseShowsMaxAndInvalidRepsAreRejected() {
         BuiltPlan built = factory.executablePlan(admin, "Cedimento", 1, 1, 2);
         UUID sectionId = built.sectionIds().get(0);
-        UUID exercise = fixtures.createExercise("Trazioni");
+        UUID group = UUID.fromString(api.get(admin, "/api/admin/plans/" + built.planId())
+                .read("$.sessions[0].sections[0].muscleGroupId"));
+        UUID exercise = fixtures.createExercise("Trazioni", group);
         Api.Response plan = api.post(admin, "/api/admin/sections/" + sectionId + "/exercises",
                 PlanFactory.exerciseJson(exercise, 3, 0, true, 120)).expect(201);
         assertThat((Boolean) plan.read("$.sessions[0].sections[0].exercises[1].toFailure")).isTrue();
@@ -206,6 +208,42 @@ class PlanIntegrationTest {
         api.post(admin, "/api/admin/sections/" + built.sectionIds().get(0) + "/exercises",
                 PlanFactory.exerciseJson(UUID.fromString(exerciseId), 3, 8, false, 60))
                 .expectCode(422, "CATALOG_ITEM_INACTIVE");
+    }
+
+    @Test
+    void exercisesMustBelongToTheSectionGroupButHistoricEntriesStaySaveable() {
+        BuiltPlan built = factory.executablePlan(admin, "Gruppi", 1, 1, 2);
+        UUID sectionId = built.sectionIds().get(0);
+        UUID planExerciseId = built.planExerciseIds().get(0);
+        Api.Response plan = api.get(admin, "/api/admin/plans/" + built.planId());
+        UUID sectionGroup = UUID.fromString(plan.read("$.sessions[0].sections[0].muscleGroupId"));
+        UUID usedExercise = UUID.fromString(plan.read("$.sessions[0].sections[0].exercises[0].exerciseId"));
+        assertThat((Boolean) plan.read("$.sessions[0].sections[0].exercises[0].exerciseInSectionGroup")).isTrue();
+
+        UUID otherGroup = fixtures.createMuscleGroup("Altro");
+        UUID foreign = fixtures.createExercise("Estraneo", otherGroup);
+
+        // Adding an exercise of another group is rejected with a precise payload.
+        Api.Response error = api.post(admin, "/api/admin/sections/" + sectionId + "/exercises",
+                PlanFactory.exerciseJson(foreign, 3, 10, false, 60)).expectCode(422, "EXERCISE_GROUP_MISMATCH");
+        assertThat((String) error.read("$.exerciseId")).isEqualTo(foreign.toString());
+        assertThat((String) error.read("$.muscleGroupId")).isEqualTo(sectionGroup.toString());
+        assertThat((String) error.read("$.exerciseName")).startsWith("Estraneo");
+        // Same rule when the configuration switches to another exercise.
+        api.put(admin, "/api/admin/plan-exercises/" + planExerciseId, PlanFactory.exerciseJson(foreign, 3, 10, false, 60))
+                .expectCode(422, "EXERCISE_GROUP_MISMATCH");
+        // An exercise of the right group is accepted.
+        UUID sameGroup = fixtures.createExercise("Stesso gruppo", sectionGroup);
+        api.post(admin, "/api/admin/sections/" + sectionId + "/exercises",
+                PlanFactory.exerciseJson(sameGroup, 3, 10, false, 60)).expect(201);
+
+        // The exercise already in the plan is moved to another group: the plan stays saveable.
+        api.put(admin, "/api/admin/exercises/" + usedExercise,
+                "{\"name\":\"Spostato %s\",\"muscleGroupId\":\"%s\"}".formatted(usedExercise, otherGroup)).expect(200);
+        plan = api.put(admin, "/api/admin/plan-exercises/" + planExerciseId,
+                PlanFactory.exerciseJson(usedExercise, 4, 8, false, 90)).expect(200);
+        assertThat((Boolean) plan.read("$.sessions[0].sections[0].exercises[0].exerciseInSectionGroup")).isFalse();
+        assertThat((Boolean) plan.read("$.executable")).isTrue();
     }
 
     @Test

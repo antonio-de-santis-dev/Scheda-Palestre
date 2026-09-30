@@ -77,6 +77,9 @@ function CalendarRow({ day, today }: { day: CalendarDay; today: string }) {
         <div>
           <strong>{day.workout ? day.workout.sessionTitle : day.type === 'TRAINING' ? day.sessionTitle : day.type === 'REST' ? 'Riposo' : '—'}</strong>
           {isToday ? <span className="muted small"> · oggi</span> : null}
+          {(day.workout?.planName ?? day.planName) ? (
+            <div className="muted small">{day.workout?.planName ?? day.planName}</div>
+          ) : null}
         </div>
         {day.workout ? (
           <Link to={day.workout.status === 'IN_PROGRESS' ? `/app/workout/${day.workout.id}` : `/app/history/${day.workout.id}`} aria-label={`Apri allenamento del ${formatDate(day.date)}`}>

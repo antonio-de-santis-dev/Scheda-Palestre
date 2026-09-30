@@ -1,12 +1,11 @@
-import { CalendarCheck, CalendarDays, ClipboardList, Dumbbell, History, LayoutDashboard, Sun, Target, UserRound, Users } from 'lucide-react';
+import { CalendarCheck, CalendarDays, ClipboardList, Dumbbell, History, LayoutDashboard, Sun, UserRound, Users } from 'lucide-react';
 import type { ComponentType } from 'react';
 import type { NavItem } from '../layouts/AppLayout';
 
 export const ADMIN_NAV: NavItem[] = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/users', label: 'Utenti', icon: Users },
-  { to: '/admin/catalog/muscle-groups', label: 'Gruppi', icon: Target },
-  { to: '/admin/catalog/exercises', label: 'Esercizi', icon: Dumbbell },
+  { to: '/admin/catalog', label: 'Catalogo', icon: Dumbbell },
   { to: '/admin/plans', label: 'Schede', icon: ClipboardList },
   { to: '/admin/profile', label: 'Profilo', icon: UserRound, mobile: false },
 ];
@@ -30,7 +29,6 @@ export interface Shortcut {
 export const ADMIN_SHORTCUTS: Shortcut[] = [
   { to: '/admin/plans', label: 'Schede', description: 'Crea, modifica, duplica e assegna le schede.', icon: ClipboardList },
   { to: '/admin/users', label: 'Utenti', description: 'Crea account, disattiva, reset password.', icon: Users },
-  { to: '/admin/catalog/muscle-groups', label: 'Gruppi muscolari', description: 'Catalogo dei gruppi muscolari.', icon: Target },
-  { to: '/admin/catalog/exercises', label: 'Esercizi', description: 'Catalogo degli esercizi.', icon: Dumbbell },
+  { to: '/admin/catalog', label: 'Catalogo esercizi', description: 'Gruppi muscolari e i loro esercizi, in un unico posto.', icon: Dumbbell },
   { to: '/admin/profile', label: 'Profilo', description: 'Telefono e cambio password.', icon: UserRound },
 ];

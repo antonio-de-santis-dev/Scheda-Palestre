@@ -10,9 +10,10 @@ import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import { EmptyState, QueryState } from '../../shared/components/States';
 import { Pagination } from '../../shared/components/Pagination';
 import { useDebouncedValue } from '../../shared/utils/useDebouncedValue';
-import { formatDate, formatDateTime } from '../../shared/utils/format';
+import { formatDateTime } from '../../shared/utils/format';
 import { plansApi, plansKeys, usePlans, type PlanListItem } from './api';
 import { PlanMetadataForm } from './PlanMetadataForm';
+import { EDITOR_NEW_PLAN } from './editorState';
 import { PlanStatusBadge } from './PlanStatusBadge';
 
 export function PlansPage() {
@@ -71,8 +72,10 @@ export function PlansPage() {
             pending={create.isPending}
             error={create.error}
             onSubmit={async (values) => {
-              const plan = await create.mutateAsync(values);
-              navigate(`/admin/plans/${plan.id}/edit`);
+              // The plan is stored now; "Nuova scheda creata" is confirmed by "Salva dati" in the editor.
+              await create.mutateAsync(values, {
+                onSuccess: (plan) => navigate(`/admin/plans/${plan.id}/edit`, { state: EDITOR_NEW_PLAN }),
+              });
             }}
             onCancel={() => {
               setCreating(false);
@@ -113,7 +116,7 @@ export function PlansPage() {
                     <div className="list-item__title">{plan.name}</div>
                     <div className="list-item__meta">
                       {plan.sessionCount} {plan.sessionCount === 1 ? 'sessione' : 'sessioni'}
-                      {plan.expiresOn ? ` · scade il ${formatDate(plan.expiresOn)}` : ''} · modificata il{' '}
+                      {plan.durationWeeks ? ` · durata consigliata ${plan.durationWeeks} ${plan.durationWeeks === 1 ? 'settimana' : 'settimane'}` : ''} · modificata il{' '}
                       {formatDateTime(plan.updatedAt)}
                     </div>
                   </div>
@@ -140,7 +143,9 @@ export function PlansPage() {
                           aria-label={`Duplica ${plan.name}`}
                           loading={duplicate.isPending && duplicate.variables === plan.id}
                           onClick={() =>
-                            duplicate.mutate(plan.id, { onSuccess: (copy) => navigate(`/admin/plans/${copy.id}/edit`) })
+                            duplicate.mutate(plan.id, {
+                              onSuccess: (copy) => navigate(`/admin/plans/${copy.id}/edit`, { state: EDITOR_NEW_PLAN }),
+                            })
                           }
                         >
                           Duplica

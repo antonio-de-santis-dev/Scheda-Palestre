@@ -7,7 +7,7 @@ export interface PlanListItem {
   id: string;
   name: string;
   description: string | null;
-  expiresOn: string | null;
+  durationWeeks: number | null;
   sessionCount: number;
   executable: boolean;
   copiedFromPlanId: string | null;
@@ -19,7 +19,7 @@ export interface PlanListItem {
 export interface PlanMetadata {
   name: string;
   description: string | null;
-  expiresOn: string | null;
+  durationWeeks: number | null;
 }
 
 export interface SetInput {

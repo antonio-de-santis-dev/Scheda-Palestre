@@ -59,8 +59,12 @@ public class TestFixtures {
         return insertCatalog("muscle_groups", name);
     }
 
-    public UUID createExercise(String name) {
-        return insertCatalog("exercises", name);
+    /** Inserts an active exercise of the given muscle group (ADR 0007) and returns its id. */
+    public UUID createExercise(String name, UUID muscleGroupId) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("insert into exercises (id, name, active, muscle_group_id, created_at, updated_at) "
+                + "values (?, ?, true, ?, now(), now())", id, name + " " + id.toString().substring(0, 8), muscleGroupId);
+        return id;
     }
 
     private UUID insertCatalog(String table, String name) {

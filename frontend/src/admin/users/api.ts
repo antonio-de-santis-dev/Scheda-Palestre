@@ -16,6 +16,10 @@ export interface AdminUser {
   locked: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Deleted logically and anonymized (ADR 0010): read-only. */
+  deleted: boolean;
+  /** The initial ADMIN from the configuration: it cannot be deleted. */
+  protectedAccount: boolean;
 }
 
 export interface UserWithPassword {
@@ -53,6 +57,7 @@ export const usersApi = {
   activate: (id: string) => http.post<AdminUser>(`/api/admin/users/${id}/activate`),
   deactivate: (id: string) => http.post<AdminUser>(`/api/admin/users/${id}/deactivate`),
   resetPassword: (id: string) => http.post<UserWithPassword>(`/api/admin/users/${id}/reset-password`),
+  remove: (id: string) => http.del<void>(`/api/admin/users/${id}`),
 };
 
 export function useUsers(search: UserSearch) {

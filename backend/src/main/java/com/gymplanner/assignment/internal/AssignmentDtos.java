@@ -14,8 +14,8 @@ final class AssignmentDtos {
     }
 
     /**
-     * Spec 13.5. {@code copySchedule} (O-07, default true) copies the weekly days of the user's
-     * previous active assignment when activating.
+     * Spec 13.5. {@code copySchedule} (ADR 0008, default false): when activating, copy from the
+     * user's most recently closed plan only the weekdays that are still free.
      */
     record AssignRequest(
             @NotNull UUID planId,
@@ -25,19 +25,31 @@ final class AssignmentDtos {
             Boolean copySchedule) {
 
         boolean copy() {
-            return copySchedule == null || copySchedule;
+            return Boolean.TRUE.equals(copySchedule);
         }
     }
 
     record ActivateRequest(Boolean copySchedule) {
 
         boolean copy() {
-            return copySchedule == null || copySchedule;
+            return Boolean.TRUE.equals(copySchedule);
         }
     }
 
+    /**
+     * {@code copiedWeekdays}/{@code skippedWeekdays} are filled only by an activation that asked
+     * for the copy: skipped days were already used by another active plan of the user.
+     * {@code planExpiresOn} is calculated per assignment from startDate + durationWeeks.
+     * Warning starts seven days before that date; ended starts the day after it.
+     * Both are computed in the gym's time zone, and the plan stays usable.
+     */
     record AssignmentResponse(UUID id, UUID userId, String userFullName, String username, UUID planId,
             String planName, boolean planDeleted, LocalDate startDate, LocalDate endDate, boolean active,
-            String status, Instant createdAt) {
+            String status, Instant createdAt, List<Integer> copiedWeekdays, List<Integer> skippedWeekdays,
+            LocalDate planExpiresOn, boolean recommendedDurationEnded, boolean recommendedDurationWarning) {
+    }
+
+    /** ADMIN indicator: an active assignment in its final recommended week or later. */
+    record EndedDurationResponse(UUID userId, UUID assignmentId, UUID planId, String planName, LocalDate expiresOn) {
     }
 }

@@ -13,6 +13,9 @@ public interface WorkoutPlanQueries {
 
     Map<UUID, PlanSummary> findPlans(Collection<UUID> planIds);
 
+    /** Not deleted plans with a duration configured, for the ADMIN indicator. */
+    Map<UUID, PlanSummary> findPlansWithRecommendedDuration();
+
     /** @throws com.gymplanner.shared.error.NotFoundException if the plan does not exist */
     PlanStructure getStructure(UUID planId);
 

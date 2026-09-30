@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import { CheckCheck, Hourglass, OctagonX, SkipForward, TimerReset, Trophy } from 'lucide-react';
+import { CheckCheck, Hourglass, OctagonX, PartyPopper, SkipForward, TimerReset, Trophy, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '../../shared/components/Button';
 import { Alert, ErrorAlert } from '../../shared/components/Alert';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
@@ -11,8 +11,10 @@ import { repsLabel } from '../../shared/api/planTypes';
 import { STALE_STATE_CODES, useWorkout, useWorkoutAction, workoutApi, type WorkoutState } from './api';
 import { useRestTimer } from './useRestTimer';
 import { ExerciseStatusBadge, WorkoutStatusBadge } from './ExerciseStatusBadge';
+import { celebrate, transitions, type Feedback } from './feedback';
+import { useRestAlert } from './useRestAlert';
 
-/** Guided execution (US-17, US-18, US-20, US-23): usable one-handed from 360 px. */
+/** Workout execution (US-17, US-18, US-20, US-23): usable one-handed from 360 px. */
 export function WorkoutPage() {
   const { id = '' } = useParams();
   const query = useWorkout(id);
@@ -26,16 +28,35 @@ export function WorkoutPage() {
 function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => void }) {
   const [confirm, setConfirm] = useState<'skip' | 'interrupt' | null>(null);
   const [announcement, setAnnouncement] = useState('');
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  // Transitions already celebrated: refetches, retries and StrictMode never repeat them.
+  const celebrated = useRef(new Set<string>());
+  const restAlert = useRestAlert();
   const complete = useWorkoutAction(state.workoutId, (setId: string) => workoutApi.completeSet(state.workoutId, setId), true);
   const skip = useWorkoutAction(state.workoutId, (exerciseId: string) => workoutApi.skip(state.workoutId, exerciseId), true);
   const interrupt = useWorkoutAction(state.workoutId, () => workoutApi.interrupt(state.workoutId), true);
 
   const remaining = useRestTimer(state, refetch, () => {
-    setAnnouncement('Recupero terminato');
+    setAnnouncement('Recupero terminato: puoi completare la prossima serie.');
+    restAlert.play();
     if ('vibrate' in navigator) {
       navigator.vibrate?.(300);
     }
   });
+  const resting = remaining > 0;
+
+  /** Called only from a successful mutation (never from an effect watching the data). */
+  const onActionSuccess = (before: WorkoutState, after: WorkoutState) => {
+    const fresh = transitions(before, after).filter((t) => !celebrated.current.has(t.key));
+    fresh.forEach((t) => celebrated.current.add(t.key));
+    if (fresh.length === 0) {
+      return;
+    }
+    const main = fresh.find((t) => t.kind === 'workout') ?? fresh.find((t) => t.kind === 'group') ?? fresh[0]!;
+    const message = fresh.map((t) => t.message).join(' ');
+    setFeedback({ ...main, message });
+    void celebrate(main.kind);
+  };
 
   const error = complete.error ?? skip.error ?? interrupt.error;
   // Stale screens (e.g. set completed from another tab) are re-synced by the mutation hook.
@@ -55,15 +76,48 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
             {state.planName} · esercizi {done}/{state.exercises.length}
           </p>
         </div>
-        <WorkoutStatusBadge status={state.status} />
+        <div className="row">
+          <label className="row small">
+            <input type="checkbox" checked={restAlert.enabled} onChange={(e) => restAlert.setEnabled(e.target.checked)} />
+            {restAlert.enabled ? <Volume2 size={18} aria-hidden="true" /> : <VolumeX size={18} aria-hidden="true" />}
+            Suono fine recupero
+          </label>
+          {restAlert.enabled ? (
+            <label className="row small">
+              Suono
+              <select className="input" aria-label="Suono di fine recupero" value={restAlert.sound}
+                onChange={(e) => restAlert.setSound(e.target.value as 'alert-1' | 'alert-2' | 'alert-3')}>
+                <option value="alert-1">Suono 1</option>
+                <option value="alert-2">Suono 2</option>
+                <option value="alert-3">Suono 3</option>
+              </select>
+            </label>
+          ) : null}
+          <WorkoutStatusBadge status={state.status} />
+        </div>
       </header>
 
-      <div className="visually-hidden" aria-live="assertive">
+      {/* Announced once when the rest ends; the countdown itself is never a live region. */}
+      <div className="visually-hidden" role="status">
         {announcement}
+      </div>
+      <div role="status" aria-live="polite">
+        {feedback ? (
+          <div className={`alert alert--success celebration celebration--${feedback.kind}`}>
+            <PartyPopper size={22} aria-hidden="true" />
+            <div className="alert__body">
+              <p>{feedback.message}</p>
+            </div>
+          </div>
+        ) : null}
       </div>
       {stale ? (
         <Alert tone="info">
-          <p>La schermata è stata aggiornata con lo stato più recente.</p>
+          <p>
+            {isApiError(error) && error.code === 'REST_NOT_FINISHED'
+              ? 'Il recupero non è ancora finito: la schermata è stata allineata al server.'
+              : 'La schermata è stata aggiornata con lo stato più recente.'}
+          </p>
         </Alert>
       ) : error ? (
         <ErrorAlert error={error} />
@@ -113,22 +167,32 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
             </div>
           ) : null}
 
+          {/* aria-disabled (not disabled): the button stays in the tab order and says why it waits. */}
           <Button
             size="lg"
             block
-            icon={<CheckCheck size={26} aria-hidden="true" />}
+            className={resting ? 'btn--waiting' : undefined}
+            aria-disabled={resting || undefined}
+            aria-describedby={resting ? 'rest-hint' : undefined}
+            icon={resting ? <Hourglass size={26} aria-hidden="true" /> : <CheckCheck size={26} aria-hidden="true" />}
             loading={complete.isPending}
             onClick={() => {
+              if (resting) {
+                return;
+              }
               setAnnouncement('');
+              setFeedback(null);
               skip.reset();
-              complete.mutate(currentSet.id);
+              const before = state;
+              complete.mutate(currentSet.id, { onSuccess: (after) => onActionSuccess(before, after) });
             }}
           >
             Fine serie
+            {resting ? <span className="btn__sub" aria-hidden="true">tra {formatDuration(remaining)}</span> : null}
           </Button>
-          {remaining > 0 ? (
-            <p className="small muted center" style={{ margin: 'var(--space-2) 0 0' }}>
-              Il timer è indicativo: puoi iniziare la serie quando sei pronto.
+          {resting ? (
+            <p id="rest-hint" className="small muted center" style={{ margin: 'var(--space-2) 0 0' }}>
+              Disponibile al termine del recupero. Puoi comunque saltare l'esercizio o interrompere l'allenamento.
             </p>
           ) : null}
         </section>
@@ -180,7 +244,11 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
         onCancel={() => setConfirm(null)}
         onConfirm={() => {
           if (current) {
-            skip.mutate(current.id, { onSettled: () => setConfirm(null) });
+            const before = state;
+            skip.mutate(current.id, {
+              onSuccess: (after) => onActionSuccess(before, after),
+              onSettled: () => setConfirm(null),
+            });
           }
         }}
       >

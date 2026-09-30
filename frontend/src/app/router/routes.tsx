@@ -43,11 +43,10 @@ export const routes: RouteObject[] = [
       { index: true, ...page(() => import('../../admin/AdminDashboardPage'), (m) => m.AdminDashboardPage) },
       { path: 'users', ...page(() => import('../../admin/users/UsersPage'), (m) => m.UsersPage) },
       { path: 'users/:id', ...page(() => import('../../admin/users/UserDetailPage'), (m) => m.UserDetailPage) },
-      {
-        path: 'catalog/muscle-groups',
-        ...page(() => import('../../admin/catalog/CatalogPage'), (m) => m.MuscleGroupsPage),
-      },
-      { path: 'catalog/exercises', ...page(() => import('../../admin/catalog/CatalogPage'), (m) => m.ExercisesPage) },
+      { path: 'catalog', ...page(() => import('../../admin/catalog/CatalogPage'), (m) => m.CatalogPage) },
+      // Old URLs (bookmarks) of the two separate catalogs.
+      { path: 'catalog/muscle-groups', element: <Navigate to="/admin/catalog" replace /> },
+      { path: 'catalog/exercises', element: <Navigate to="/admin/catalog" replace /> },
       { path: 'plans', ...page(() => import('../../admin/plans/PlansPage'), (m) => m.PlansPage) },
       { path: 'plans/:id/edit', ...page(() => import('../../admin/plans/PlanEditorPage'), (m) => m.PlanEditorPage) },
       {

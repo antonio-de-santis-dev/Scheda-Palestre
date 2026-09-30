@@ -11,6 +11,9 @@ import { usersApi, useUserMutation, useUsers, type UserWithPassword } from './ap
 import { UserForm } from './UserForm';
 import { TemporaryPasswordNotice } from './TemporaryPasswordNotice';
 import { UserStatusBadges } from './UserStatusBadges';
+import { CalendarX2 } from 'lucide-react';
+import { StatusBadge } from '../../shared/components/StatusBadge';
+import { useRecommendedDurationEnded } from '../assignments/api';
 
 const PAGE_SIZE = 20;
 
@@ -23,6 +26,8 @@ export function UsersPage() {
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState<UserWithPassword | null>(null);
 
+  const ended = useRecommendedDurationEnded();
+  const endedUsers = new Set((ended.data ?? []).map((e) => e.userId));
   const query = useUsers({
     q: q || undefined,
     active: status === 'all' ? undefined : status === 'active',
@@ -131,6 +136,11 @@ export function UsersPage() {
                     </div>
                   </div>
                   <UserStatusBadges user={user} />
+                  {endedUsers.has(user.id) ? (
+                    <StatusBadge tone="warning" icon={<CalendarX2 size={14} aria-hidden="true" />}>
+                      Scheda da rinnovare
+                    </StatusBadge>
+                  ) : null}
                   <div className="list-item__actions">
                     <Link
                       className="btn btn--secondary btn--sm"

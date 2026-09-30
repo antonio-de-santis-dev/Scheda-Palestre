@@ -42,10 +42,10 @@ class HistoryIntegrationTest {
         admin = fixtures.createAdmin();
         user = fixtures.createUser();
         plan = factory.executablePlan(admin, "Storico", 2, 2, 1);
-        api.post(admin, "/api/admin/assignments", """
+        String assignmentId = api.post(admin, "/api/admin/assignments", """
                 {"planId":"%s","userIds":["%s"],"startDate":"%s","activate":true}"""
-                .formatted(plan.planId(), user.id(), MONDAY)).expect(201);
-        api.put(user, "/api/me/schedule", "{\"weekdays\":[1,2,3,4,5,6,7]}").expect(200);
+                .formatted(plan.planId(), user.id(), MONDAY)).expect(201).read("$[0].id");
+        api.put(user, "/api/me/assignments/" + assignmentId + "/schedule", "{\"weekdays\":[1,2,3,4,5,6,7]}").expect(200);
     }
 
     @AfterEach

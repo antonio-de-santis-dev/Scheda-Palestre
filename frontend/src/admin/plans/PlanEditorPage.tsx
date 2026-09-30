@@ -1,21 +1,24 @@
 import { useState, type ReactNode } from 'react';
-import { useParams } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from 'lucide-react';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
 import { Alert, ErrorAlert } from '../../shared/components/Alert';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
-import { SelectField, TextField } from '../../shared/components/Field';
+import { TextField } from '../../shared/components/Field';
 import { QueryState } from '../../shared/components/States';
 import { StatusBadge } from '../../shared/components/StatusBadge';
 import { restText } from '../../shared/utils/format';
 import { describeSets, type PlanSection, type PlanSession, type PlanStructure } from '../../shared/api/planTypes';
-import { useActiveCatalog } from '../catalog/api';
+import { useActiveMuscleGroups } from '../catalog/api';
+import { Combobox } from '../../shared/components/Combobox';
 import { moved, plansApi, usePlan, usePlanMutation, type PlanExerciseInput } from './api';
 import { PlanMetadataForm } from './PlanMetadataForm';
 import { PlanStatusBadge } from './PlanStatusBadge';
 import { ExerciseEditor } from './ExerciseEditor';
 import { ActiveAssigneesNotice } from '../assignments/ActiveAssigneesNotice';
+import { flashState } from '../../shared/flash/flash';
+import { isNewPlan } from './editorState';
 
 type Confirm = { title: string; body: ReactNode; label: string; run: () => Promise<unknown> } | null;
 
@@ -26,7 +29,9 @@ export function PlanEditorPage() {
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [confirmPending, setConfirmPending] = useState(false);
   const [confirmError, setConfirmError] = useState<unknown>(null);
-  const [savedMeta, setSavedMeta] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const newPlan = isNewPlan(location.state);
 
   const updateMeta = usePlanMutation(id, (values: Parameters<typeof plansApi.update>[1]) => plansApi.update(id, values));
   const addSession = usePlanMutation(id, (title: string) => plansApi.addSession(id, title));
@@ -67,12 +72,11 @@ export function PlanEditorPage() {
                   sessione.
                 </p>
               ) : null}
-              {savedMeta ? (
-                <div style={{ marginBottom: 'var(--space-3)' }}>
-                  <Alert tone="success">
-                    <p>Dati salvati.</p>
-                  </Alert>
-                </div>
+              {newPlan && !plan.deletedAt ? (
+                <p className="muted small">
+                  Componi sessioni ed esercizi qui sotto: ogni modifica alla struttura viene salvata subito. Quando hai finito
+                  premi “Salva dati” per tornare all'elenco delle schede.
+                </p>
               ) : null}
               <PlanMetadataForm
                 key={plan.version}
@@ -81,11 +85,25 @@ export function PlanEditorPage() {
                 disabled={plan.deletedAt !== null}
                 pending={updateMeta.isPending}
                 error={updateMeta.error}
-                onSubmit={async (values) => {
-                  setSavedMeta(false);
-                  await updateMeta.mutateAsync({ ...values, version: plan.version });
-                  setSavedMeta(true);
-                }}
+                onSubmit={(values) =>
+                  // Navigate only after a successful save: on error the form stays open with the message.
+                  updateMeta.mutateAsync(
+                    { ...values, version: plan.version },
+                    {
+                      onSuccess: (saved) =>
+                        navigate('/admin/plans', {
+                          replace: true,
+                          state: flashState({
+                            tone: 'success',
+                            title: newPlan ? 'Nuova scheda creata' : 'Scheda modificata',
+                            message: saved.executable
+                              ? `“${saved.name}” è pronta per essere assegnata.`
+                              : `“${saved.name}” non è ancora assegnabile: serve almeno una sessione con un esercizio in ogni sessione.`,
+                          }),
+                        }),
+                    },
+                  )
+                }
               />
             </section>
 
@@ -164,8 +182,8 @@ function SessionCard({ session, index, total, readOnly, onMove, run, ask }: Sess
   const [renaming, setRenaming] = useState(false);
   const [title, setTitle] = useState(session.title);
   const [renameError, setRenameError] = useState<string | undefined>();
-  const groups = useActiveCatalog('muscle-groups');
-  const [groupId, setGroupId] = useState('');
+  const groups = useActiveMuscleGroups();
+  const [groupId, setGroupId] = useState<string | null>(null);
   const available = (groups.data?.content ?? []).filter((g) => !session.sections.some((s) => s.muscleGroupId === g.id));
   const titleId = `session-${session.id}`;
 
@@ -255,18 +273,18 @@ function SessionCard({ session, index, total, readOnly, onMove, run, ask }: Sess
             onSubmit={(e) => {
               e.preventDefault();
               if (groupId) {
-                void run(() => plansApi.addSection(session.id, groupId)).then(() => setGroupId(''));
+                void run(() => plansApi.addSection(session.id, groupId)).then(() => setGroupId(null));
               }
             }}
           >
-            <SelectField label={`Nuova sezione in ${session.title}`} value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-              <option value="">Scegli un gruppo muscolare…</option>
-              {available.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </SelectField>
+            <Combobox
+              label={`Nuova sezione in ${session.title}`}
+              placeholder="Cerca un gruppo muscolare…"
+              options={available.map((g) => ({ id: g.id, label: g.name }))}
+              value={groupId}
+              onChange={setGroupId}
+              emptyText="Nessun gruppo muscolare disponibile"
+            />
             <Button type="submit" variant="secondary" disabled={!groupId} icon={<Plus size={18} aria-hidden="true" />}>
               Aggiungi sezione
             </Button>
@@ -344,6 +362,8 @@ function SectionBlock({ section, index, total, readOnly, onMove, run, ask }: Sec
           <ExerciseEditor
             key={exercise.id}
             initial={exercise}
+            muscleGroupId={section.muscleGroupId}
+            muscleGroupName={section.muscleGroupName}
             pending={pending}
             error={error}
             onSubmit={(input: PlanExerciseInput) => save(() => plansApi.updateExercise(exercise.id, input))}
@@ -357,6 +377,12 @@ function SectionBlock({ section, index, total, readOnly, onMove, run, ask }: Sec
                 <>
                   {' '}
                   <StatusBadge tone="neutral">disattivato</StatusBadge>
+                </>
+              ) : null}
+              {!exercise.exerciseInSectionGroup ? (
+                <>
+                  {' '}
+                  <StatusBadge tone="warning">ora in un altro gruppo</StatusBadge>
                 </>
               ) : null}
             </span>
@@ -401,6 +427,8 @@ function SectionBlock({ section, index, total, readOnly, onMove, run, ask }: Sec
       {!readOnly ? (
         editing === 'new' ? (
           <ExerciseEditor
+            muscleGroupId={section.muscleGroupId}
+            muscleGroupName={section.muscleGroupName}
             pending={pending}
             error={error}
             onSubmit={(input) => save(() => plansApi.addExercise(section.id, input))}

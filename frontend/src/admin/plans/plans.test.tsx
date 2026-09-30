@@ -17,13 +17,15 @@ const catalogPage = (items: { id: string; name: string }[]) => ({
 function setup(plan = planStructure()) {
   let current = plan;
   const calls: { method: string; url: string; body: unknown }[] = [];
+  const exerciseQueries: string[] = [];
   server.use(
     http.get('*/api/auth/me', () => HttpResponse.json(adminUser)),
     http.get('*/api/admin/plans/:id', () => HttpResponse.json(current)),
     http.get('*/api/admin/plans/:id/assignments', () => HttpResponse.json([])),
-    http.get('*/api/admin/exercises', () =>
-      HttpResponse.json(catalogPage([{ id: 'ex-1', name: 'Panca piana' }, { id: 'ex-3', name: 'Squat' }])),
-    ),
+    http.get('*/api/admin/exercises', ({ request }) => {
+      exerciseQueries.push(new URL(request.url).search);
+      return HttpResponse.json(catalogPage([{ id: 'ex-1', name: 'Panca piana' }, { id: 'ex-3', name: 'Squat' }]));
+    }),
     http.get('*/api/admin/muscle-groups', () =>
       HttpResponse.json(catalogPage([{ id: 'mg-1', name: 'Petto' }, { id: 'mg-2', name: 'Dorso' }])),
     ),
@@ -35,6 +37,7 @@ function setup(plan = planStructure()) {
   );
   return {
     calls,
+    exerciseQueries,
     setPlan: (p: typeof plan) => {
       current = p;
     },
@@ -89,12 +92,13 @@ describe('plan editor', () => {
   });
 
   it('adds an exercise to failure sending reps 0', async () => {
-    const { calls } = setup();
+    const { calls, exerciseQueries } = setup();
     renderApp('/admin/plans/plan-1/edit');
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Aggiungi esercizio a Petto' }));
     const form = screen.getByRole('form', { name: 'Nuovo esercizio' });
-    await user.selectOptions(within(form).getByLabelText(/^Esercizio/), 'ex-3');
+    await user.click(within(form).getByRole('combobox', { name: 'Esercizio' }));
+    await user.click(within(form).getByRole('option', { name: 'Squat' }));
     await user.click(within(form).getByLabelText('A cedimento (MAX)'));
     await user.click(within(form).getByRole('button', { name: 'Aggiungi esercizio' }));
     await waitFor(() =>
@@ -104,6 +108,16 @@ describe('plan editor', () => {
         body: { exerciseId: 'ex-3', setsCount: 3, reps: 0, toFailure: true, restSeconds: 90, customSets: [] },
       }),
     );
+    // Only the active exercises of the section's group are offered.
+    expect(exerciseQueries.some((q) => q.includes('muscleGroupId=mg-1') && q.includes('active=true'))).toBe(true);
+  });
+
+  it('flags a historic exercise that now belongs to another group', async () => {
+    const plan = planStructure();
+    plan.sessions[0]!.sections[0]!.exercises = [exercise({ exerciseInSectionGroup: false })];
+    setup(plan);
+    renderApp('/admin/plans/plan-1/edit');
+    expect(await screen.findByText('ora in un altro gruppo')).toBeInTheDocument();
   });
 
   it('validates the configuration on the client', async () => {
@@ -184,7 +198,7 @@ describe('plans page', () => {
               id: 'plan-1',
               name: 'Forza',
               description: null,
-              expiresOn: null,
+              durationWeeks: null,
               sessionCount: 2,
               executable: true,
               copiedFromPlanId: null,
