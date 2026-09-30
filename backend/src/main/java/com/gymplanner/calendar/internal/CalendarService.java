@@ -59,7 +59,12 @@ class CalendarService implements CalendarQueries {
     }
 
     /** The days of one active plan of the user. */
-    record PlanSchedule(UUID assignmentId, UUID planId, String planName, LocalDate startDate, Set<Integer> weekdays) {
+    record PlanSchedule(UUID assignmentId,
+                        UUID planId,
+                        String planName,
+                        LocalDate startDate,
+                        Set<Integer> weekdays,
+                        List<PlanSessionRef> sessions) {
     }
 
     /** A requested day already used by another active plan of the same user. */
@@ -137,14 +142,33 @@ class CalendarService implements CalendarQueries {
         if (list.isEmpty()) {
             return List.of();
         }
+
         Map<UUID, Set<Integer>> days = new TreeMap<>();
         list.forEach(a -> days.put(a.id(), new TreeSet<>()));
+
         schedules.findByPlanAssignmentIdIn(days.keySet())
                 .forEach(s -> days.get(s.getPlanAssignmentId()).add(s.getWeekday()));
-        Map<UUID, PlanSummary> names = plans.findPlans(list.stream().map(AssignmentView::planId).toList());
+
+        Map<UUID, PlanSummary> names = plans.findPlans(
+                list.stream().map(AssignmentView::planId).toList());
+
+        Map<UUID, List<PlanSessionRef>> sessionsByPlan = new TreeMap<>();
+        list.stream()
+                .map(AssignmentView::planId)
+                .distinct()
+                .forEach(planId ->
+                        sessionsByPlan.put(planId, plans.sessionsInOrder(planId)));
+
         return list.stream().map(a -> {
             PlanSummary plan = names.get(a.planId());
-            return new PlanSchedule(a.id(), a.planId(), plan == null ? "?" : plan.name(), a.startDate(), days.get(a.id()));
+
+            return new PlanSchedule(
+                    a.id(),
+                    a.planId(),
+                    plan == null ? "?" : plan.name(),
+                    a.startDate(),
+                    days.get(a.id()),
+                    List.copyOf(sessionsByPlan.get(a.planId())));
         }).toList();
     }
 
