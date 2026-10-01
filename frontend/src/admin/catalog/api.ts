@@ -40,6 +40,8 @@ export const catalogKeys = {
 };
 
 export const catalogApi = {
+  deleteGroup: (id: string) => http.del<void>(`/api/admin/muscle-groups/${id}`),
+  deleteExercise: (id: string) => http.del<void>(`/api/admin/exercises/${id}`),
   groups: (search: CatalogSearch) => http.get<Page<MuscleGroup>>('/api/admin/muscle-groups', { ...search }),
   group: (id: string) => http.get<MuscleGroup>(`/api/admin/muscle-groups/${id}`),
   createGroup: (name: string) => http.post<MuscleGroup>('/api/admin/muscle-groups', { name }),
