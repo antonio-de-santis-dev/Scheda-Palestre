@@ -66,6 +66,20 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
   const currentSet = current?.sets.find((s) => s.id === state.currentSetId) ?? null;
   const finished = state.status !== 'IN_PROGRESS';
   const done = state.exercises.filter((e) => e.status === 'COMPLETED' || e.status === 'SKIPPED').length;
+    const exercisePriority = {
+        IN_PROGRESS: 0,
+        TODO: 1,
+        SKIPPED: 2,
+        COMPLETED: 3,
+    } as const;
+
+    const visibleExercises = finished
+        ? state.exercises
+        : [...state.exercises].sort(
+            (a, b) =>
+                exercisePriority[a.status] - exercisePriority[b.status]
+                || a.position - b.position,
+        );
 
   return (
     <div className="workout">
@@ -218,7 +232,7 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
           Esercizi
         </h2>
         <ol className="list workout-exercises">
-          {state.exercises.map((e) => (
+          {visibleExercises.map((e) => (
             <li key={e.id} className={`list-item${e.id === state.currentExerciseId ? ' list-item--current' : ''}`}>
               <div className="list-item__main">
                 <div className="list-item__title">
