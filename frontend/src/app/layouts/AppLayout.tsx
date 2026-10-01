@@ -1,5 +1,5 @@
-import type { ComponentType } from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router';
+import { useLayoutEffect, type ComponentType } from 'react';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { LogOut } from 'lucide-react';
 import { useCurrentUser, useLogout } from '../../auth/useAuth';
 import { BrandMark } from './BrandMark';
@@ -25,10 +25,22 @@ export function AppLayout({ home, areaLabel, items }: AppLayoutProps) {
   const { data: user } = useCurrentUser();
   const logout = useLogout();
   const navigate = useNavigate();
+  const { pathname, hash } = useLocation();
+  const isAdmin = pathname.startsWith('/admin/');
+
+  useLayoutEffect(() => {
+    if (isAdmin && !hash) {
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: 'instant',
+      });
+    }
+  }, [pathname, hash, isAdmin]);
   const mobileItems = items.filter((i) => i.mobile !== false).slice(0, 5);
 
   return (
-    <div className="app-shell">
+      <div className={`app-shell${isAdmin ? ' app-shell--admin' : ''}`}>
       <a className="skip-link" href="#main">
         Vai al contenuto
       </a>
