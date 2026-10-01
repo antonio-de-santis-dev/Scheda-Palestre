@@ -27,6 +27,17 @@ interface ExerciseRepository extends CatalogRepository<Exercise> {
             """)
     List<GroupCount> countByGroup(@Param("groupIds") Collection<UUID> groupIds);
 
+    @Query("""
+            select count(e) > 0 from Exercise e
+            where e.muscleGroupId = :groupId
+              and lower(e.name) = lower(:name)
+              and (:excludeId is null or e.id <> :excludeId)
+            """)
+    boolean existsNameInGroup(
+            @Param("groupId") UUID groupId,
+            @Param("name") String name,
+            @Param("excludeId") UUID excludeId);
+
     interface GroupCount {
         UUID getGroupId();
 

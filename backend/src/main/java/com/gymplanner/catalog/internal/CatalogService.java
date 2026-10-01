@@ -79,7 +79,7 @@ abstract class CatalogService<T extends CatalogItem> {
         return new CatalogItemView(item.getId(), item.getName(), item.isActive());
     }
 
-    private T saveUnique(T item) {
+    protected T saveUnique(T item) {
         try {
             return repository.saveAndFlush(item);
         } catch (DataIntegrityViolationException e) {

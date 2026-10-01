@@ -12,6 +12,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.gymplanner.shared.error.ConflictException;
+import com.gymplanner.shared.error.FieldViolation;
+import java.util.List;
 
 /** Exercises always belong to one muscle group (ADR 0007). */
 @Service
@@ -35,7 +38,11 @@ class ExerciseService extends CatalogService<Exercise> {
     @Transactional
     public Exercise create(String name, UUID muscleGroupId) {
         groups.requireSelectable(muscleGroupId);
-        return insert(new Exercise(normalize(name), muscleGroupId));
+
+        String normalized = normalize(name);
+        ensureUniqueInGroup(muscleGroupId, normalized, null);
+
+        return saveUnique(new Exercise(normalized, muscleGroupId));
     }
 
     /**
@@ -44,12 +51,23 @@ class ExerciseService extends CatalogService<Exercise> {
      */
     @Transactional
     public Exercise update(UUID id, String name, UUID muscleGroupId) {
-        Exercise exercise = rename(id, name);
-        if (muscleGroupId != null && !muscleGroupId.equals(exercise.getMuscleGroupId())) {
-            groups.requireSelectable(muscleGroupId);
-            exercise.moveTo(muscleGroupId);
+        Exercise exercise = get(id);
+
+        UUID targetGroupId = muscleGroupId != null
+                ? muscleGroupId
+                : exercise.getMuscleGroupId();
+
+        if (!targetGroupId.equals(exercise.getMuscleGroupId())) {
+            groups.requireSelectable(targetGroupId);
         }
-        return exercise;
+
+        String normalized = normalize(name);
+        ensureUniqueInGroup(targetGroupId, normalized, id);
+
+        exercise.rename(normalized);
+        exercise.moveTo(targetGroupId);
+
+        return saveUnique(exercise);
     }
 
     @Transactional(readOnly = true)
@@ -81,5 +99,28 @@ class ExerciseService extends CatalogService<Exercise> {
 
     static ExerciseView exerciseView(Exercise e) {
         return new ExerciseView(e.getId(), e.getName(), e.isActive(), e.getMuscleGroupId());
+    }
+
+    @Override
+    @Transactional
+    public Exercise rename(UUID id, String name) {
+        return update(id, name, null);
+    }
+
+    private void ensureUniqueInGroup(
+            UUID muscleGroupId,
+            String name,
+            UUID excludeId) {
+
+        if (repository.existsNameInGroup(
+                muscleGroupId, name, excludeId)) {
+
+            throw new ConflictException(
+                    "NAME_TAKEN",
+                    "Exercise name already in use in this muscle group",
+                    List.of(new FieldViolation(
+                            "name",
+                            "Il nome è già in uso in questo gruppo muscolare")));
+        }
     }
 }
