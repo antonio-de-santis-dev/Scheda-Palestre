@@ -5,9 +5,9 @@ import type { NavItem } from '../layouts/AppLayout';
 export const ADMIN_NAV: NavItem[] = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/users', label: 'Utenti', icon: Users },
-  { to: '/admin/catalog', label: 'Catalogo', icon: Dumbbell },
   { to: '/admin/plans', label: 'Schede', icon: ClipboardList },
-  { to: '/admin/profile', label: 'Profilo', icon: UserRound, mobile: false },
+  { to: '/admin/catalog', label: 'Esercizi', icon: Dumbbell },
+  { to: '/admin/profile', label: 'Profilo', icon: UserRound },
 ];
 
 export const USER_NAV: NavItem[] = [

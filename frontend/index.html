@@ -7,6 +7,9 @@
     <meta name="theme-color" content="#111827" />
     <meta name="description" content="GymPlanner - schede di allenamento in palestra" />
     <title>GymPlanner</title>
+    <script>
+      try { const theme = localStorage.getItem('gymplanner-theme'); if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme; } catch { /* Browser storage is optional. */ }
+    </script>
   </head>
   <body>
     <div id="root"></div>

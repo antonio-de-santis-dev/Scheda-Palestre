@@ -4,6 +4,7 @@
  * All text/background pairs are checked for WCAG AA (>= 4.5:1 for text).
  */
 :root {
+  color-scheme: light;
   /* Primitives */
   --orange-500: #f97316;
   --orange-600: #ea580c;
@@ -36,7 +37,7 @@
   --color-surface-muted: var(--slate-50);
   --color-text: var(--slate-900);
   --color-text-muted: var(--slate-600);
-  --color-border: var(--slate-300);
+  --color-border: var(--slate-200);
   --color-primary: var(--orange-500);
   --color-primary-hover: var(--orange-600);
   --color-on-primary: var(--slate-900);
@@ -50,7 +51,7 @@
   --color-warning-soft: var(--amber-100);
   --color-info: var(--blue-700);
   --color-info-soft: var(--blue-100);
-  --color-focus: var(--blue-700);
+  --color-focus: var(--orange-700);
   --color-nav-bg: var(--gray-900);
   --color-nav-text: #f9fafb;
 
@@ -76,24 +77,25 @@
   --space-8: 2rem;
   --space-10: 2.5rem;
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
   --radius-full: 999px;
   --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.08);
   --shadow-md: 0 4px 16px rgb(15 23 42 / 0.12);
   --touch-target: 44px;
-  --content-max: 72rem;
+  --content-max: 70rem;
   --transition: 180ms ease-out;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
     --color-bg: var(--gray-900);
     --color-surface: var(--gray-800);
     --color-surface-muted: #273244;
     --color-text: #f8fafc;
     --color-text-muted: var(--slate-300);
-    --color-border: #475569;
+    --color-border: #374151;
     --color-primary-text: #fdba74;
     --color-primary-soft: #43261a;
     --color-success: #4ade80;
@@ -115,4 +117,28 @@
   :root {
     --transition: 0ms;
   }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-bg: var(--gray-900);
+  --color-surface: var(--gray-800);
+  --color-surface-muted: #273244;
+  --color-text: #f8fafc;
+  --color-text-muted: var(--slate-300);
+  --color-border: #374151;
+  --color-primary-text: #fdba74;
+  --color-primary-soft: #43261a;
+  --color-success: #4ade80;
+  --color-success-soft: #14321f;
+  --color-danger: #fca5a5;
+  --color-danger-soft: #3f1d1d;
+  --color-warning: #fcd34d;
+  --color-warning-soft: #3b2f12;
+  --color-info: #93c5fd;
+  --color-info-soft: #1e2a44;
+  --color-focus: #93c5fd;
+  --color-nav-bg: #0b1220;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 16px rgb(0 0 0 / 0.5);
 }

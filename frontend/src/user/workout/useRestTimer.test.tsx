@@ -5,6 +5,26 @@ import { useRestTimer } from './useRestTimer';
 afterEach(() => vi.useRealTimers());
 
 describe('rest timer lifecycle', () => {
+  it('starts a new rest at its server duration before the first scheduled tick', () => {
+    vi.useFakeTimers();
+    const start = Date.now();
+    const input = {
+      restEndsAt: new Date(start + 250 + 60_000).toISOString(),
+      serverTime: new Date(start + 250).toISOString(),
+      receivedAt: start + 250,
+    };
+    const { result, rerender } = renderHook(
+      ({ value }) => useRestTimer(value, vi.fn()),
+      { initialProps: { value: undefined as typeof input | undefined } },
+    );
+    expect(result.current).toBe(0);
+    vi.setSystemTime(start + 250);
+    rerender({ value: input });
+    expect(result.current).toBe(60);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(result.current).toBe(59);
+  });
+
   it('stops ticking at expiry and notifies once even after a server refresh', () => {
     vi.useFakeTimers();
     const start = Date.now();

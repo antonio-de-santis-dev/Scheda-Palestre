@@ -47,7 +47,7 @@ export function UserDetailPage() {
       />
       <QueryState isLoading={query.isLoading} error={query.error} onRetry={() => void query.refetch()}>
         {user ? (
-          <div className="stack">
+          <div className="user-detail-layout">
             {temporary ? (
               <TemporaryPasswordNotice
                 username={temporary.user.username}

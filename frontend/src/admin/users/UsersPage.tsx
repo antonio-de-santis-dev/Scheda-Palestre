@@ -52,7 +52,7 @@ export function UsersPage() {
     <>
       <PageHeader
         title="Utenti"
-        subtitle="Account USER della palestra. La registrazione pubblica non esiste: gli account li crei tu."
+        subtitle="Gestisci gli account e gli accessi alla palestra."
         actions={
           !creating ? (
             <Button icon={<UserPlus size={18} aria-hidden="true" />} onClick={() => setCreating(true)}>
@@ -126,7 +126,8 @@ export function UsersPage() {
             </p>
             <ul className="list" aria-label="Elenco utenti">
               {query.data?.content.map((user) => (
-                <li key={user.id} className="list-item">
+                <li key={user.id} className="list-item user-list-item">
+                  <span className="avatar avatar--soft" aria-hidden="true">{user.firstName.charAt(0)}{user.lastName.charAt(0)}</span>
                   <div className="list-item__main">
                     <div className="list-item__title">
                       {user.lastName} {user.firstName}

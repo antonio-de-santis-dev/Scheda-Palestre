@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import { Link, useParams } from 'react-router';
 import { CheckCheck, Hourglass, OctagonX, PartyPopper, SkipForward, TimerReset, Trophy, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '../../shared/components/Button';
@@ -66,24 +66,13 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
   const currentSet = current?.sets.find((s) => s.id === state.currentSetId) ?? null;
   const finished = state.status !== 'IN_PROGRESS';
   const done = state.exercises.filter((e) => e.status === 'COMPLETED' || e.status === 'SKIPPED').length;
-    const exercisePriority = {
-        IN_PROGRESS: 0,
-        TODO: 1,
-        SKIPPED: 2,
-        COMPLETED: 3,
-    } as const;
-
-    const visibleExercises = finished
-        ? state.exercises
-        : [...state.exercises].sort(
-            (a, b) =>
-                exercisePriority[a.status] - exercisePriority[b.status]
-                || a.position - b.position,
-        );
+  const totalSets = state.exercises.reduce((n, e) => n + e.setsPlanned, 0);
+  const completedSets = state.exercises.reduce((n, e) => n + e.setsCompleted, 0);
+  const progress = totalSets ? Math.round(completedSets / totalSets * 100) : 0;
 
   return (
     <div className="workout">
-      <header className="row row--between">
+      <header className="row row--between workout-header">
         <div>
           <h1 style={{ fontSize: 'var(--text-2xl)', margin: 0 }}>{state.sessionTitle}</h1>
           <p className="muted small" style={{ margin: 0 }}>
@@ -137,6 +126,11 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
         <ErrorAlert error={error} />
       ) : null}
 
+      <div className="workout-progress" role="progressbar" aria-label="Serie completate" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+        <span style={{ width: `${progress}%` }} />
+      </div>
+      <div className="workout-layout">
+        <div className="workout-primary">
       {finished ? (
         <FinishedCard state={state} />
       ) : current && currentSet ? (
@@ -145,6 +139,9 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
           <h2 id="current-exercise" className="workout-current__name">
             {current.exerciseName}
           </h2>
+          <div className="set-progress" aria-label={`Serie ${currentSet.setIndex} di ${current.setsPlanned}`}>
+            {current.sets.map((set) => <span key={set.id} className={set.completedAt ? 'set-progress--done' : set.id === currentSet.id ? 'set-progress--current' : ''} />)}
+          </div>
           <div className="workout-current__stats">
             <div className="stat">
               <span className="stat__label">Serie</span>
@@ -165,7 +162,7 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
           </div>
 
           {remaining > 0 ? (
-            <div className="timer" role="timer" aria-live="off" aria-label={`Recupero: ${formatDuration(remaining)} rimanenti`}>
+            <div className="timer timer--ring" style={{ '--rest-progress': `${Math.min(100, remaining / Math.max(1, state.restSeconds ?? currentSet.restSeconds) * 100)}%` } as CSSProperties} role="timer" aria-live="off" aria-label={`Recupero: ${formatDuration(remaining)} rimanenti`}>
               <span className="timer__label">
                 <Hourglass size={22} aria-hidden="true" />
                 Recupero
@@ -227,16 +224,17 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
         </div>
       ) : null}
 
-      <section aria-labelledby="exercise-list-title">
+      </div>
+      <section className="card workout-path" aria-labelledby="exercise-list-title">
         <h2 id="exercise-list-title" style={{ fontSize: 'var(--text-xl)' }}>
           Esercizi
         </h2>
         <ol className="list workout-exercises">
-          {visibleExercises.map((e) => (
-            <li key={e.id} className={`list-item${e.id === state.currentExerciseId ? ' list-item--current' : ''}`}>
+          {state.exercises.map((e) => (
+            <li key={e.id} className={`list-item${e.id === state.currentExerciseId ? ' list-item--current' : ''}${e.status === 'COMPLETED' ? ' list-item--done' : ''}`}>
               <div className="list-item__main">
                 <div className="list-item__title">
-                  {e.position}. {e.exerciseName}
+                  <span className="exercise-row__number" aria-hidden="true">{e.position}</span>{e.exerciseName}
                 </div>
                 <div className="list-item__meta">
                   {e.muscleGroupName} · {e.setsCompleted}/{e.setsPlanned} serie ·{' '}
@@ -248,6 +246,8 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
           ))}
         </ol>
       </section>
+
+      </div>
 
       <ConfirmDialog
         open={confirm === 'skip'}

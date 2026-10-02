@@ -94,7 +94,7 @@ export function PlanAssignmentsPage() {
           </Link>
         }
       />
-      <div className="stack">
+      <div className="assignment-layout">
         {plan.data && !plan.data.executable ? (
           <Alert tone="warning" title="Scheda non ancora eseguibile">
             <p>

@@ -76,11 +76,13 @@ describe('plan editor', () => {
     setup();
     renderApp('/admin/plans/plan-1/edit');
     expect(await screen.findByRole('heading', { name: '1. Giorno 1' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '2. Giorno 2' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '2. Giorno 2' })).not.toBeInTheDocument();
     const section = screen.getByRole('region', { name: 'Sezione Petto' });
     expect(within(section).getByText(/3 × 10/)).toBeInTheDocument();
     expect(within(section).getByText(/3 × MAX/)).toBeInTheDocument();
     expect(screen.getByText('Pronta')).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('tab', { name: /Sessione B/ }));
+    expect(screen.getByRole('heading', { name: '2. Giorno 2' })).toBeInTheDocument();
   });
 
   it('adds a session with the suggested title', async () => {
@@ -111,6 +113,7 @@ describe('plan editor', () => {
     const { calls } = setup();
     renderApp('/admin/plans/plan-1/edit');
     const user = userEvent.setup();
+    await user.click(await screen.findByRole('tab', { name: /Sessione B/ }));
     await user.click(await screen.findByRole('button', { name: 'Elimina Giorno 2' }));
     const dialog = await screen.findByRole('dialog');
     expect(calls.filter((c) => c.method === 'DELETE')).toHaveLength(0);

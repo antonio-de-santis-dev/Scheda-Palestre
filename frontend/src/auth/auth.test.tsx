@@ -13,7 +13,7 @@ describe('routing guards', () => {
   it('redirects anonymous users to /login', async () => {
     meReturns(null);
     const { router } = renderApp('/admin');
-    expect(await screen.findByRole('heading', { name: 'Accedi' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Bentornato' })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/login');
   });
 

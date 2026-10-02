@@ -10,6 +10,8 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
   cleanup();
   server.resetHandlers();
+  localStorage.clear();
+  delete document.documentElement.dataset.theme;
   document.cookie = 'XSRF-TOKEN=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
 });
 afterAll(() => server.close());
@@ -20,6 +22,8 @@ if (!HTMLDialogElement.prototype.showModal) {
     this.setAttribute('open', '');
   };
   HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
+    if (!this.hasAttribute('open')) return;
     this.removeAttribute('open');
+    this.dispatchEvent(new Event('close'));
   };
 }

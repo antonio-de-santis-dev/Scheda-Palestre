@@ -8,6 +8,7 @@ import '@fontsource/barlow/700.css';
 import '@fontsource/barlow-condensed/600.css';
 import '@fontsource/barlow-condensed/700.css';
 import './shared/styles/global.css';
+import './shared/styles/design.css';
 import { AppProviders } from './app/providers/AppProviders';
 import { routes } from './app/router/routes';
 

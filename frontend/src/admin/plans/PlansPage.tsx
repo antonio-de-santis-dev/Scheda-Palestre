@@ -52,7 +52,7 @@ export function PlansPage() {
     <>
       <PageHeader
         title="Schede"
-        subtitle="Le schede sono condivise: la stessa scheda può essere assegnata a più utenti."
+        subtitle="Crea, organizza e assegna le schede di allenamento."
         actions={
           !creating ? (
             <Button icon={<FilePlus2 size={18} aria-hidden="true" />} onClick={() => setCreating(true)}>
@@ -109,7 +109,7 @@ export function PlansPage() {
           </EmptyState>
         ) : (
           <>
-            <ul className="list" aria-label="Elenco schede">
+            <ul className="list plan-list" aria-label="Elenco schede">
               {query.data?.content.map((plan) => (
                 <li key={plan.id} className="list-item">
                   <div className="list-item__main">

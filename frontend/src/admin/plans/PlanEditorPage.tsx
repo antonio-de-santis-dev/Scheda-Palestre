@@ -19,6 +19,7 @@ import { ExerciseEditor } from './ExerciseEditor';
 import { ActiveAssigneesNotice } from '../assignments/ActiveAssigneesNotice';
 import { flashState } from '../../shared/flash/flash';
 import { isNewPlan } from './editorState';
+import { SessionTabs } from '../../shared/components/SessionTabs';
 
 type Confirm = { title: string; body: ReactNode; label: string; run: () => Promise<unknown> } | null;
 
@@ -26,6 +27,8 @@ export function PlanEditorPage() {
   const { id = '' } = useParams();
   const query = usePlan(id);
   const plan = query.data;
+  const [selectedSession, setSelectedSession] = useState('');
+  const activeSession = plan?.sessions.find((s) => s.id === selectedSession) ?? plan?.sessions[0];
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [confirmPending, setConfirmPending] = useState(false);
   const [confirmError, setConfirmError] = useState<unknown>(null);
@@ -52,14 +55,14 @@ export function PlanEditorPage() {
       />
       <QueryState isLoading={query.isLoading} error={query.error} onRetry={() => void query.refetch()}>
         {plan ? (
-          <div className="stack">
+          <div className="plan-editor-layout">
             <ActiveAssigneesNotice planId={plan.id} />
             {plan.deletedAt ? (
               <Alert tone="warning" title="Scheda eliminata">
                 <p>Ripristinala dall'elenco delle schede per poterla modificare.</p>
               </Alert>
             ) : null}
-            <section className="card" aria-labelledby="meta-title">
+            <section className="card plan-editor-metadata" aria-labelledby="meta-title">
               <div className="row row--between">
                 <h2 id="meta-title" className="card__title">
                   Dati della scheda
@@ -110,16 +113,18 @@ export function PlanEditorPage() {
             {structureMutation.error ? <ErrorAlert error={structureMutation.error} /> : null}
             {reorderSessions.error ? <ErrorAlert error={reorderSessions.error} /> : null}
 
-            <section aria-labelledby="sessions-title" className="stack">
+            <section aria-labelledby="sessions-title" className="stack plan-editor-structure">
               <h2 id="sessions-title">Sessioni</h2>
               <p className="muted small" style={{ marginTop: 'calc(-1 * var(--space-3))' }}>
                 Le sessioni vengono proposte agli utenti a rotazione, in quest'ordine.
               </p>
               {plan.sessions.length === 0 ? <p className="muted">Nessuna sessione. Aggiungi la prima qui sotto.</p> : null}
+              {activeSession ? <SessionTabs sessions={plan.sessions} activeId={activeSession.id} onSelect={setSelectedSession} prefix="editor" /> : null}
               <div>
                 {plan.sessions.map((session, index) => (
+                  <div key={session.id} role="tabpanel" hidden={session.id !== activeSession?.id}
+                    id={`editor-panel-${session.id}`} aria-labelledby={`editor-tab-${session.id}`} tabIndex={0}>
                   <SessionCard
-                    key={session.id}
                     session={session}
                     index={index}
                     total={plan.sessions.length}
@@ -128,6 +133,7 @@ export function PlanEditorPage() {
                     run={(fn) => structureMutation.mutateAsync(fn)}
                     ask={ask}
                   />
+                  </div>
                 ))}
               </div>
               {plan.deletedAt === null ? (
@@ -135,7 +141,11 @@ export function PlanEditorPage() {
                   nextNumber={plan.sessions.length + 1}
                   pending={addSession.isPending}
                   error={addSession.error}
-                  onAdd={(title) => addSession.mutateAsync(title)}
+                  onAdd={(title) => addSession.mutateAsync(title).then((updated) => {
+                    const created = updated.sessions.find((s) => !plan.sessions.some((old) => old.id === s.id));
+                    if (created) setSelectedSession(created.id);
+                    return updated;
+                  })}
                 />
               ) : null}
             </section>

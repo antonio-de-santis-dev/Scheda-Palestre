@@ -18,7 +18,9 @@ export function TodayPage() {
   const query = useToday(date);
   return (
     <>
-      <PageHeader title="Oggi" subtitle={formatLongDate(date)} />
+      <div className={query.data?.status === 'TRAINING_DAY' && query.data.session ? 'visually-hidden' : undefined}>
+        <PageHeader title="Oggi" subtitle={formatLongDate(date)} />
+      </div>
       <QueryState isLoading={query.isLoading} error={query.error} onRetry={() => void query.refetch()}>
         {query.data ? <TodayContent today={query.data} /> : null}
       </QueryState>
@@ -102,10 +104,10 @@ function TodayContent({ today }: { today: Today }) {
 
       {today.status === 'TRAINING_DAY' && today.session ? (
         <>
-          <section className="card" aria-labelledby="today-session">
+          <section className="today-hero" aria-labelledby="today-session">
             <div className="row row--between">
               <div>
-                <p className="muted small" style={{ margin: 0 }}>
+                <p className="today-hero__plan" style={{ margin: 0 }}>
                   {today.planName}
                 </p>
                 <h2 id="today-session" style={{ margin: 0 }}>
@@ -114,7 +116,11 @@ function TodayContent({ today }: { today: Today }) {
               </div>
               {today.workout ? <WorkoutStatusBadge status={today.workout.status} /> : null}
             </div>
-            <div style={{ marginTop: 'var(--space-4)' }}>
+            <div className="today-hero__chips">
+              <span>{today.session.sections.reduce((n, s) => n + s.exercises.length, 0)} esercizi</span>
+              <span>{today.session.sections.reduce((n, s) => n + s.exercises.reduce((total, e) => total + e.setsCount, 0), 0)} serie</span>
+            </div>
+            <div>
               {start.error ? <ErrorAlert error={start.error} /> : null}
               {today.canStart ? (
                 <Button
@@ -138,7 +144,10 @@ function TodayContent({ today }: { today: Today }) {
               ) : null}
             </div>
           </section>
-          <PlanSessionView session={today.session} headingLevel={3} />
+          <section className="card today-program" aria-labelledby="today-program-title">
+            <h2 id="today-program-title">Programma di oggi</h2>
+            <PlanSessionView session={today.session} headingLevel={3} hideTitle />
+          </section>
         </>
       ) : null}
     </div>

@@ -3,13 +3,14 @@ import { describeSets } from '../api/planTypes';
 import { restText } from '../utils/format';
 
 /** Read-only rendering of a session: muscle sections, exercises and planned values. */
-export function PlanSessionView({ session, headingLevel = 2 }: { session: PlanSession; headingLevel?: 2 | 3 }) {
+export function PlanSessionView({ session, headingLevel = 2, hideTitle = false }: { session: PlanSession; headingLevel?: 2 | 3; hideTitle?: boolean }) {
   const Heading = headingLevel === 2 ? 'h2' : 'h3';
+  let exerciseNumber = 0;
   return (
-    <article className="plan-session" aria-label={session.title}>
-      <header className="plan-session__header">
+    <article className="plan-session plan-session--readonly" aria-label={session.title}>
+      {!hideTitle ? <header className="plan-session__header">
         <Heading>{session.title}</Heading>
-      </header>
+      </header> : null}
       <div className="plan-session__body">
         {session.sections.length === 0 ? <p className="muted">Sessione ancora vuota.</p> : null}
         {session.sections.map((section) => (
@@ -20,6 +21,7 @@ export function PlanSessionView({ session, headingLevel = 2 }: { session: PlanSe
             <ul className="list" style={{ gap: 0 }}>
               {section.exercises.map((exercise) => (
                 <li key={exercise.id} className="exercise-row">
+                  <span className="exercise-row__number" aria-hidden="true">{++exerciseNumber}</span>
                   <span className="exercise-row__name">{exercise.exerciseName}</span>
                   <span className="exercise-row__values">
                     {describeSets(exercise)}

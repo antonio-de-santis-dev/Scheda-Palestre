@@ -17,6 +17,7 @@ export function useMyAssignments() {
 export function useMyPlan(assignmentId: string) {
   return useQuery({
     queryKey: myPlansKeys.plan(assignmentId),
+    enabled: assignmentId !== '',
     queryFn: () => http.get<PlanStructure>(`/api/me/assignments/${assignmentId}/plan`),
   });
 }

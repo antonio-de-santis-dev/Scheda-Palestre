@@ -7,6 +7,7 @@ import { normalUser, renderApp } from '../../test/render';
 import { planStructure } from '../../test/planFixtures';
 import { workoutState } from '../../test/workoutFixtures';
 import type { Today } from '../workout/api';
+import { addDays } from '../../shared/utils/format';
 
 const session = planStructure().sessions[0]!;
 
@@ -151,12 +152,14 @@ describe('today page', () => {
 });
 
 describe('calendar page', () => {
-  it('lists planned sessions and outcomes with text badges', async () => {
+  it('selects completed, rest and planned days, and requests complete weeks when changing month', async () => {
+    const ranges: { from: string; to: string }[] = [];
     server.use(
       http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
       http.get('*/api/me/calendar', ({ request }) => {
         const url = new URL(request.url);
         const from = url.searchParams.get('from')!;
+        ranges.push({ from, to: url.searchParams.get('to')! });
         return HttpResponse.json([
           {
             date: from,
@@ -175,15 +178,28 @@ describe('calendar page', () => {
               skippedExercises: 0,
             },
           },
-          { date: '2099-01-02', type: 'REST', sessionTitle: null, workout: null },
-          { date: '2099-01-03', type: 'TRAINING', sessionTitle: 'Giorno 2', workout: null },
+          { date: addDays(from, 1), type: 'REST', sessionTitle: null, workout: null },
+          { date: addDays(from, 2), type: 'TRAINING', sessionTitle: 'Giorno 2', workout: null },
         ]);
       }),
     );
     renderApp('/app/calendar');
     const list = await screen.findByRole('list', { name: 'Giorni' });
-    expect(within(list).getByText('Completato')).toBeInTheDocument();
-    expect(within(list).getByText('Riposo')).toBeInTheDocument();
-    expect(within(list).getByText('Giorno 2')).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(within(list).getByRole('button', { name: /completato/ }));
+    expect(screen.getByText('Completato')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Apri allenamento del/ })).toHaveAttribute('href', '/app/history/w-1');
+    await user.click(within(list).getAllByRole('button', { name: /riposo/ })[0]!);
+    expect(screen.getByText(/Giorno di riposo/)).toBeInTheDocument();
+    await user.click(within(list).getByRole('button', { name: /Giorno 2/ }));
+    expect(screen.getByRole('heading', { name: 'Giorno 2' })).toBeInTheDocument();
+    expect(within(list).getAllByRole('button').length).toBeLessThanOrEqual(42);
+    await user.click(screen.getByRole('button', { name: 'Mese successivo' }));
+    await waitFor(() => expect(ranges).toHaveLength(2));
+    expect(ranges[0]!.from).not.toBe(ranges[1]!.from);
+    for (const range of ranges) {
+      expect(new Date(range.from + 'T12:00:00').getDay()).toBe(1);
+      expect(new Date(range.to + 'T12:00:00').getDay()).toBe(0);
+    }
   });
 });

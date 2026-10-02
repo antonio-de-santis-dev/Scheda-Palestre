@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [delpy]
   push:
-    branches: ['fix/**']
+    branches: [desaig, 'fix/**']
   workflow_dispatch:
 
 permissions:
