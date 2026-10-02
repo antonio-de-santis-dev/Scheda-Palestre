@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
@@ -16,13 +18,10 @@ import org.springframework.stereotype.Component;
  * queries (no N+1: children are loaded with Hibernate batch fetching).
  */
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class PlanStructureAssembler {
 
     private final CatalogLookup catalog;
-
-    PlanStructureAssembler(CatalogLookup catalog) {
-        this.catalog = catalog;
-    }
 
     PlanStructure assemble(WorkoutPlan plan) {
         Set<UUID> groupIds = new HashSet<>();

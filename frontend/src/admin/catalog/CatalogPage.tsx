@@ -112,7 +112,7 @@ export function CatalogPage() {
 
 function GroupsPanel({ selectedId }: { selectedId: string | null }) {
     const [params, setParams] = useSearchParams();
-    const [text, setText] = useState(params.get('q') ?? '');
+    const text = params.get('q') ?? '';
     const q = useDebouncedValue(text.trim(), 300);
     const status = (params.get('status') ?? 'all') as StatusFilter;
     const page = Number(params.get('page') ?? '0') || 0;
@@ -182,8 +182,7 @@ function GroupsPanel({ selectedId }: { selectedId: string | null }) {
                     type="search"
                     value={text}
                     onChange={(event) => {
-                        setText(event.target.value);
-                        setParam('q', event.target.value.trim() || null);
+                        setParam('q', event.target.value || null);
                     }}
                 />
 
@@ -509,14 +508,14 @@ function ExercisesOfGroup({ group }: { group: MuscleGroup }) {
                     label="Cerca esercizio"
                     type="search"
                     value={text}
-                    onChange={(event) => setText(event.target.value)}
+                    onChange={(event) => { setText(event.target.value); setPage(0); }}
                 />
 
                 <SelectField
                     label="Stato degli esercizi"
                     value={status}
                     onChange={(event) =>
-                        setStatus(event.target.value as StatusFilter)
+                        { setStatus(event.target.value as StatusFilter); setPage(0); }
                     }
                 >
                     <option value="all">Tutti</option>

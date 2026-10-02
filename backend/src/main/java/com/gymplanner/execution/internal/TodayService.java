@@ -20,6 +20,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
  * module) with the workouts, so they are orchestrated here (ADR 0002).
  */
 @Service
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class TodayService {
 
     static final int MAX_RANGE_DAYS = 62;
@@ -79,15 +82,6 @@ class TodayService {
     private final CalendarQueries calendarQueries;
     private final WorkoutPlanQueries plans;
     private final BusinessCalendar calendar;
-
-    TodayService(WorkoutRepository workouts, AssignmentQueries assignments, CalendarQueries calendarQueries,
-            WorkoutPlanQueries plans, BusinessCalendar calendar) {
-        this.workouts = workouts;
-        this.assignments = assignments;
-        this.calendarQueries = calendarQueries;
-        this.plans = plans;
-        this.calendar = calendar;
-    }
 
     /**
      * ADR 0008: with several active plans the date is resolved from the weekdays. At most one plan

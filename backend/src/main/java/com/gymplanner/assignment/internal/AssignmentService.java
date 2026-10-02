@@ -30,6 +30,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -44,6 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
  * by {@link UserLock}; closing reacts in other modules through synchronous events.
  */
 @Service
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class AssignmentService implements AssignmentQueries {
 
     private static final Logger log = LoggerFactory.getLogger(AssignmentService.class);
@@ -55,18 +58,6 @@ class AssignmentService implements AssignmentQueries {
     private final ApplicationEventPublisher events;
     private final UserLock userLock;
     private final ScheduleCopyPort scheduleCopy;
-
-    AssignmentService(PlanAssignmentRepository assignments, UserDirectory users, WorkoutPlanQueries plans,
-            BusinessCalendar calendar, ApplicationEventPublisher events, UserLock userLock,
-            ScheduleCopyPort scheduleCopy) {
-        this.assignments = assignments;
-        this.users = users;
-        this.plans = plans;
-        this.calendar = calendar;
-        this.events = events;
-        this.userLock = userLock;
-        this.scheduleCopy = scheduleCopy;
-    }
 
     // ------------------------------------------------------------------ ADMIN
 

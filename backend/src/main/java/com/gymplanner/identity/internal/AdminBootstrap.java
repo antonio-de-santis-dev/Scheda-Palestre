@@ -3,6 +3,8 @@ package com.gymplanner.identity.internal;
 import com.gymplanner.identity.api.UserRole;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
  * startup with a clear message. The password is never logged.
  */
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class AdminBootstrap implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(AdminBootstrap.class);
@@ -23,12 +26,6 @@ class AdminBootstrap implements ApplicationRunner {
     private final UserRepository users;
     private final PasswordEncoder passwordEncoder;
     private final AdminBootstrapProperties properties;
-
-    AdminBootstrap(UserRepository users, PasswordEncoder passwordEncoder, AdminBootstrapProperties properties) {
-        this.users = users;
-        this.passwordEncoder = passwordEncoder;
-        this.properties = properties;
-    }
 
     @Override
     @Transactional

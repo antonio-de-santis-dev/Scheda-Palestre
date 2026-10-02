@@ -5,6 +5,8 @@ import com.gymplanner.execution.internal.WorkoutDtos.WorkoutState;
 import com.gymplanner.shared.security.AuthenticatedUser;
 import com.gymplanner.shared.web.PageResponse;
 import com.gymplanner.shared.web.Paging;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -25,15 +27,11 @@ import org.springframework.web.bind.annotation.RestController;
 /** USER execution endpoints (spec 13.6). The user always comes from the session. */
 @RestController
 @RequestMapping("/api/me")
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class WorkoutController {
 
     private final WorkoutService workouts;
     private final TodayService today;
-
-    WorkoutController(WorkoutService workouts, TodayService today) {
-        this.workouts = workouts;
-        this.today = today;
-    }
 
     @GetMapping("/today")
     TodayService.TodayResponse today(@AuthenticationPrincipal AuthenticatedUser user,

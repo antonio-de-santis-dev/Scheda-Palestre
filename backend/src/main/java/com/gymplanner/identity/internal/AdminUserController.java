@@ -11,6 +11,8 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import java.time.Clock;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,17 +28,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/admin/users")
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class AdminUserController {
 
     private static final Sort SORT = Sort.by("lastName", "firstName", "username");
 
     private final AdminUserService service;
     private final Clock clock;
-
-    AdminUserController(AdminUserService service, Clock clock) {
-        this.service = service;
-        this.clock = clock;
-    }
 
     @GetMapping
     PageResponse<UserResponse> list(@RequestParam(required = false) String q,

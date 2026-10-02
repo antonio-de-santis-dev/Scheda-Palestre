@@ -25,6 +25,9 @@ services:
       retries: 20
 
   backend:
+    networks:
+      default:
+        aliases: [gym-planner-backend]
     profiles: ["app"]
     build:
       context: ./backend

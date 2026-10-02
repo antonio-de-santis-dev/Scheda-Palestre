@@ -8,6 +8,8 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,13 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
  * active plan are skipped and reported. Runs in the activation transaction, under the user lock.
  */
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class ScheduleCopyAdapter implements ScheduleCopyPort {
 
     private final WeeklyScheduleRepository schedules;
-
-    ScheduleCopyAdapter(WeeklyScheduleRepository schedules) {
-        this.schedules = schedules;
-    }
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)

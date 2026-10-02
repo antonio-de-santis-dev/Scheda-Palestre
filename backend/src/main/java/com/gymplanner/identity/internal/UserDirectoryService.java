@@ -8,18 +8,17 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class UserDirectoryService implements UserDirectory {
 
     private final UserRepository users;
-
-    UserDirectoryService(UserRepository users) {
-        this.users = users;
-    }
 
     @Override
     public Optional<UserSummary> find(UUID id) {

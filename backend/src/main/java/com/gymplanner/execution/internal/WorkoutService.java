@@ -19,6 +19,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
@@ -31,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
  * complete state. Ownership is always checked against the authenticated user (404 otherwise).
  */
 @Service
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class WorkoutService {
 
     private static final Logger log = LoggerFactory.getLogger(WorkoutService.class);
@@ -42,15 +45,6 @@ class WorkoutService {
     private final CalendarQueries calendarQueries;
     private final WorkoutPlanQueries plans;
     private final BusinessCalendar calendar;
-
-    WorkoutService(WorkoutRepository workouts, AssignmentQueries assignments, CalendarQueries calendarQueries,
-            WorkoutPlanQueries plans, BusinessCalendar calendar) {
-        this.workouts = workouts;
-        this.assignments = assignments;
-        this.calendarQueries = calendarQueries;
-        this.plans = plans;
-        this.calendar = calendar;
-    }
 
     /** Spec 10.7: validation + immutable snapshot in a single transaction. */
     @Transactional

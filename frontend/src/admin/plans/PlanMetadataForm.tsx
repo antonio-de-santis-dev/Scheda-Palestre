@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -32,7 +33,8 @@ export function PlanMetadataForm({ initial, submitLabel, pending, error, disable
     register,
     handleSubmit,
     setError,
-    formState: { errors },
+    reset,
+    formState: { errors, dirtyFields },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -41,6 +43,16 @@ export function PlanMetadataForm({ initial, submitLabel, pending, error, disable
       durationWeeks: initial?.durationWeeks ?? '',
     },
   });
+
+  // Subscribe to dirty fields so background updates preserve the user's draft.
+  void dirtyFields;
+  useEffect(() => {
+    reset({
+      name: initial?.name ?? '',
+      description: initial?.description ?? '',
+      durationWeeks: initial?.durationWeeks ?? '',
+    }, { keepDirtyValues: true });
+  }, [initial, reset]);
 
   const submit = handleSubmit(async (values) => {
     try {

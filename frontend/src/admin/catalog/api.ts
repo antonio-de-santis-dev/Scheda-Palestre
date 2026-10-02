@@ -42,13 +42,13 @@ export const catalogKeys = {
 export const catalogApi = {
   deleteGroup: (id: string) => http.del<void>(`/api/admin/muscle-groups/${id}`),
   deleteExercise: (id: string) => http.del<void>(`/api/admin/exercises/${id}`),
-  groups: (search: CatalogSearch) => http.get<Page<MuscleGroup>>('/api/admin/muscle-groups', { ...search }),
-  group: (id: string) => http.get<MuscleGroup>(`/api/admin/muscle-groups/${id}`),
+  groups: (search: CatalogSearch, signal?: AbortSignal) => http.get<Page<MuscleGroup>>('/api/admin/muscle-groups', { ...search }, signal),
+  group: (id: string, signal?: AbortSignal) => http.get<MuscleGroup>(`/api/admin/muscle-groups/${id}`, undefined, signal),
   createGroup: (name: string) => http.post<MuscleGroup>('/api/admin/muscle-groups', { name }),
   renameGroup: (id: string, name: string) => http.put<MuscleGroup>(`/api/admin/muscle-groups/${id}`, { name }),
   setGroupActive: (id: string, active: boolean) =>
     http.post<MuscleGroup>(`/api/admin/muscle-groups/${id}/${active ? 'activate' : 'deactivate'}`),
-  exercises: (search: ExerciseSearch) => http.get<Page<Exercise>>('/api/admin/exercises', { ...search }),
+  exercises: (search: ExerciseSearch, signal?: AbortSignal) => http.get<Page<Exercise>>('/api/admin/exercises', { ...search }, signal),
   createExercise: (name: string, muscleGroupId: string) =>
     http.post<Exercise>('/api/admin/exercises', { name, muscleGroupId }),
   updateExercise: (id: string, name: string, muscleGroupId: string) =>
@@ -60,19 +60,19 @@ export const catalogApi = {
 export function useMuscleGroups(search: CatalogSearch) {
   return useQuery({
     queryKey: catalogKeys.groups(search),
-    queryFn: () => catalogApi.groups(search),
+    queryFn: ({ signal }) => catalogApi.groups(search, signal),
     placeholderData: keepPreviousData,
   });
 }
 
 export function useMuscleGroup(id: string) {
-  return useQuery({ queryKey: [...catalogKeys.all, 'muscle-group', id], queryFn: () => catalogApi.group(id) });
+  return useQuery({ queryKey: [...catalogKeys.all, 'muscle-group', id], queryFn: ({ signal }) => catalogApi.group(id, signal) });
 }
 
 export function useExercises(search: ExerciseSearch, enabled = true) {
   return useQuery({
     queryKey: catalogKeys.exercises(search),
-    queryFn: () => catalogApi.exercises(search),
+    queryFn: ({ signal }) => catalogApi.exercises(search, signal),
     placeholderData: keepPreviousData,
     enabled,
   });
@@ -82,7 +82,7 @@ export function useExercises(search: ExerciseSearch, enabled = true) {
 export function useActiveMuscleGroups() {
   return useQuery({
     queryKey: catalogKeys.groups({ active: true, size: 200 }),
-    queryFn: () => catalogApi.groups({ active: true, size: 200 }),
+    queryFn: ({ signal }) => catalogApi.groups({ active: true, size: 200 }, signal),
     staleTime: 60_000,
   });
 }
@@ -92,7 +92,7 @@ export function useActiveExercisesOfGroup(muscleGroupId: string) {
   const search = { active: true, muscleGroupId, size: 200 };
   return useQuery({
     queryKey: catalogKeys.exercises(search),
-    queryFn: () => catalogApi.exercises(search),
+    queryFn: ({ signal }) => catalogApi.exercises(search, signal),
     staleTime: 60_000,
   });
 }

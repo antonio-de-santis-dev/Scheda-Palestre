@@ -39,4 +39,18 @@ interface WorkoutPlanRepository extends JpaRepository<WorkoutPlan, UUID> {
 
     @Query("select s from PlanSession s where s.workoutPlan.id = :planId order by s.position")
     List<PlanSession> findSessionsInOrder(@Param("planId") UUID planId);
+
+    interface SessionRow {
+        UUID getPlanId();
+        UUID getId();
+        String getTitle();
+        int getPosition();
+    }
+
+    @Query("""
+            select s.workoutPlan.id as planId, s.id as id, s.title as title, s.position as position
+            from PlanSession s where s.workoutPlan.id in :planIds
+            order by s.workoutPlan.id, s.position
+            """)
+    List<SessionRow> findSessionRows(@Param("planIds") Collection<UUID> planIds);
 }

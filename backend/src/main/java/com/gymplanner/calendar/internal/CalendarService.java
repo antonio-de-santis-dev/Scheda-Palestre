@@ -26,12 +26,13 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.gymplanner.calendar.api.WorkoutScheduleAvailability;
 import com.gymplanner.calendar.api.WorkoutScheduleAvailability;
 
 /**
@@ -41,6 +42,7 @@ import com.gymplanner.calendar.api.WorkoutScheduleAvailability;
  * The rotation anchor is owned by the assignment module and moved through its public API.
  */
 @Service
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class CalendarService implements CalendarQueries {
 
     private static final Logger log = LoggerFactory.getLogger(CalendarService.class);
@@ -51,21 +53,6 @@ class CalendarService implements CalendarQueries {
     private final BusinessCalendar calendar;
     private final UserLock userLock;
     private final WorkoutScheduleAvailability workoutAvailability;
-
-    CalendarService(
-            WeeklyScheduleRepository schedules,
-            AssignmentQueries assignments,
-            WorkoutPlanQueries plans,
-            BusinessCalendar calendar,
-            UserLock userLock,
-            WorkoutScheduleAvailability workoutAvailability) {
-        this.schedules = schedules;
-        this.assignments = assignments;
-        this.plans = plans;
-        this.calendar = calendar;
-        this.userLock = userLock;
-        this.workoutAvailability = workoutAvailability;
-    }
 
     /** The days of one active plan of the user. */
     record PlanSchedule(UUID assignmentId,
@@ -226,12 +213,8 @@ class CalendarService implements CalendarQueries {
         Map<UUID, PlanSummary> names = plans.findPlans(
                 list.stream().map(AssignmentView::planId).toList());
 
-        Map<UUID, List<PlanSessionRef>> sessionsByPlan = new TreeMap<>();
-        list.stream()
-                .map(AssignmentView::planId)
-                .distinct()
-                .forEach(planId ->
-                        sessionsByPlan.put(planId, plans.sessionsInOrder(planId)));
+        Map<UUID, List<PlanSessionRef>> sessionsByPlan = plans.sessionsInOrder(
+                list.stream().map(AssignmentView::planId).toList());
 
         return list.stream().map(a -> {
             PlanSummary plan = names.get(a.planId());

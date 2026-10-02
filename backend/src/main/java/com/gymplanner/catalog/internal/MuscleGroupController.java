@@ -7,6 +7,8 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
@@ -21,15 +23,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/admin/muscle-groups")
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class MuscleGroupController {
 
     private static final Sort SORT = Sort.by("name");
 
     private final MuscleGroupService service;
-
-    MuscleGroupController(MuscleGroupService service) {
-        this.service = service;
-    }
 
     @GetMapping
     PageResponse<CatalogItemResponse> list(@RequestParam(required = false) String q,

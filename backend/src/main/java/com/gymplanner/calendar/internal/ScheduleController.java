@@ -7,6 +7,8 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/me")
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class ScheduleController {
 
     record ScheduleRequest(@NotNull @Size(max = 7) List<Integer> weekdays) {
@@ -56,10 +59,6 @@ class ScheduleController {
     }
 
     private final CalendarService service;
-
-    ScheduleController(CalendarService service) {
-        this.service = service;
-    }
 
     /** Every active plan with its days: the page shows which plan occupies each weekday. */
     @GetMapping("/schedules")

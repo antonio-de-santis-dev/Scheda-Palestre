@@ -11,7 +11,9 @@ import com.gymplanner.workoutplan.api.WorkoutPlanQueries;
 import com.gymplanner.workoutplan.internal.PlanDtos.CreatePlanRequest;
 import com.gymplanner.workoutplan.internal.PlanDtos.UpdatePlanRequest;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -19,6 +21,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -28,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Plan lifecycle (US-06 creation, US-08, US-26) and the module's public query API. */
 @Service
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class PlanService implements WorkoutPlanQueries {
 
     static final String COPY_SUFFIX = " (copia)";
@@ -36,14 +41,6 @@ class PlanService implements WorkoutPlanQueries {
     private final PlanStructureAssembler assembler;
     private final ApplicationEventPublisher events;
     private final Clock clock;
-
-    PlanService(WorkoutPlanRepository plans, PlanStructureAssembler assembler, ApplicationEventPublisher events,
-            Clock clock) {
-        this.plans = plans;
-        this.assembler = assembler;
-        this.events = events;
-        this.clock = clock;
-    }
 
     /** Mapped inside the transaction: flags need the (batch fetched) structure. */
     @Transactional(readOnly = true)
@@ -157,6 +154,20 @@ class PlanService implements WorkoutPlanQueries {
         return plans.findSessionsInOrder(planId).stream()
                 .map(s -> new PlanSessionRef(s.getId(), s.getTitle(), s.getPosition()))
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, List<PlanSessionRef>> sessionsInOrder(Collection<UUID> planIds) {
+        if (planIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, List<PlanSessionRef>> result = new HashMap<>();
+        planIds.forEach(id -> result.put(id, new ArrayList<>()));
+        plans.findSessionRows(result.keySet()).forEach(row -> result.get(row.getPlanId())
+                .add(new PlanSessionRef(row.getId(), row.getTitle(), row.getPosition())));
+        result.replaceAll((id, sessions) -> List.copyOf(sessions));
+        return Map.copyOf(result);
     }
 
     @Override

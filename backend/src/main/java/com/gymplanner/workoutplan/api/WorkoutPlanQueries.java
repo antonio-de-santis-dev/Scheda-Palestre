@@ -22,6 +22,9 @@ public interface WorkoutPlanQueries {
     /** Sessions ordered by position: the rotation order decided by the ADMIN. */
     List<PlanSessionRef> sessionsInOrder(UUID planId);
 
+    /** Ordered session references for several plans, loaded in one query. */
+    Map<UUID, List<PlanSessionRef>> sessionsInOrder(Collection<UUID> planIds);
+
     /**
      * @throws com.gymplanner.shared.error.NotFoundException     if the plan does not exist
      * @throws com.gymplanner.shared.error.BusinessRuleException {@code PLAN_NOT_EXECUTABLE} or {@code PLAN_DELETED}

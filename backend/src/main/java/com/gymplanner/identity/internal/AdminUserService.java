@@ -12,6 +12,8 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Account management by the ADMIN (US-01, US-25). */
 @Service
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class AdminUserService {
 
     private static final Logger log = LoggerFactory.getLogger(AdminUserService.class);
@@ -35,15 +38,6 @@ class AdminUserService {
     private final AdminBootstrapProperties bootstrap;
     private final ApplicationEventPublisher events;
     private final Clock clock;
-
-    AdminUserService(UserRepository users, PasswordEncoder passwordEncoder, AdminBootstrapProperties bootstrap,
-            ApplicationEventPublisher events, Clock clock) {
-        this.users = users;
-        this.passwordEncoder = passwordEncoder;
-        this.bootstrap = bootstrap;
-        this.events = events;
-        this.clock = clock;
-    }
 
     /** The ADMIN created at start-up from the configuration cannot be deleted (ADR 0010). */
     boolean isProtected(User user) {

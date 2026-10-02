@@ -45,9 +45,9 @@ export const plansKeys = {
 };
 
 export const plansApi = {
-  list: (search: { q?: string; deleted?: boolean; page?: number; size?: number }) =>
-    http.get<Page<PlanListItem>>('/api/admin/plans', { ...search }),
-  get: (id: string) => http.get<PlanStructure>(`/api/admin/plans/${id}`),
+  list: (search: { q?: string; deleted?: boolean; page?: number; size?: number }, signal?: AbortSignal) =>
+    http.get<Page<PlanListItem>>('/api/admin/plans', { ...search }, signal),
+  get: (id: string, signal?: AbortSignal) => http.get<PlanStructure>(`/api/admin/plans/${id}`, undefined, signal),
   create: (input: PlanMetadata) => http.post<PlanStructure>('/api/admin/plans', input),
   update: (id: string, input: PlanMetadata & { version: number }) => http.put<PlanStructure>(`/api/admin/plans/${id}`, input),
   remove: (id: string) => http.del<void>(`/api/admin/plans/${id}`),
@@ -75,13 +75,13 @@ export const plansApi = {
 export function usePlans(search: { q?: string; deleted?: boolean; page?: number; size?: number }) {
   return useQuery({
     queryKey: plansKeys.list(search),
-    queryFn: () => plansApi.list(search),
+    queryFn: ({ signal }) => plansApi.list(search, signal),
     placeholderData: keepPreviousData,
   });
 }
 
 export function usePlan(id: string) {
-  return useQuery({ queryKey: plansKeys.detail(id), queryFn: () => plansApi.get(id) });
+  return useQuery({ queryKey: plansKeys.detail(id), queryFn: ({ signal }) => plansApi.get(id, signal) });
 }
 
 /** Structure mutations return the whole plan: the cache is replaced with the server state. */

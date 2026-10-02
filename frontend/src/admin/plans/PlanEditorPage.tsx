@@ -79,7 +79,7 @@ export function PlanEditorPage() {
                 </p>
               ) : null}
               <PlanMetadataForm
-                key={plan.version}
+                key={plan.id}
                 initial={plan}
                 submitLabel="Salva dati"
                 disabled={plan.deletedAt !== null}
@@ -204,7 +204,7 @@ function SessionCard({ session, index, total, readOnly, onMove, run, ask }: Sess
               void run(() => plansApi.renameSession(session.id, value)).then(() => {
                 setRenaming(false);
                 setRenameError(undefined);
-              });
+              }).catch(() => { /* The mutation error is displayed by the editor. */ });
             }}
           >
             <TextField label="Titolo sessione" value={title} onChange={(e) => setTitle(e.target.value)} error={renameError} />
@@ -260,7 +260,7 @@ function SessionCard({ session, index, total, readOnly, onMove, run, ask }: Sess
             total={session.sections.length}
             readOnly={readOnly}
             onMove={(delta) =>
-              void run(() => plansApi.reorderSections(session.id, moved(session.sections, sectionIndex, delta).map((s) => s.id)))
+              void run(() => plansApi.reorderSections(session.id, moved(session.sections, sectionIndex, delta).map((s) => s.id))).catch(() => { /* Displayed by the editor. */ })
             }
             run={run}
             ask={ask}
@@ -273,7 +273,7 @@ function SessionCard({ session, index, total, readOnly, onMove, run, ask }: Sess
             onSubmit={(e) => {
               e.preventDefault();
               if (groupId) {
-                void run(() => plansApi.addSection(session.id, groupId)).then(() => setGroupId(null));
+                void run(() => plansApi.addSection(session.id, groupId)).then(() => setGroupId(null)).catch(() => { /* Displayed by the editor. */ });
               }
             }}
           >
@@ -393,11 +393,11 @@ function SectionBlock({ section, index, total, readOnly, onMove, run, ask }: Sec
             {!readOnly ? (
               <span className="row">
                 <Button variant="ghost" size="sm" className="icon-btn" aria-label={`Sposta su ${exercise.exerciseName}`} disabled={exerciseIndex === 0}
-                  onClick={() => void run(() => plansApi.reorderExercises(section.id, moved(section.exercises, exerciseIndex, -1).map((e) => e.id)))}>
+                  onClick={() => void run(() => plansApi.reorderExercises(section.id, moved(section.exercises, exerciseIndex, -1).map((e) => e.id))).catch(() => { /* Displayed by the editor. */ })}>
                   <ArrowUp size={18} aria-hidden="true" />
                 </Button>
                 <Button variant="ghost" size="sm" className="icon-btn" aria-label={`Sposta giù ${exercise.exerciseName}`} disabled={exerciseIndex === section.exercises.length - 1}
-                  onClick={() => void run(() => plansApi.reorderExercises(section.id, moved(section.exercises, exerciseIndex, 1).map((e) => e.id)))}>
+                  onClick={() => void run(() => plansApi.reorderExercises(section.id, moved(section.exercises, exerciseIndex, 1).map((e) => e.id))).catch(() => { /* Displayed by the editor. */ })}>
                   <ArrowDown size={18} aria-hidden="true" />
                 </Button>
                 <Button variant="ghost" size="sm" className="icon-btn" aria-label={`Modifica ${exercise.exerciseName}`} onClick={() => { setError(null); setEditing(exercise.id); }}>

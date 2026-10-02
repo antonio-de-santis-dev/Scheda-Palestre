@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
@@ -55,6 +55,28 @@ function catalogServer() {
 }
 
 describe('unified catalog page', () => {
+  it('resets the exercise page when changing filters', async () => {
+    catalogServer();
+    const { router } = renderApp('/admin/catalog?group=g1&epage=3');
+    const user = userEvent.setup();
+    await user.type(await screen.findByRole('searchbox', { name: 'Cerca esercizio' }), 'Panca');
+    await waitFor(() => expect(new URLSearchParams(router.state.location.search).get('epage')).toBe('0'));
+    await act(() => router.navigate('/admin/catalog?group=g1&epage=4'));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Stato degli esercizi' }), 'inactive');
+    await waitFor(() => expect(new URLSearchParams(router.state.location.search).get('epage')).toBe('0'));
+  });
+
+  it('restores the group search from the URL during navigation', async () => {
+    catalogServer();
+    const { router } = renderApp('/admin/catalog?q=Petto');
+    const input = await screen.findByRole('searchbox', { name: 'Cerca gruppo' });
+    expect(input).toHaveValue('Petto');
+    await act(() => router.navigate('/admin/catalog?q=Dorso'));
+    expect(input).toHaveValue('Dorso');
+    await act(() => router.navigate(-1));
+    expect(input).toHaveValue('Petto');
+  });
+
   it('redirects the old URLs and shows the exercises of the selected group', async () => {
     const { calls } = catalogServer();
     const { router } = renderApp('/admin/catalog/exercises');

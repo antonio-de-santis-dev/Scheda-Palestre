@@ -7,6 +7,7 @@ import com.gymplanner.identity.api.UserDirectory;
 import com.gymplanner.shared.error.NotFoundException;
 import com.gymplanner.shared.time.BusinessCalendar;
 import com.gymplanner.workoutplan.api.PlanSummary;
+import com.gymplanner.workoutplan.api.PlanSessionRef;
 import com.gymplanner.workoutplan.api.WorkoutPlanQueries;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -17,6 +18,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
  * the app does not record them. Interpretations (rates) are left to the client and labelled.
  */
 @Service
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class ActivityReportService {
 
     static final int WEEKS = 12;
@@ -55,16 +59,6 @@ class ActivityReportService {
     private final UserDirectory users;
     private final BusinessCalendar calendar;
 
-    ActivityReportService(ReportRepository reports, AssignmentQueries assignments, CalendarQueries calendarQueries,
-            WorkoutPlanQueries plans, UserDirectory users, BusinessCalendar calendar) {
-        this.reports = reports;
-        this.assignments = assignments;
-        this.calendarQueries = calendarQueries;
-        this.plans = plans;
-        this.users = users;
-        this.calendar = calendar;
-    }
-
     @Transactional(readOnly = true)
     public ActivityReport report(UUID userId) {
         users.find(userId).orElseThrow(() -> new NotFoundException("User"));
@@ -72,6 +66,8 @@ class ActivityReportService {
 
         List<AssignmentView> list = assignments.listAllForUser(userId);
         Map<UUID, PlanSummary> planMap = plans.findPlans(list.stream().map(AssignmentView::planId).toList());
+        Map<UUID, List<PlanSessionRef>> sessionsByPlan = plans.sessionsInOrder(
+                planMap.values().stream().filter(p -> !p.deleted()).map(PlanSummary::id).toList());
         Map<UUID, Map<WorkoutStatus, ReportRepository.WorkoutCount>> workouts = new HashMap<>();
         for (ReportRepository.WorkoutCount c : reports.workoutsByAssignmentAndStatus(userId)) {
             workouts.computeIfAbsent(c.getAssignmentId(), k -> new HashMap<>()).put(c.getStatus(), c);
@@ -98,7 +94,7 @@ class ActivityReportService {
                     count(w, WorkoutStatus.COMPLETED), count(w, WorkoutStatus.INTERRUPTED),
                     count(w, WorkoutStatus.IN_PROGRESS), sets.getOrDefault(a.id(), 0L),
                     e.getOrDefault(WorkoutExerciseStatus.COMPLETED, 0L), e.getOrDefault(WorkoutExerciseStatus.SKIPPED, 0L),
-                    last, plan == null || plan.deleted() ? 0 : plans.sessionsInOrder(a.planId()).size(),
+                    last, plan == null || plan.deleted() ? 0 : sessionsByPlan.get(a.planId()).size(),
                     sessions.getOrDefault(a.id(), 0L)));
         }
 

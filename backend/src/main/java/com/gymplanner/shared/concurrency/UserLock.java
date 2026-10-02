@@ -1,6 +1,7 @@
 package com.gymplanner.shared.concurrency;
 
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -14,16 +15,13 @@ import org.springframework.transaction.annotation.Transactional;
  * <em>after</em> acquiring it.
  */
 @Component
+@RequiredArgsConstructor
 public class UserLock {
 
     /** Namespace so these keys never collide with other advisory locks. */
     private static final long NAMESPACE = 0x4750_5553_4552_4C4BL; // "GPUSERLK"
 
     private final JdbcTemplate jdbc;
-
-    public UserLock(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
-    }
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void lock(UUID userId) {

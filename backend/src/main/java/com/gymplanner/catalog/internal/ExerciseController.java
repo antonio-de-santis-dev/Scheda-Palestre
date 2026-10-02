@@ -6,6 +6,8 @@ import com.gymplanner.shared.web.Paging;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,15 +21,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/admin/exercises")
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class ExerciseController {
 
     private static final Sort SORT = Sort.by("name");
 
     private final ExerciseService service;
-
-    ExerciseController(ExerciseService service) {
-        this.service = service;
-    }
 
     /** {@code muscleGroupId} restricts the page to one group (master-detail and plan editor). */
     @GetMapping

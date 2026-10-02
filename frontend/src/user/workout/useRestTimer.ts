@@ -26,6 +26,7 @@ export function useRestTimer(input: TimerInput | undefined, onVisible: () => voi
     callbacks.current = { onVisible, onFinished };
   });
 
+  const finishedRest = useRef<string | null>(null);
   const restEndsAt = input?.restEndsAt ?? null;
   const serverTime = input?.serverTime ?? null;
   const receivedAt = input?.receivedAt ?? 0;
@@ -37,10 +38,17 @@ export function useRestTimer(input: TimerInput | undefined, onVisible: () => voi
     let running = true;
     const tick = () => {
       const current = Date.now();
-      setNow(current);
-      if (running && remainingRestMs(restEndsAt, serverTime, receivedAt, current) <= 0) {
+      const remaining = remainingRestMs(restEndsAt, serverTime, receivedAt, current);
+      // Re-render the workout only when the displayed second changes.
+      setNow((previous) => Math.ceil(remainingRestMs(restEndsAt, serverTime, receivedAt, previous) / 1000)
+        === Math.ceil(remaining / 1000) ? previous : current);
+      if (running && remaining <= 0) {
         running = false;
-        callbacks.current.onFinished?.();
+        window.clearInterval(id);
+        if (finishedRest.current !== restEndsAt) {
+          finishedRest.current = restEndsAt;
+          callbacks.current.onFinished?.();
+        }
       }
     };
     const first = window.setTimeout(tick, 0);

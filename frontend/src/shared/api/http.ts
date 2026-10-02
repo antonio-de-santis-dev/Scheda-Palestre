@@ -30,11 +30,28 @@ function readCookie(name: string): string | null {
 let csrfRequest: Promise<void> | null = null;
 
 async function fetchCsrf(): Promise<void> {
-  csrfRequest ??= fetch(buildUrl('/api/auth/csrf'), { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-    .then(() => undefined)
-    .finally(() => {
-      csrfRequest = null;
-    });
+  if (!csrfRequest) {
+    const timeout = AbortSignal.timeout(TIMEOUT_MS);
+    csrfRequest = fetch(buildUrl('/api/auth/csrf'), {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+      signal: timeout,
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw await toApiError(response);
+        }
+      })
+      .catch((error: unknown) => {
+        if (error instanceof ApiError) {
+          throw error;
+        }
+        throw ApiError.network(timeout.aborted);
+      })
+      .finally(() => {
+        csrfRequest = null;
+      });
+  }
   return csrfRequest;
 }
 

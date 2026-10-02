@@ -6,18 +6,16 @@ import com.gymplanner.catalog.api.ExerciseView;
 import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class CatalogLookupService implements CatalogLookup {
 
     private final MuscleGroupService muscleGroups;
     private final ExerciseService exercises;
-
-    CatalogLookupService(MuscleGroupService muscleGroups, ExerciseService exercises) {
-        this.muscleGroups = muscleGroups;
-        this.exercises = exercises;
-    }
 
     @Override
     public Map<UUID, CatalogItemView> muscleGroups(Collection<UUID> ids) {

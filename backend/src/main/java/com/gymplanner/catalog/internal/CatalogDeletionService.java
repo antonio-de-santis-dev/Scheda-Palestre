@@ -6,20 +6,18 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class CatalogDeletionService {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final Clock clock;
-
-    CatalogDeletionService(NamedParameterJdbcTemplate jdbc, Clock clock) {
-        this.jdbc = jdbc;
-        this.clock = clock;
-    }
 
     @Transactional
     public void deleteExercise(UUID id) {

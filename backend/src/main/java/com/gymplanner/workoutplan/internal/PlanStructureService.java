@@ -13,6 +13,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
  * version) and returns the full updated structure.
  */
 @Service
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class PlanStructureService {
 
     private final WorkoutPlanRepository plans;
@@ -31,16 +34,6 @@ class PlanStructureService {
     private final CatalogLookup catalog;
     private final ApplicationEventPublisher events;
     private final Clock clock;
-
-    PlanStructureService(WorkoutPlanRepository plans, PlanService planService, PlanStructureAssembler assembler,
-            CatalogLookup catalog, ApplicationEventPublisher events, Clock clock) {
-        this.plans = plans;
-        this.planService = planService;
-        this.assembler = assembler;
-        this.catalog = catalog;
-        this.events = events;
-        this.clock = clock;
-    }
 
     // ---------------------------------------------------------------- sessions
 

@@ -8,6 +8,8 @@ import com.gymplanner.shared.security.AuthenticatedUser;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.web.csrf.CsrfToken;
@@ -19,15 +21,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class AuthController {
 
     private final AuthService authService;
     private final SessionAuthentication sessionAuthentication;
-
-    AuthController(AuthService authService, SessionAuthentication sessionAuthentication) {
-        this.authService = authService;
-        this.sessionAuthentication = sessionAuthentication;
-    }
 
     /** Issues the CSRF cookie ({@code XSRF-TOKEN}) the SPA must echo in {@code X-XSRF-TOKEN}. */
     @GetMapping("/csrf")

@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
-import { server } from '../../test/server';
+import { problem, server } from '../../test/server';
 import { adminUser, renderApp } from '../../test/render';
 import { exercise, planStructure } from '../../test/planFixtures';
 
@@ -45,6 +45,33 @@ function setup(plan = planStructure()) {
 }
 
 describe('plan editor', () => {
+  it('shows a failed rename and preserves the title draft for retry', async () => {
+    setup();
+    server.use(http.put('*/api/admin/sessions/:id', () => problem(409, 'OPTIMISTIC_LOCK')));
+    renderApp('/admin/plans/plan-1/edit');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Rinomina Giorno 1' }));
+    const input = screen.getByRole('textbox', { name: 'Titolo sessione' });
+    await user.clear(input);
+    await user.type(input, 'Titolo da riprovare');
+    await user.click(screen.getByRole('button', { name: 'Salva' }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(input).toHaveValue('Titolo da riprovare');
+  });
+
+  it('keeps unsaved metadata when a structure mutation increments the plan version', async () => {
+    setup();
+    server.use(http.post('*/api/admin/plans/:id/sessions', () => HttpResponse.json(planStructure({ version: 2 }))));
+    const { client } = renderApp('/admin/plans/plan-1/edit');
+    const user = userEvent.setup();
+    const name = await screen.findByRole('textbox', { name: 'Nome scheda' });
+    await user.clear(name);
+    await user.type(name, 'Bozza non salvata');
+    await user.click(screen.getByRole('button', { name: 'Aggiungi sessione' }));
+    await waitFor(() => expect(client.getQueryData<{ version: number }>(['admin', 'plans', 'detail', 'plan-1'])?.version).toBe(2));
+    expect(screen.getByRole('textbox', { name: 'Nome scheda' })).toHaveValue('Bozza non salvata');
+  });
+
   it('renders sessions, sections and MAX for exercises to failure', async () => {
     setup();
     renderApp('/admin/plans/plan-1/edit');
