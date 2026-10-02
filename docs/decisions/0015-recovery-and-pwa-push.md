@@ -107,3 +107,14 @@ Riavviare il backend, poi richiedere il recupero usando l'email dell'account Gym
 che si vuole recuperare: il mittente SMTP non sostituisce l'email registrata nel DB.
 Un 400 richiede di leggere il JSON Problem Details (code/errors) della risposta nella
 scheda Network del browser; un 401 di `/api/auth/me` prima del login è normale.
+
+### Diagnosi invio SMTP
+
+Da root: `python3 scripts/check-smtp.py`. Legge la `.env` locale (variabili del terminale
+hanno precedenza), verifica connessione, STARTTLS/certificato e autenticazione.
+Non invia email e non stampa username/password, risposte SMTP o token.
+Il backend registra soltanto un codice diagnostico fisso tra parentesi:
+`SMTP_AUTHENTICATION_FAILED`, `SMTP_TLS_FAILED`, `SMTP_TIMEOUT`, `SMTP_DNS_FAILED`,
+`SMTP_CONNECTION_FAILED` oppure `SMTP_DELIVERY_FAILED`. Nessuna exception completa viene loggata.
+Se la verifica SMTP riesce ma manca l'email, confrontare configurazione effettiva del backend,
+riavvio dopo modifica `.env`, email dell'account, spam e limiti richieste (3/email/ora).

@@ -43,7 +43,7 @@ class RecoveryMail {
             sender.getObject().send(mail);
         } catch (Exception e) {
             // Never log SMTP exceptions: they may contain addresses, credentials or message content.
-            org.slf4j.LoggerFactory.getLogger(RecoveryMail.class).warn("Recovery email delivery failed");
+            org.slf4j.LoggerFactory.getLogger(RecoveryMail.class).warn("Recovery email delivery failed [{}]", RecoveryMailFailure.classify(e));
         }
     }
 }
