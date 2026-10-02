@@ -55,7 +55,7 @@ const days = (list: number[]) => (list.length ? list.map((d) => WEEKDAYS[d - 1]?
 
 /**
  * ADMIN activity report (ADR 0010): measured numbers in tables, interpretations kept apart and
- * labelled. The app does not record loads, body weight or physical progress, so none is shown.
+ * labelled. Set loads/reps belong to the USER progress report; this report covers activity.
  */
 export function ActivityReportSection({ userId }: { userId: string }) {
   const query = useQuery({
@@ -84,8 +84,8 @@ function ReportBody({ report }: { report: ActivityReport }) {
   return (
     <div className="stack">
       <p className="muted small" style={{ margin: 0 }}>
-        Dati registrati dall'app al {formatDate(report.generatedOn)}. L'app non registra carichi, peso corporeo o progressi
-        fisici.
+        Dati di attività registrati dall'app al {formatDate(report.generatedOn)}. Questo report riepiloga allenamenti,
+        esercizi e serie; non misura progressi fisici.
       </p>
 
       <h3>Dati registrati</h3>

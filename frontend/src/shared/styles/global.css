@@ -1329,3 +1329,17 @@ svg {
     transform: scale(0.97);
   }
 }
+
+/* V2 history/progress: wraps controls on phones; charts have exact-value table alternatives. */
+.progress-filters { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-3); margin-bottom: var(--space-4); }
+.progress-filters .field { flex: 1 1 180px; min-width: 0; }
+.progress-filters input, .progress-filters select { width: 100%; }
+.progress-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: var(--space-3); margin: 0; }
+.progress-totals dd { margin: var(--space-2) 0 0; font-size: var(--text-xl); font-weight: 700; }
+.progress-chart { margin: 0; }
+.progress-chart figcaption { font-weight: 600; margin-bottom: var(--space-3); }
+.progress-chart svg { display: block; width: 100%; max-height: 300px; }
+.progress-chart text { fill: var(--color-text-muted); font-size: 11px; }
+.progress-chart__bar { fill: var(--color-primary-text); }
+.progress-chart__axis { stroke: var(--color-border); }
+.progress-chart summary { cursor: pointer; margin-top: var(--space-3); }

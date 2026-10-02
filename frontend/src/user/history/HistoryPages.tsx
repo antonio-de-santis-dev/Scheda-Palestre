@@ -1,5 +1,6 @@
 import { useSearchParams, useParams, Link } from 'react-router';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { History } from 'lucide-react';
 import { http } from '../../shared/api/http';
 import type { Page } from '../../shared/api/types';
@@ -13,26 +14,48 @@ import { formatWeight } from '../../shared/utils/weight';
 import { WorkoutDuration } from '../../shared/components/WorkoutDuration';
 import { ExerciseStatusBadge, WorkoutStatusBadge } from '../workout/ExerciseStatusBadge';
 
-function useHistory(page: number) {
+function useHistory(page: number, filters: { from: string; to: string; status: string; search: string }) {
   return useQuery({
-    queryKey: ['me', 'history', page],
-    queryFn: () => http.get<Page<WorkoutSummary>>('/api/me/workouts', { page, size: 20 }),
-    placeholderData: keepPreviousData,
+    queryKey: ['me', 'history', page, filters],
+    queryFn: () => http.get<Page<WorkoutSummary>>('/api/me/workouts', { page, size: 20, ...filters }),
   });
 }
 
 /** US-24: essential history with snapshot values. */
 export function HistoryPage() {
   const [params, setParams] = useSearchParams();
-  const page = Number(params.get('page') ?? '0') || 0;
-  const query = useHistory(page);
+  const page = Math.max(0, Math.floor(Number(params.get('page') ?? '0') || 0));
+  const filters = { from: params.get('from') ?? '', to: params.get('to') ?? '', status: params.get('status') ?? '', search: params.get('search') ?? '' };
+  const query = useHistory(page, filters);
+  const [filterError, setFilterError] = useState('');
+  const filtered = Object.values(filters).some(Boolean);
   return (
     <>
-      <PageHeader title="Storico" subtitle="I tuoi allenamenti, dal più recente." />
+      <PageHeader title="Storico" subtitle="I tuoi allenamenti, dal più recente."
+        actions={<Link to="/app/progress" className="btn btn--primary">Statistiche e record</Link>} />
+      <form key={JSON.stringify(filters)} className="card progress-filters" aria-label="Filtri storico" onSubmit={(event) => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget);
+        const next = Object.fromEntries(['from', 'to', 'status', 'search'].map((key) => [key, String(data.get(key) ?? '').trim()]));
+        if (next.from && next.to && next.from > next.to) { setFilterError('La data finale deve seguire quella iniziale.'); return; }
+        setFilterError('');
+        setParams(Object.fromEntries(Object.entries(next).filter(([, value]) => value !== '')));
+      }}>
+        <label className="field">Dal<input type="date" name="from" defaultValue={filters.from} /></label>
+        <label className="field">Al<input type="date" name="to" defaultValue={filters.to} /></label>
+        <label className="field">Esito<select name="status" defaultValue={filters.status}>
+          <option value="">Tutti gli esiti</option><option value="COMPLETED">Completati</option>
+          <option value="INTERRUPTED">Interrotti</option><option value="IN_PROGRESS">In corso</option>
+        </select></label>
+        <label className="field">Scheda o sessione<input type="search" name="search" maxLength={100} defaultValue={filters.search} placeholder="Cerca per nome" /></label>
+        <button className="btn btn--primary" type="submit">Applica filtri</button>
+        <button className="btn btn--secondary" type="button" onClick={() => { setFilterError(''); setParams({}); }}>Azzera filtri</button>
+        {filterError ? <p role="alert">{filterError}</p> : null}
+      </form>
       <QueryState isLoading={query.isLoading} error={query.error} onRetry={() => void query.refetch()}>
         {query.data && query.data.content.length === 0 ? (
-          <EmptyState title="Nessun allenamento ancora" icon={<History size={40} />}>
-            <p>Gli allenamenti svolti compariranno qui.</p>
+          <EmptyState title={filtered ? "Nessun risultato per questi filtri" : "Nessun allenamento ancora"} icon={<History size={40} />}>
+            <p>{filtered ? "Prova a cambiare il periodo, il nome o l’esito." : "Gli allenamenti svolti compariranno qui."}</p>
           </EmptyState>
         ) : (
           <>
@@ -58,7 +81,7 @@ export function HistoryPage() {
             <Pagination
               page={query.data?.page ?? 0}
               totalPages={query.data?.totalPages ?? 0}
-              onChange={(p) => setParams({ page: String(p) })}
+              onChange={(p) => { const next = new URLSearchParams(params); next.set('page', String(p)); setParams(next); }}
             />
           </>
         )}

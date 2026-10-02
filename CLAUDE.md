@@ -77,7 +77,7 @@ Monolite modulare in `backend/src/main/java/com/gymplanner/`:
   `BusinessRuleException` 422, `BadRequestException`, …) → RFC 9457 con campo `code`.
   Risorse di altri utenti → **404**, mai 403.
 - `/api/me/**`: l'utente si ricava **sempre** da `@AuthenticationPrincipal AuthenticatedUser`.
-- Schema DB solo tramite **Flyway** (`backend/src/main/resources/db/migration`, V1…V13).
+- Schema DB solo tramite **Flyway** (`backend/src/main/resources/db/migration`, V1…V14).
   **Non modificare migrazioni esistenti**: aggiungi una nuova migrazione. Hibernate è in `validate`.
 - Tabelle al plurale (`users`, mai `user`); nessun `@ManyToMany` utente-scheda.
 

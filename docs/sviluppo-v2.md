@@ -8,7 +8,7 @@ Questo documento distingue ciò che il codice implementa dai prossimi incrementi
 | --- | --- | --- |
 | 1 | Durata allenamenti; pausa/ripresa, estensione e salto recupero | Implementata, vedere verifiche sotto |
 | 2 | Carichi previsti/usati e ripetizioni effettive per serie | Implementata, ADR 0013 |
-| 3 | Storico avanzato, statistiche, grafici e record usando dati reali | Da sviluppare |
+| 3 | Storico avanzato, statistiche, grafici e record usando dati reali | Implementata, ADR 0014 |
 | 4 | PWA e notifiche push | Da sviluppare; richiederà configurazione origine HTTPS e chiavi push |
 | 5 | Recupero password via email | Da sviluppare; richiederà servizio invio, credenziali e URL pubblico |
 
@@ -33,6 +33,18 @@ Questo documento distingue ciò che il codice implementa dai prossimi incrementi
 - Doppie richieste idempotenti e risultati atomici sotto lock PostgreSQL.
 
 Dettagli e contratto: [ADR 0013](decisions/0013-planned-loads-and-set-results.md).
+
+## Fase 3
+
+- Storico filtrabile per date inclusive, esito e nome della scheda/sessione, con filtri nell'URL.
+- Pagina Statistiche e record accessibile dallo Storico; default ultime 12 settimane, periodo fino a 366 giorni.
+- Totali di attività, serie, durata dei conclusi/media, volume e copertura dei dati registrati.
+- Grafici per giorno: allenamenti conclusi e carico/ripetizioni/volume per esercizio, con tabella alternativa.
+- Record di peso e ripetizioni su tutto lo storico, indipendenti dal periodo.
+- Identità catalogo preservata nei nuovi snapshot; vecchi snapshot separati, nessun abbinamento inventato per nome.
+- V14 additiva, nessun backfill di risultati.
+
+Contratto e calcoli: [ADR 0014](decisions/0014-progress-and-history.md).
 
 ## API
 
@@ -67,6 +79,12 @@ Verificare che il tempo finale resti invariato dopo refresh nello storico.
 Per la Fase 2: impostare carichi nell'editor, avviare l'allenamento, registrare peso e ripetizioni,
 concludere/interrompere e verificare lo storico. Lasciare una serie senza dati per verificare
 "Non registrato". Cambiare la scheda dopo l'avvio: i carichi dello snapshot restano identici.
+
+Per la Fase 3: in Storico applicare date/esito/nome e cambiare pagina; i filtri restano.
+Aprire Statistiche e record, cambiare periodo ed esercizio/metrica, aprire le tabelle dei grafici.
+Confrontare il volume con kg × ripetizioni delle sole serie con entrambi i valori;
+verificare che una serie senza risultati non aggiunga volume e che 0 rimanga 0.
+I record rimangono globali cambiando periodo. Un utente diverso non vede questi dati.
 
 ## Avvio locale
 

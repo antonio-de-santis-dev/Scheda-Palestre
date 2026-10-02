@@ -36,6 +36,9 @@ public class WorkoutExercise {
     @Column(name = "plan_exercise_id", updatable = false)
     private UUID planExerciseId;
 
+    @Column(updatable = false)
+    private UUID catalogExerciseId;
+
     @Column(nullable = false, updatable = false)
     private int position;
 
@@ -67,6 +70,10 @@ public class WorkoutExercise {
         this.exerciseNameSnapshot = exerciseNameSnapshot;
         this.muscleGroupNameSnapshot = muscleGroupNameSnapshot;
         this.status = WorkoutExerciseStatus.TODO;
+    }
+
+    void snapshotCatalogIdentity(UUID id) {
+        this.catalogExerciseId = id;
     }
 
     void addSet(int setIndex, int repsPlanned, boolean toFailure, int restSeconds) {

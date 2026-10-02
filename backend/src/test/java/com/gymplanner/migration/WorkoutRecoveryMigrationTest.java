@@ -61,6 +61,7 @@ class WorkoutRecoveryMigrationTest {
             assertThat(jdbc.queryForObject("select rest_duration_seconds from workouts where id = ?", Integer.class, workout)).isEqualTo(60);
             assertThat(jdbc.queryForObject("select rest_version from workouts where id = ?", Long.class, workout)).isZero();
             assertThat(jdbc.queryForObject("select exercise_name_snapshot from workout_exercises where id = ?", String.class, exercise)).isEqualTo("Panca storica");
+            assertThat(jdbc.queryForObject("select catalog_exercise_id from workout_exercises where id = ?", UUID.class, exercise)).isNull();
             assertThat(jdbc.queryForObject("select count(*) from workout_sets", Long.class)).isEqualTo(3);
             assertThat(jdbc.queryForObject("select count(*) from workout_sets where weight_kg_planned is null and weight_kg_used is null and reps_actual is null", Long.class)).isEqualTo(3);
         }

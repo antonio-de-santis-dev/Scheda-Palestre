@@ -255,3 +255,7 @@ le altre sessioni aperte dell'utente.
 Durata e controlli recupero: [sviluppo-v2.md](sviluppo-v2.md#api), ADR 0012.
 
 Carichi previsti e risultati per serie (V2 Fase 2): [ADR 0013](decisions/0013-planned-loads-and-set-results.md#persistenza-e-api).
+
+## SviluppoV2 — Fase 3
+
+Filtri dello storico e `GET /api/me/progress`: contratto in [ADR 0014](decisions/0014-progress-and-history.md).

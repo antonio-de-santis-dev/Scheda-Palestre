@@ -87,6 +87,7 @@ class WorkoutService {
                         .forEach(exercise -> {
                             WorkoutExercise we = workout.addExercise(exercise.id(), exercise.exerciseName(),
                                     section.muscleGroupName());
+                            we.snapshotCatalogIdentity(exercise.exerciseId());
                             exercise.sets().forEach(s -> we.addSet(s.setIndex(), s.reps(), s.toFailure(),
                                     s.restSeconds(), s.plannedWeightKg()));
                         }));
@@ -111,7 +112,31 @@ class WorkoutService {
     @Transactional(readOnly = true)
     public org.springframework.data.domain.Page<WorkoutDtos.WorkoutSummary> history(UUID userId,
             org.springframework.data.domain.Pageable pageable) {
-        return workouts.findByUserId(userId, pageable).map(WorkoutDtos.WorkoutSummary::of);
+        return history(userId, pageable, null, null, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<WorkoutDtos.WorkoutSummary> history(UUID userId,
+            org.springframework.data.domain.Pageable pageable, LocalDate from, LocalDate to,
+            WorkoutStatus status, String search) {
+        if (from != null && to != null && from.isAfter(to)) {
+            throw com.gymplanner.shared.error.BadRequestException.field("to", "Must be on or after from");
+        }
+        String term = search == null ? "" : search.strip().toLowerCase(java.util.Locale.ROOT);
+        if (term.length() > 100) {
+            throw com.gymplanner.shared.error.BadRequestException.field("search", "Maximum 100 characters");
+        }
+        return workouts.findAll((root, query, cb) -> {
+            var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+            predicates.add(cb.equal(root.get("userId"), userId));
+            if (from != null) predicates.add(cb.greaterThanOrEqualTo(root.get("scheduledDate"), from));
+            if (to != null) predicates.add(cb.lessThanOrEqualTo(root.get("scheduledDate"), to));
+            if (status != null) predicates.add(cb.equal(root.get("status"), status));
+            if (!term.isEmpty()) predicates.add(cb.or(
+                    cb.greaterThan(cb.locate(cb.lower(root.get("planNameSnapshot")), term), 0),
+                    cb.greaterThan(cb.locate(cb.lower(root.get("sessionTitleSnapshot")), term), 0)));
+            return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        }, pageable).map(WorkoutDtos.WorkoutSummary::of);
     }
 
     @Transactional(readOnly = true)

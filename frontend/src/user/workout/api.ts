@@ -165,6 +165,7 @@ export function useWorkoutAction<TArgs>(workoutId: string, fn: (args: TArgs) => 
       void queryClient.invalidateQueries({ queryKey: ['me', 'today'] });
       void queryClient.invalidateQueries({ queryKey: ['me', 'calendar'] });
       void queryClient.invalidateQueries({ queryKey: ['me', 'history'] });
+      void queryClient.invalidateQueries({ queryKey: ['me', 'progress'] });
     },
   });
 }

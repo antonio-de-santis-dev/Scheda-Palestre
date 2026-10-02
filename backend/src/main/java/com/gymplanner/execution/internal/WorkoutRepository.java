@@ -12,7 +12,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-interface WorkoutRepository extends JpaRepository<Workout, UUID> {
+interface WorkoutRepository extends JpaRepository<Workout, UUID>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<Workout> {
 
     Optional<Workout> findByIdAndUserId(UUID id, UUID userId);
 
