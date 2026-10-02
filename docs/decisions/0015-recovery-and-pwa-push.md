@@ -113,8 +113,25 @@ scheda Network del browser; un 401 di `/api/auth/me` prima del login è normale.
 Da root: `python3 scripts/check-smtp.py`. Legge la `.env` locale (variabili del terminale
 hanno precedenza), verifica connessione, STARTTLS/certificato e autenticazione.
 Non invia email e non stampa username/password, risposte SMTP o token.
-Il backend registra soltanto un codice diagnostico fisso tra parentesi:
+Il backend registra un codice diagnostico fisso tra parentesi:
 `SMTP_AUTHENTICATION_FAILED`, `SMTP_TLS_FAILED`, `SMTP_TIMEOUT`, `SMTP_DNS_FAILED`,
 `SMTP_CONNECTION_FAILED` oppure `SMTP_DELIVERY_FAILED`. Nessuna exception completa viene loggata.
 Se la verifica SMTP riesce ma manca l'email, confrontare configurazione effettiva del backend,
 riavvio dopo modifica `.env`, email dell'account, spam e limiti richieste (3/email/ora).
+
+## Diagnosi dell'invio Java dopo SMTP_OK
+
+`scripts/check-smtp.py` prova connessione, TLS e autenticazione Python; non prova
+la serializzazione o l'invio del messaggio dal backend Java. Un esito SMTP_OK
+non garantisce la consegna del recupero password.
+
+Il log di `RecoveryMail` include ora `types=[...]`: solo i nomi delle classi
+delle eccezioni annidate e, per i rifiuti SMTP Angus, il codice numerico.
+Non include messaggi di eccezione, risposte testuali SMTP, indirizzi,
+credenziali o token. Distingue inoltre mittente/destinatario/messaggio rifiutati
+e sender/provider mancanti. Dopo aggiornamento e riavvio, una nuova richiesta
+di recupero fornisce la riga necessaria a diagnosticare l'errore Java.
+
+`RecoverySmtpTransportTest` usa l'autoconfigurazione reale e il trasporto JavaMail
+contro un server SMTP locale di test, verificando invio e contenuto UTF-8.
+Non contatta Gmail e non dimostra la consegna nella casella dell'utente.
