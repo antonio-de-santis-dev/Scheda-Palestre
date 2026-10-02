@@ -27,6 +27,7 @@ export interface SetInput {
   reps: number;
   toFailure: boolean;
   restSeconds: number;
+  plannedWeightKg?: number | null;
 }
 
 export interface PlanExerciseInput {
@@ -35,6 +36,7 @@ export interface PlanExerciseInput {
   reps: number;
   toFailure: boolean;
   restSeconds: number;
+  plannedWeightKg?: number | null;
   customSets: SetInput[];
 }
 

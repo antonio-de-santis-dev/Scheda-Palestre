@@ -21,7 +21,7 @@ GymPlanner è una web app per palestre, **amministrata**: non esiste registrazio
   - esegue l'allenamento serie per serie con **timer di recupero**: "Fine serie" è bloccato finché
     il recupero non finisce; celebrazioni e avviso sonoro di fine recupero sono opzionali;
   - può saltare esercizi o interrompere;
-  - consulta lo **storico** e modifica telefono e password;
+  - registra facoltativamente peso usato e ripetizioni effettive per serie; consulta lo **storico** e modifica telefono e password;
   - riceve un avviso quando la durata consigliata di una scheda è terminata.
 
 Fonte di verità funzionale: `MEGA_DOCUMENTAZIONE_GYM_PLANNER_PER_CLAUDE_CODE.md`.
@@ -42,7 +42,8 @@ Documentazione tecnica: `docs/architecture.md`, `docs/api.md`, `docs/decisions/`
 
 Tutte le decisioni aperte O-01…O-07 della specifica sono state chiuse con le proposte consigliate
 (`docs/decisions/0004-open-decisions.md`). **O-06** (timer informativo) e **O-07** (copia dei giorni)
-sono state superate dal branch `modifiche`: vedi ADR 0004, 0008 e ADR 0007-0010. Le funzionalità marcate FUTURO **non** vanno implementate.
+sono state superate dal branch `modifiche`: vedi ADR 0004, 0008 e ADR 0007-0010. Le funzionalità marcate FUTURO erano escluse dalla V1. Il proprietario ha autorizzato
+la V2 sul branch `SviluppoV2`: seguire le fasi e lo stato di `docs/sviluppo-v2.md`.
 
 ## 3. Stack
 
@@ -76,7 +77,7 @@ Monolite modulare in `backend/src/main/java/com/gymplanner/`:
   `BusinessRuleException` 422, `BadRequestException`, …) → RFC 9457 con campo `code`.
   Risorse di altri utenti → **404**, mai 403.
 - `/api/me/**`: l'utente si ricava **sempre** da `@AuthenticationPrincipal AuthenticatedUser`.
-- Schema DB solo tramite **Flyway** (`backend/src/main/resources/db/migration`, V1…V10).
+- Schema DB solo tramite **Flyway** (`backend/src/main/resources/db/migration`, V1…V16).
   **Non modificare migrazioni esistenti**: aggiungi una nuova migrazione. Hibernate è in `validate`.
 - Tabelle al plurale (`users`, mai `user`); nessun `@ManyToMany` utente-scheda.
 
@@ -98,7 +99,7 @@ Punti delicati già risolti (non romperli):
 - `duration_weeks` è la durata **consigliata**, calcolata dalla data di inizio di ogni assegnazione: lo stato è calcolato dal server con `BusinessCalendar`
   e non blocca nulla (ADR 0009);
 - "Fine serie" idempotente con lock pessimistico sul workout;
-- timer derivato da `restEndsAt`/`serverTime` (mai un contatore), `BusinessCalendar.now()` troncato ai ms;
+- timer V2 persistente con pausa/ripresa/estensione/salto esplicito, derivato da `restEndsAt`/`serverTime` (mai un contatore), `BusinessCalendar.now()` troncato ai ms;
 - sessione server + CSRF SPA (`XSRF-TOKEN` → `X-XSRF-TOKEN`), `users.session_version` invalida le sessioni.
 
 Frontend (`frontend/src/`): `app/` (router, provider, layout), `auth/`, `admin/`, `user/`,

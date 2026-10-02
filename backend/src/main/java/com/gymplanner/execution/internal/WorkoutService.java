@@ -87,7 +87,9 @@ class WorkoutService {
                         .forEach(exercise -> {
                             WorkoutExercise we = workout.addExercise(exercise.id(), exercise.exerciseName(),
                                     section.muscleGroupName());
-                            exercise.sets().forEach(s -> we.addSet(s.setIndex(), s.reps(), s.toFailure(), s.restSeconds()));
+                            we.snapshotCatalogIdentity(exercise.exerciseId());
+                            exercise.sets().forEach(s -> we.addSet(s.setIndex(), s.reps(), s.toFailure(),
+                                    s.restSeconds(), s.plannedWeightKg()));
                         }));
         workout.begin();
         try {
@@ -110,7 +112,31 @@ class WorkoutService {
     @Transactional(readOnly = true)
     public org.springframework.data.domain.Page<WorkoutDtos.WorkoutSummary> history(UUID userId,
             org.springframework.data.domain.Pageable pageable) {
-        return workouts.findByUserId(userId, pageable).map(WorkoutDtos.WorkoutSummary::of);
+        return history(userId, pageable, null, null, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<WorkoutDtos.WorkoutSummary> history(UUID userId,
+            org.springframework.data.domain.Pageable pageable, LocalDate from, LocalDate to,
+            WorkoutStatus status, String search) {
+        if (from != null && to != null && from.isAfter(to)) {
+            throw com.gymplanner.shared.error.BadRequestException.field("to", "Must be on or after from");
+        }
+        String term = search == null ? "" : search.strip().toLowerCase(java.util.Locale.ROOT);
+        if (term.length() > 100) {
+            throw com.gymplanner.shared.error.BadRequestException.field("search", "Maximum 100 characters");
+        }
+        return workouts.findAll((root, query, cb) -> {
+            var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+            predicates.add(cb.equal(root.get("userId"), userId));
+            if (from != null) predicates.add(cb.greaterThanOrEqualTo(root.get("scheduledDate"), from));
+            if (to != null) predicates.add(cb.lessThanOrEqualTo(root.get("scheduledDate"), to));
+            if (status != null) predicates.add(cb.equal(root.get("status"), status));
+            if (!term.isEmpty()) predicates.add(cb.or(
+                    cb.greaterThan(cb.locate(cb.lower(root.get("planNameSnapshot")), term), 0),
+                    cb.greaterThan(cb.locate(cb.lower(root.get("sessionTitleSnapshot")), term), 0)));
+            return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        }, pageable).map(WorkoutDtos.WorkoutSummary::of);
     }
 
     @Transactional(readOnly = true)
@@ -125,7 +151,7 @@ class WorkoutService {
      * without advancing twice. The completion instant comes from the server clock.
      */
     @Transactional
-    public WorkoutState completeSet(UUID userId, UUID workoutId, UUID setId) {
+    public WorkoutState completeSet(UUID userId, UUID workoutId, UUID setId, WorkoutDtos.CompleteSetRequest result) {
         Workout workout = lockOwned(userId, workoutId);
         WorkoutSet set = workout.findSet(setId).orElseThrow(() -> new NotFoundException("Set"));
         Instant now = calendar.now();
@@ -141,20 +167,37 @@ class WorkoutService {
         }
         // Fase F (supersedes O-06): the next set cannot start while the rest is running. A repeated
         // request for an already completed set was answered above (idempotency is preserved).
-        Optional<Instant> restEndsAt = workout.lastCompletedSet()
-                .filter(last -> last.getRestSeconds() > 0)
-                .map(last -> last.getCompletedAt().plusSeconds(last.getRestSeconds()))
-                .filter(now::isBefore);
-        if (restEndsAt.isPresent()) {
+        if (workout.remainingRestMillis(now) > 0) {
             throw new BusinessRuleException("REST_NOT_FINISHED", "The rest period is not over yet")
-                    .with("restEndsAt", restEndsAt.get())
+                    .with("restEndsAt", workout.getRestEndsAt())
+                    .with("restPaused", workout.isRestPaused())
                     .with("serverTime", now);
         }
-        set.complete(now);
+        set.complete(now, result == null ? null : result.weightKgUsed(),
+                result == null || result.repsActual() == null ? null : result.repsActual().intValueExact());
         if (exercise.nextSet().isEmpty()) {
             exercise.markCompleted();
             advance(workout, now);
         }
+        workout.startRest(now, set.getRestSeconds());
+        workouts.flush();
+        return WorkoutStateMapper.toState(workout, now);
+    }
+
+    /** The same workout row lock serializes recovery controls and set completion. */
+    @Transactional
+    public WorkoutState changeRest(UUID userId, UUID workoutId, WorkoutDtos.RestRequest request) {
+        Workout workout = lockOwned(userId, workoutId);
+        requireInProgress(workout);
+        if (request.expectedVersion() != workout.getRestVersion()) {
+            throw new ConflictException("REST_STATE_CHANGED", "Rest was changed by another request");
+        }
+        if ((request.action() == WorkoutDtos.RestAction.EXTEND) != (request.seconds() != null)) {
+            throw com.gymplanner.shared.error.BadRequestException.field("seconds",
+                    "Seconds are required only for EXTEND");
+        }
+        Instant now = calendar.now();
+        workout.changeRest(request.action(), request.seconds(), now);
         workouts.flush();
         return WorkoutStateMapper.toState(workout, now);
     }

@@ -1,5 +1,6 @@
 package com.gymplanner.workoutplan.internal;
 
+import java.math.BigDecimal;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -36,15 +37,19 @@ public class PlanSet {
     @Column(nullable = false)
     private int restSeconds;
 
+    @Column(precision = 6, scale = 2)
+    private BigDecimal plannedWeightKg;
+
     protected PlanSet() {
     }
 
-    PlanSet(PlanExercise planExercise, int setIndex, int reps, boolean toFailure, int restSeconds) {
+    PlanSet(PlanExercise planExercise, int setIndex, int reps, boolean toFailure, int restSeconds, BigDecimal plannedWeightKg) {
         this.planExercise = planExercise;
         this.setIndex = setIndex;
         this.reps = reps;
         this.toFailure = toFailure;
         this.restSeconds = restSeconds;
+        this.plannedWeightKg = plannedWeightKg;
     }
 
     public UUID getId() {
@@ -62,6 +67,8 @@ public class PlanSet {
     public boolean isToFailure() {
         return toFailure;
     }
+
+    public BigDecimal getPlannedWeightKg() { return plannedWeightKg; }
 
     public int getRestSeconds() {
         return restSeconds;

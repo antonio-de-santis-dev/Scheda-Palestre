@@ -2,6 +2,7 @@ import { isApiError } from './ApiError';
 
 /** Italian messages for the application error codes returned by the backend. */
 const MESSAGES: Record<string, string> = {
+  RECOVERY_UNAVAILABLE: 'Il recupero password via email non è disponibile al momento. Contatta la palestra.',
   NETWORK_ERROR: 'Connessione assente o server non raggiungibile. Controlla la rete e riprova.',
   TIMEOUT: 'Il server non ha risposto in tempo. Riprova.',
   INVALID_CREDENTIALS: 'Credenziali non valide.',
@@ -42,6 +43,11 @@ const MESSAGES: Record<string, string> = {
   RANGE_TOO_LARGE: "L'intervallo richiesto è troppo ampio (massimo 62 giorni).",
   EXERCISE_GROUP_MISMATCH: 'L’esercizio scelto non appartiene al gruppo muscolare di questa sezione.',
   SCHEDULE_DAY_CONFLICT: 'Alcuni giorni sono già usati da un’altra tua scheda attiva.',
+  REST_STATE_CHANGED: 'Il recupero è stato modificato da un’altra richiesta. La schermata è stata aggiornata.',
+  REST_NOT_ACTIVE: 'Non c’è un recupero attivo da modificare.',
+  REST_ALREADY_PAUSED: 'Il recupero è già in pausa.',
+  REST_NOT_PAUSED: 'Il recupero è già in esecuzione.',
+  REST_LIMIT_EXCEEDED: 'Il recupero non può superare un’ora.',
   REST_NOT_FINISHED: 'Il recupero non è ancora finito: la schermata è stata allineata al server.',
   CANNOT_DELETE_SELF: 'Non puoi eliminare il tuo account.',
   PROTECTED_ACCOUNT: "L'account ADMIN iniziale non può essere eliminato.",

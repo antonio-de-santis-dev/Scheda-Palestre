@@ -36,6 +36,17 @@ services:
       GYM_COOKIE_SECURE: "true"
       GYM_CORS_ALLOWED_ORIGINS: https://${GYM_DOMAIN:?Impostare GYM_DOMAIN}
       GYM_TIME_ZONE: ${GYM_TIME_ZONE:-Europe/Rome}
+      GYM_RECOVERY_ENABLED: ${GYM_RECOVERY_ENABLED:-false}
+      GYM_PUBLIC_URL: ${GYM_PUBLIC_URL:-}
+      GYM_MAIL_FROM: ${GYM_MAIL_FROM:-}
+      GYM_SMTP_HOST: ${GYM_SMTP_HOST:-smtp.gmail.com}
+      GYM_SMTP_PORT: ${GYM_SMTP_PORT:-587}
+      GYM_SMTP_USERNAME: ${GYM_SMTP_USERNAME:-}
+      GYM_SMTP_PASSWORD: ${GYM_SMTP_PASSWORD:-}
+      GYM_PUSH_ENABLED: ${GYM_PUSH_ENABLED:-false}
+      GYM_VAPID_PUBLIC_KEY: ${GYM_VAPID_PUBLIC_KEY:-}
+      GYM_VAPID_PRIVATE_KEY: ${GYM_VAPID_PRIVATE_KEY:-}
+      GYM_VAPID_SUBJECT: ${GYM_VAPID_SUBJECT:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
       interval: 10s

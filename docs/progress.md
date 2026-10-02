@@ -115,3 +115,23 @@ revisione.
 | F | "Fine serie" bloccato durante il recupero (`REST_NOT_FINISHED`), celebrazioni una volta per transizione, guida vocale opzionale | ADR 0004 (O-06 superata) |
 
 **Prova manuale.** Vedi `GUIDA_TEST_MANUALE.md`, sezione "Nuove funzionalità (branch modifiche)".
+
+## SviluppoV2 — Fase 1
+
+Durata per allenamento e recupero avanzato. Roadmap e stato: [sviluppo-v2.md](sviluppo-v2.md).
+
+## SviluppoV2 — Fase 2
+
+Carichi generali/personalizzati, snapshot dei pesi, registrazione facoltativa dei risultati e storico dettagliato.
+Migrazione V13. Contratto e regole: ADR 0013; esiti delle verifiche nella PR.
+
+## SviluppoV2 — Fase 3
+
+Storico filtrabile, statistiche/grafici del periodo e record personali globali.
+Migrazione V14 per identità snapshot; nessun risultato inventato. Contratto: ADR 0014.
+Esiti delle verifiche nella PR.
+
+## SviluppoV2 — Fasi 4–5
+
+PWA, push fine recupero, recupero password SMTP. Migrazioni V15/V16.
+Codice implementato; attivazione esterna e prove di consegna richiedono ambiente configurato. ADR 0015.

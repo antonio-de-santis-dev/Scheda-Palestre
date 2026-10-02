@@ -65,8 +65,8 @@ class PlanStructureAssembler {
                 e.getPosition(), e.getSetsCount(), e.getReps(), e.isToFailure(),
                 e.getRestSeconds(), e.isCustomized(),
                 e.effectiveSets().stream()
-                        .map(s -> new PlanStructure.Set(s.setIndex(), s.reps(), s.toFailure(), s.restSeconds()))
-                        .toList());
+                        .map(s -> new PlanStructure.Set(s.setIndex(), s.reps(), s.toFailure(), s.restSeconds(), s.plannedWeightKg()))
+                        .toList(), e.getPlannedWeightKg());
     }
 
     /** In-memory order may be stale right after a reorder in the same transaction. */

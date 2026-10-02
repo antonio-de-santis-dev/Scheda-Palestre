@@ -61,9 +61,12 @@ class WorkoutController {
 
     @GetMapping("/workouts")
     PageResponse<WorkoutDtos.WorkoutSummary> history(@AuthenticationPrincipal AuthenticatedUser user,
-            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
-        Sort sort = Sort.by(Sort.Order.desc("scheduledDate"), Sort.Order.desc("startedAt"));
-        return PageResponse.of(workouts.history(user.id(), Paging.of(page, size, sort)), s -> s);
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) WorkoutStatus status, @RequestParam(required = false) String search) {
+        Sort sort = Sort.by(Sort.Order.desc("scheduledDate"), Sort.Order.desc("startedAt"), Sort.Order.desc("id"));
+        return PageResponse.of(workouts.history(user.id(), Paging.of(page, size, sort), from, to, status, search), s -> s);
     }
 
     /** Full state of one of the user's workouts (resume after reload, history detail). */
@@ -74,14 +77,20 @@ class WorkoutController {
 
     @PostMapping("/workouts/{id}/sets/{setId}/complete")
     WorkoutState completeSet(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id,
-            @PathVariable UUID setId) {
-        return workouts.completeSet(user.id(), id, setId);
+            @PathVariable UUID setId, @Valid @RequestBody(required = false) WorkoutDtos.CompleteSetRequest result) {
+        return workouts.completeSet(user.id(), id, setId, result);
     }
 
     @PostMapping("/workouts/{id}/exercises/{exerciseId}/skip")
     WorkoutState skip(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id,
             @PathVariable UUID exerciseId) {
         return workouts.skipExercise(user.id(), id, exerciseId);
+    }
+
+    @PostMapping("/workouts/{id}/rest")
+    WorkoutState rest(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id,
+            @Valid @RequestBody WorkoutDtos.RestRequest body) {
+        return workouts.changeRest(user.id(), id, body);
     }
 
     @PostMapping("/workouts/{id}/interrupt")

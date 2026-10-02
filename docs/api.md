@@ -249,3 +249,17 @@ rifiutata con `422 REST_NOT_FINISHED` (O-06 superata); "Salta" e "Interrompi" re
 
 Il cambio password usa `POST /api/auth/change-password` (password attuale obbligatoria) e chiude
 le altre sessioni aperte dell'utente.
+
+## Estensioni V2
+
+Durata e controlli recupero: [sviluppo-v2.md](sviluppo-v2.md#api), ADR 0012.
+
+Carichi previsti e risultati per serie (V2 Fase 2): [ADR 0013](decisions/0013-planned-loads-and-set-results.md#persistenza-e-api).
+
+## SviluppoV2 — Fase 3
+
+Filtri dello storico e `GET /api/me/progress`: contratto in [ADR 0014](decisions/0014-progress-and-history.md).
+
+## SviluppoV2 — Fasi 4–5
+
+Recupero password e push: [ADR 0015](decisions/0015-recovery-and-pwa-push.md).

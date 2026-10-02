@@ -40,14 +40,14 @@ final class ExerciseConfigValidator {
             }
             for (SetRequest s : sorted) {
                 checkReps("customSets[" + (s.setIndex() - 1) + "].reps", s.reps(), s.toFailure(), errors);
-                sets.add(new ExerciseConfig.SetConfig(s.setIndex(), s.reps(), s.toFailure(), s.restSeconds()));
+                sets.add(new ExerciseConfig.SetConfig(s.setIndex(), s.reps(), s.toFailure(), s.restSeconds(), s.plannedWeightKg()));
             }
         }
         if (!errors.isEmpty()) {
             throw new BadRequestException("VALIDATION_ERROR", "One or more fields are invalid", errors);
         }
         return new ExerciseConfig(request.setsCount(), request.reps(), request.toFailure(), request.restSeconds(),
-                List.copyOf(sets));
+                request.plannedWeightKg(), List.copyOf(sets));
     }
 
     private static void checkReps(String field, int reps, boolean toFailure, List<FieldViolation> errors) {

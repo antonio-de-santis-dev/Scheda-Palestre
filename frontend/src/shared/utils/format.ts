@@ -73,6 +73,15 @@ export function formatDuration(totalSeconds: number): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
+/** Workout wall-clock duration; hours never wrap at midnight. */
+export function formatWorkoutDuration(totalSeconds: number): string {
+  const safe = Number.isFinite(totalSeconds) ? Math.max(0, Math.floor(totalSeconds)) : 0;
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const seconds = String(safe % 60).padStart(2, '0');
+  return hours ? `${hours}:${String(minutes).padStart(2, '0')}:${seconds}` : `${minutes}:${seconds}`;
+}
+
 export function formatRest(seconds: number): string {
   if (seconds === 0) {
     return 'nessun recupero';

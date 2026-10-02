@@ -16,8 +16,9 @@ export function exercise(overrides: Partial<PlanExercise> = {}): PlanExercise {
     reps,
     toFailure,
     restSeconds,
+    plannedWeightKg: null,
     customized: false,
-    sets: Array.from({ length: setsCount }, (_, i) => ({ setIndex: i + 1, reps, toFailure, restSeconds })),
+    sets: Array.from({ length: setsCount }, (_, i) => ({ setIndex: i + 1, reps, toFailure, restSeconds, plannedWeightKg: null })),
     ...overrides,
   };
 }

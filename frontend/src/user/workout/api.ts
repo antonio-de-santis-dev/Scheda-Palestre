@@ -14,6 +14,9 @@ export interface WorkoutSetState {
   toFailure: boolean;
   restSeconds: number;
   completedAt: string | null;
+  weightKgPlanned: number | null;
+  weightKgUsed: number | null;
+  repsActual: number | null;
 }
 
 export interface WorkoutExerciseState {
@@ -35,11 +38,15 @@ export interface WorkoutState {
   sessionTitle: string;
   startedAt: string;
   finishedAt: string | null;
+  durationSeconds: number;
   exercises: WorkoutExerciseState[];
   currentExerciseId: string | null;
   currentSetId: string | null;
   restEndsAt: string | null;
   restSeconds: number | null;
+  restPaused: boolean;
+  restRemainingSeconds: number;
+  restVersion: number;
   serverTime: string;
   nextAction: NextAction;
   /** Client clock when the response arrived: used to compute the server/client offset. */
@@ -54,6 +61,7 @@ export interface WorkoutSummary {
   sessionTitle: string;
   startedAt: string;
   finishedAt: string | null;
+  durationSeconds: number | null;
   totalExercises: number;
   completedExercises: number;
   skippedExercises: number;
@@ -105,15 +113,21 @@ export const workoutKeys = {
   workout: (id: string) => ['me', 'workout', id] as const,
 };
 
+export interface SetResultInput { weightKgUsed: number | null; repsActual: number | null; }
+
+export type RestAction = 'PAUSE' | 'RESUME' | 'EXTEND' | 'SKIP';
+
 export const workoutApi = {
   today: (date: string) => http.get<Today>('/api/me/today', { date }),
   calendar: (from: string, to: string) => http.get<CalendarDay[]>('/api/me/calendar', { from, to }),
   start: async (date: string) => stamp(await http.post<RawState>('/api/me/workouts', { date })),
   get: async (id: string) => stamp(await http.get<RawState>(`/api/me/workouts/${id}`)),
-  completeSet: async (workoutId: string, setId: string) =>
-    stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/sets/${setId}/complete`)),
+  completeSet: async (workoutId: string, setId: string, result?: SetResultInput) =>
+    stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/sets/${setId}/complete`, result)),
   skip: async (workoutId: string, exerciseId: string) =>
     stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/exercises/${exerciseId}/skip`)),
+  changeRest: async (workoutId: string, action: RestAction, expectedVersion: number, seconds?: number) =>
+    stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/rest`, { action, expectedVersion, seconds })),
   interrupt: async (workoutId: string) => stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/interrupt`)),
 };
 
@@ -133,7 +147,7 @@ export function useWorkout(id: string) {
 const retryNetwork = (failureCount: number, error: unknown) => failureCount < 3 && isApiError(error) && error.isNetwork;
 
 /** Errors meaning "the screen is stale": the state is reloaded from the server. */
-export const STALE_STATE_CODES = ['SET_NOT_CURRENT', 'WORKOUT_NOT_IN_PROGRESS', 'EXERCISE_NOT_IN_PROGRESS', 'REST_NOT_FINISHED'];
+export const STALE_STATE_CODES = ['SET_NOT_CURRENT', 'WORKOUT_NOT_IN_PROGRESS', 'EXERCISE_NOT_IN_PROGRESS', 'REST_NOT_FINISHED', 'REST_STATE_CHANGED', 'REST_NOT_ACTIVE', 'REST_ALREADY_PAUSED', 'REST_NOT_PAUSED'];
 
 export function useWorkoutAction<TArgs>(workoutId: string, fn: (args: TArgs) => Promise<WorkoutState>, idempotent: boolean) {
   const queryClient = useQueryClient();
@@ -151,6 +165,7 @@ export function useWorkoutAction<TArgs>(workoutId: string, fn: (args: TArgs) => 
       void queryClient.invalidateQueries({ queryKey: ['me', 'today'] });
       void queryClient.invalidateQueries({ queryKey: ['me', 'calendar'] });
       void queryClient.invalidateQueries({ queryKey: ['me', 'history'] });
+      void queryClient.invalidateQueries({ queryKey: ['me', 'progress'] });
     },
   });
 }

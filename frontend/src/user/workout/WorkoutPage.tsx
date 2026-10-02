@@ -13,6 +13,10 @@ import { useRestTimer } from './useRestTimer';
 import { ExerciseStatusBadge, WorkoutStatusBadge } from './ExerciseStatusBadge';
 import { celebrate, transitions, type Feedback } from './feedback';
 import { useRestAlert } from './useRestAlert';
+import { WorkoutDuration } from '../../shared/components/WorkoutDuration';
+import type { RestAction, SetResultInput } from './api';
+import { TextField } from '../../shared/components/Field';
+import { formatWeight, setResultSchema } from '../../shared/utils/weight';
 
 /** Workout execution (US-17, US-18, US-20, US-23): usable one-handed from 360 px. */
 export function WorkoutPage() {
@@ -26,15 +30,22 @@ export function WorkoutPage() {
 }
 
 function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => void }) {
-  const [confirm, setConfirm] = useState<'skip' | 'interrupt' | null>(null);
+  const [confirm, setConfirm] = useState<'skip' | 'interrupt' | 'restSkip' | null>(null);
   const [announcement, setAnnouncement] = useState('');
+  const [draft, setDraft] = useState({ setId: '', weightKgUsed: '', repsActual: '' });
+  const [resultErrors, setResultErrors] = useState<{ setId: string; weightKgUsed?: string; repsActual?: string }>({ setId: '' });
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   // Transitions already celebrated: refetches, retries and StrictMode never repeat them.
   const celebrated = useRef(new Set<string>());
   const restAlert = useRestAlert();
-  const complete = useWorkoutAction(state.workoutId, (setId: string) => workoutApi.completeSet(state.workoutId, setId), true);
+  const complete = useWorkoutAction(state.workoutId, ({ setId, result }: { setId: string; result: SetResultInput }) => workoutApi.completeSet(state.workoutId, setId, result), true);
   const skip = useWorkoutAction(state.workoutId, (exerciseId: string) => workoutApi.skip(state.workoutId, exerciseId), true);
   const interrupt = useWorkoutAction(state.workoutId, () => workoutApi.interrupt(state.workoutId), true);
+
+  const rest = useWorkoutAction(state.workoutId,
+    ({ action, seconds }: { action: RestAction; seconds?: number }) =>
+      workoutApi.changeRest(state.workoutId, action, state.restVersion, seconds), false);
+  const busy = complete.isPending || skip.isPending || interrupt.isPending || rest.isPending;
 
   const remaining = useRestTimer(state, refetch, () => {
     setAnnouncement('Recupero terminato: puoi completare la prossima serie.');
@@ -58,12 +69,14 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
     void celebrate(main.kind);
   };
 
-  const error = complete.error ?? skip.error ?? interrupt.error;
+  const error = complete.error ?? skip.error ?? interrupt.error ?? rest.error;
   // Stale screens (e.g. set completed from another tab) are re-synced by the mutation hook.
   const stale = isApiError(error) && STALE_STATE_CODES.includes(error.code);
 
   const current = state.exercises.find((e) => e.id === state.currentExerciseId) ?? null;
   const currentSet = current?.sets.find((s) => s.id === state.currentSetId) ?? null;
+  const values = draft.setId === currentSet?.id ? draft : { setId: currentSet?.id ?? '', weightKgUsed: '', repsActual: '' };
+  const validation: { weightKgUsed?: string; repsActual?: string } = resultErrors.setId === currentSet?.id ? resultErrors : {};
   const finished = state.status !== 'IN_PROGRESS';
   const done = state.exercises.filter((e) => e.status === 'COMPLETED' || e.status === 'SKIPPED').length;
   const totalSets = state.exercises.reduce((n, e) => n + e.setsPlanned, 0);
@@ -99,6 +112,9 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
           <WorkoutStatusBadge status={state.status} />
         </div>
       </header>
+
+      <WorkoutDuration state={state} />
+      <p className="small muted">Include recuperi e tempo trascorso fuori dalla pagina.</p>
 
       {/* Announced once when the rest ends; the countdown itself is never a live region. */}
       <div className="visually-hidden" role="status">
@@ -165,7 +181,7 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
             <div className="timer timer--ring" style={{ '--rest-progress': `${Math.min(100, remaining / Math.max(1, state.restSeconds ?? currentSet.restSeconds) * 100)}%` } as CSSProperties} role="timer" aria-live="off" aria-label={`Recupero: ${formatDuration(remaining)} rimanenti`}>
               <span className="timer__label">
                 <Hourglass size={22} aria-hidden="true" />
-                Recupero
+                {state.restPaused ? 'Recupero in pausa' : 'Recupero'}
               </span>
               <span className="timer__value">{formatDuration(remaining)}</span>
             </div>
@@ -178,28 +194,57 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
             </div>
           ) : null}
 
+          {resting ? (
+            <div className="rest-controls" role="group" aria-label="Controlli recupero">
+              <Button variant="secondary" disabled={busy} onClick={() => rest.mutate({ action: state.restPaused ? 'RESUME' : 'PAUSE' })}>
+                {state.restPaused ? 'Riprendi recupero' : 'Pausa recupero'}
+              </Button>
+              <Button variant="secondary" disabled={busy} onClick={() => rest.mutate({ action: 'EXTEND', seconds: 30 })}>+30 secondi</Button>
+              <Button variant="ghost" disabled={busy} onClick={() => setConfirm('restSkip')}>Salta recupero</Button>
+            </div>
+          ) : null}
+
+          <fieldset className="set-results" disabled={busy}>
+            <legend>Dati della serie (facoltativi)</legend>
+            <p className="small muted">Peso previsto: {formatWeight(currentSet.weightKgPlanned)}. I campi vuoti restano non registrati.</p>
+            <div className="form-grid form-grid--2">
+              <TextField label="Peso usato (kg)" inputMode="decimal" placeholder="Non registrato" value={values.weightKgUsed}
+                error={validation.weightKgUsed} onChange={(e) => setDraft({ ...values, weightKgUsed: e.target.value })} />
+              <TextField label="Ripetizioni effettive" inputMode="numeric" placeholder="Non registrate" value={values.repsActual}
+                error={validation.repsActual} onChange={(e) => setDraft({ ...values, repsActual: e.target.value })} />
+            </div>
+          </fieldset>
+
           {/* aria-disabled (not disabled): the button stays in the tab order and says why it waits. */}
           <Button
             size="lg"
             block
             className={resting ? 'btn--waiting' : undefined}
-            aria-disabled={resting || undefined}
+            aria-disabled={resting || busy || undefined}
             aria-describedby={resting ? 'rest-hint' : undefined}
             icon={resting ? <Hourglass size={26} aria-hidden="true" /> : <CheckCheck size={26} aria-hidden="true" />}
             loading={complete.isPending}
             onClick={() => {
-              if (resting) {
+              if (resting || busy) {
                 return;
               }
+              const parsed = setResultSchema.safeParse(values);
+              if (!parsed.success) {
+                const fields = parsed.error.flatten().fieldErrors;
+                setResultErrors({ setId: currentSet.id, weightKgUsed: fields.weightKgUsed?.[0], repsActual: fields.repsActual?.[0] });
+                return;
+              }
+              setResultErrors({ setId: currentSet.id });
               setAnnouncement('');
               setFeedback(null);
               skip.reset();
+              rest.reset();
               const before = state;
-              complete.mutate(currentSet.id, { onSuccess: (after) => onActionSuccess(before, after) });
+              complete.mutate({ setId: currentSet.id, result: parsed.data }, { onSuccess: (after) => onActionSuccess(before, after) });
             }}
           >
             Fine serie
-            {resting ? <span className="btn__sub" aria-hidden="true">tra {formatDuration(remaining)}</span> : null}
+            {resting ? <span className="btn__sub" aria-hidden="true">{state.restPaused ? 'recupero in pausa' : `tra ${formatDuration(remaining)}`}</span> : null}
           </Button>
           {resting ? (
             <p id="rest-hint" className="small muted center" style={{ margin: 'var(--space-2) 0 0' }}>
@@ -215,10 +260,10 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
 
       {!finished && current ? (
         <div className="workout-actions">
-          <Button variant="secondary" icon={<SkipForward size={20} aria-hidden="true" />} onClick={() => setConfirm('skip')}>
+          <Button variant="secondary" icon={<SkipForward size={20} aria-hidden="true" />} disabled={busy} onClick={() => setConfirm('skip')}>
             Salta esercizio
           </Button>
-          <Button variant="secondary" icon={<OctagonX size={20} aria-hidden="true" />} onClick={() => setConfirm('interrupt')}>
+          <Button variant="secondary" icon={<OctagonX size={20} aria-hidden="true" />} disabled={busy} onClick={() => setConfirm('interrupt')}>
             Interrompi
           </Button>
         </div>
@@ -249,6 +294,11 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
 
       </div>
 
+      <ConfirmDialog open={confirm === 'restSkip'} title="Saltare il recupero?" confirmLabel="Salta recupero" tone="primary"
+        loading={rest.isPending} onCancel={() => setConfirm(null)}
+        onConfirm={() => rest.mutate({ action: 'SKIP' }, { onSettled: () => setConfirm(null) })}>
+        <p>Il recupero verrà terminato e potrai completare la prossima serie.</p>
+      </ConfirmDialog>
       <ConfirmDialog
         open={confirm === 'skip'}
         title={`Saltare “${current?.exerciseName ?? ''}”?`}

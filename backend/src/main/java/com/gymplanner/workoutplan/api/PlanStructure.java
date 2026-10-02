@@ -1,5 +1,6 @@
 package com.gymplanner.workoutplan.api;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -40,9 +41,9 @@ public record PlanStructure(
      */
     public record Exercise(UUID id, UUID exerciseId, String exerciseName, boolean exerciseActive,
             boolean exerciseInSectionGroup, int position,
-            int setsCount, int reps, boolean toFailure, int restSeconds, boolean customized, List<Set> sets) {
+            int setsCount, int reps, boolean toFailure, int restSeconds, boolean customized, List<Set> sets, BigDecimal plannedWeightKg) {
     }
 
-    public record Set(int setIndex, int reps, boolean toFailure, int restSeconds) {
+    public record Set(int setIndex, int reps, boolean toFailure, int restSeconds, BigDecimal plannedWeightKg) {
     }
 }

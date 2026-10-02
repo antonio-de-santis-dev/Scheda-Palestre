@@ -434,4 +434,181 @@ class ExecutionIntegrationTest {
         api.get(user, "/api/me/calendar?from=" + MONDAY + "&to=" + MONDAY.minusDays(1)).expectCode(400, "VALIDATION_ERROR");
         api.get(user, "/api/me/calendar?from=nope&to=" + MONDAY).expect(400);
     }
+    private Api.Response rest(AuthenticatedUser who, Api.Response state, String action, Integer seconds) {
+        Number version = state.read("$.restVersion");
+        return api.post(who, "/api/me/workouts/" + state.read("$.workoutId") + "/rest",
+                "{\"action\":\"" + action + "\",\"expectedVersion\":" + version
+                        + (seconds == null ? "" : ",\"seconds\":" + seconds) + "}");
+    }
+
+    @Test
+    void recoveryControlsPersistAndRejectStaleAndForeignRequests() {
+        Api.Response state = complete(user, start(user, MONDAY).expect(201)).expect(200);
+        clock.advance(Duration.ofSeconds(15));
+        Api.Response paused = rest(user, state, "PAUSE", null).expect(200);
+        assertThat((Boolean) paused.read("$.restPaused")).isTrue();
+        clock.advance(Duration.ofMinutes(5));
+        Api.Response loaded = api.get(user, "/api/me/workouts/" + state.read("$.workoutId")).expect(200);
+        assertThat(((Number) loaded.read("$.restRemainingSeconds")).longValue()).isEqualTo(45);
+        complete(user, loaded).expectCode(422, "REST_NOT_FINISHED");
+        rest(user, state, "EXTEND", 30).expectCode(409, "REST_STATE_CHANGED");
+        rest(fixtures.createUser(), loaded, "SKIP", null).expectCode(404, "NOT_FOUND");
+        rest(user, loaded, "EXTEND", 0).expectCode(400, "VALIDATION_ERROR");
+        rest(user, loaded, "EXTEND", 301).expectCode(400, "VALIDATION_ERROR");
+        rest(user, loaded, "EXTEND", null).expectCode(400, "VALIDATION_ERROR");
+        loaded = rest(user, loaded, "EXTEND", 30).expect(200);
+        assertThat(((Number) loaded.read("$.restRemainingSeconds")).longValue()).isEqualTo(75);
+        loaded = rest(user, loaded, "RESUME", null).expect(200);
+        assertThat((Boolean) loaded.read("$.restPaused")).isFalse();
+        loaded = rest(user, loaded, "SKIP", null).expect(200);
+        complete(user, loaded).expect(200);
+    }
+
+    @Test
+    void simultaneousExtensionsApplyOnlyOnceForTheSameRevision() throws Exception {
+        Api.Response state = complete(user, start(user, MONDAY).expect(201)).expect(200);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            CountDownLatch go = new CountDownLatch(1);
+            Callable<Integer> call = () -> { go.await(); return rest(user, state, "EXTEND", 30).status(); };
+            Future<Integer> first = pool.submit(call);
+            Future<Integer> second = pool.submit(call);
+            go.countDown();
+            assertThat(List.of(first.get(), second.get())).containsExactlyInAnyOrder(200, 409);
+            Api.Response loaded = api.get(user, "/api/me/workouts/current").expect(200);
+            assertThat(((Number) loaded.read("$.restRemainingSeconds")).longValue()).isEqualTo(90);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void durationIsStableInHistoryAfterInterruptIncludingPausedRecovery() {
+        Api.Response state = complete(user, start(user, MONDAY).expect(201)).expect(200);
+        rest(user, state, "PAUSE", null).expect(200);
+        clock.advance(Duration.ofSeconds(3700));
+        Api.Response ended = api.post(user, "/api/me/workouts/" + state.read("$.workoutId") + "/interrupt", null).expect(200);
+        assertThat(((Number) ended.read("$.durationSeconds")).longValue()).isEqualTo(3700);
+        clock.advance(Duration.ofDays(2));
+        Api.Response history = api.get(user, "/api/me/workouts").expect(200);
+        assertThat(((Number) history.read("$.content[0].durationSeconds")).longValue()).isEqualTo(3700);
+        assertThat(((Number) api.get(user, "/api/me/workouts/" + state.read("$.workoutId")).read("$.durationSeconds")).longValue()).isEqualTo(3700);
+    }
+
+    private Api.Response completeWithResult(AuthenticatedUser who, Api.Response state, String result) {
+        return api.post(who, "/api/me/workouts/" + state.read("$.workoutId") + "/sets/"
+                + state.read("$.currentSetId") + "/complete", result);
+    }
+
+    @Test
+    void plannedWeightsSurviveDuplicationAndLaterPlanChanges() {
+        String exerciseId = api.get(admin, "/api/admin/plans/" + plan.planId()).read("$.sessions[0].sections[0].exercises[0].exerciseId");
+        String config = """
+                {"exerciseId":"%s","setsCount":2,"reps":10,"toFailure":false,"restSeconds":60,
+                 "plannedWeightKg":20,"customSets":[
+                    {"setIndex":1,"reps":10,"toFailure":false,"restSeconds":60,"plannedWeightKg":25.50},
+                    {"setIndex":2,"reps":8,"toFailure":false,"restSeconds":60,"plannedWeightKg":17.25}]}
+                """.formatted(exerciseId);
+        api.put(admin, "/api/admin/plan-exercises/" + plan.planExerciseIds().getFirst(), config).expect(200);
+        Api.Response copy = api.post(admin, "/api/admin/plans/" + plan.planId() + "/duplicate", null).expect(201);
+        assertThat(((Number) copy.read("$.sessions[0].sections[0].exercises[0].sets[0].plannedWeightKg")).doubleValue()).isEqualTo(25.5);
+        Api.Response state = start(user, MONDAY).expect(201);
+        assertThat(((Number) state.read("$.exercises[0].sets[0].weightKgPlanned")).doubleValue()).isEqualTo(25.5);
+        assertThat(((Number) state.read("$.exercises[0].sets[1].weightKgPlanned")).doubleValue()).isEqualTo(17.25);
+        api.put(admin, "/api/admin/plan-exercises/" + plan.planExerciseIds().getFirst(), config.replace("25.50", "99")).expect(200);
+        Api.Response loaded = api.get(user, "/api/me/workouts/current").expect(200);
+        assertThat(((Number) loaded.read("$.exercises[0].sets[0].weightKgPlanned")).doubleValue()).isEqualTo(25.5);
+    }
+
+    @Test
+    void actualResultsArePersistedAndDuplicateCompletionDoesNotOverwriteThem() {
+        String exerciseId = api.get(admin, "/api/admin/plans/" + plan.planId())
+                .read("$.sessions[0].sections[0].exercises[0].exerciseId");
+        api.put(admin, "/api/admin/plan-exercises/" + plan.planExerciseIds().getFirst(),
+                PlanFactory.exerciseJson(UUID.fromString(exerciseId), 2, 0, true, 60)).expect(200);
+        Api.Response state = start(user, MONDAY).expect(201);
+        assertThat((Boolean) state.read("$.exercises[0].sets[0].toFailure")).isTrue();
+        Api.Response completed = completeWithResult(user, state, "{\"weightKgUsed\":22.75,\"repsActual\":9}").expect(200);
+        assertThat(((Number) completed.read("$.exercises[0].sets[0].weightKgUsed")).doubleValue()).isEqualTo(22.75);
+        assertThat(((Number) completed.read("$.exercises[0].sets[0].repsActual")).intValue()).isEqualTo(9);
+        // Repeating the same set cannot silently change its results, even with a different body.
+        completeWithResult(user, state, "{\"weightKgUsed\":99,\"repsActual\":1}").expect(200);
+        api.post(user, "/api/me/workouts/" + state.read("$.workoutId") + "/interrupt", null).expect(200);
+        Api.Response history = api.get(user, "/api/me/workouts/" + state.read("$.workoutId")).expect(200);
+        assertThat(((Number) history.read("$.exercises[0].sets[0].weightKgUsed")).doubleValue()).isEqualTo(22.75);
+        assertThat(((Number) history.read("$.exercises[0].sets[0].repsActual")).intValue()).isEqualTo(9);
+    }
+
+    @Test
+    void missingResultsStayNullAndExplicitZeroIsRecorded() {
+        Api.Response state = start(user, MONDAY).expect(201);
+        Api.Response completed = completeWithResult(user, state, "{\"weightKgUsed\":0,\"repsActual\":0}").expect(200);
+        assertThat(((Number) completed.read("$.exercises[0].sets[0].weightKgUsed")).doubleValue()).isZero();
+        assertThat(((Number) completed.read("$.exercises[0].sets[0].repsActual")).intValue()).isZero();
+        clock.advance(Duration.ofSeconds(60));
+        completed = complete(user, completed).expect(200);
+        assertThat((Object) completed.read("$.exercises[0].sets[1].weightKgUsed")).isNull();
+        assertThat((Object) completed.read("$.exercises[0].sets[1].repsActual")).isNull();
+    }
+
+    @Test
+    void invalidActualResultsCannotCompleteASet() {
+        Api.Response state = start(user, MONDAY).expect(201);
+        for (String body : List.of("{\"weightKgUsed\":-1}", "{\"weightKgUsed\":1001}",
+                "{\"weightKgUsed\":10.001}", "{\"repsActual\":-1}", "{\"repsActual\":1001}", "{\"repsActual\":8.5}")) {
+            completeWithResult(user, state, body).expect(400);
+        }
+        completeWithResult(fixtures.createUser(), state, "{\"weightKgUsed\":20,\"repsActual\":8}").expectCode(404, "NOT_FOUND");
+        Api.Response unchanged = api.get(user, "/api/me/workouts/current").expect(200);
+        assertThat(((Number) unchanged.read("$.exercises[0].setsCompleted")).intValue()).isZero();
+    }
+
+    @Test
+    void activeRestRejectsActualResultsWithoutPersistingThem() {
+        Api.Response state = complete(user, start(user, MONDAY).expect(201)).expect(200);
+        completeWithResult(user, state, "{\"weightKgUsed\":20,\"repsActual\":8}").expectCode(422, "REST_NOT_FINISHED");
+        Api.Response loaded = api.get(user, "/api/me/workouts/current").expect(200);
+        assertThat((Object) loaded.read("$.exercises[0].sets[1].weightKgUsed")).isNull();
+        assertThat((Object) loaded.read("$.exercises[0].sets[1].repsActual")).isNull();
+    }
+
+    @Test
+    void concurrentResultsAreAtomicAndFirstCompletionWins() throws Exception {
+        Api.Response state = start(user, MONDAY).expect(201);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            CountDownLatch go = new CountDownLatch(1);
+            Future<Integer> first = pool.submit(() -> { go.await(); return completeWithResult(user, state,
+                    "{\"weightKgUsed\":11,\"repsActual\":3}").status(); });
+            Future<Integer> second = pool.submit(() -> { go.await(); return completeWithResult(user, state,
+                    "{\"weightKgUsed\":22,\"repsActual\":4}").status(); });
+            go.countDown();
+            assertThat(first.get()).isEqualTo(200);
+            assertThat(second.get()).isEqualTo(200);
+            Api.Response loaded = api.get(user, "/api/me/workouts/current").expect(200);
+            int weight = ((Number) loaded.read("$.exercises[0].sets[0].weightKgUsed")).intValue();
+            int reps = ((Number) loaded.read("$.exercises[0].sets[0].repsActual")).intValue();
+            assertThat(List.of(weight, reps)).isIn(List.of(11, 3), List.of(22, 4));
+            assertThat(((Number) loaded.read("$.exercises[0].setsCompleted")).intValue()).isEqualTo(1);
+        } finally { pool.shutdownNow(); }
+    }
+
+    @Test
+    void invalidPlannedLoadsAreRejectedForGeneralAndCustomSets() {
+        String exerciseId = api.get(admin, "/api/admin/plans/" + plan.planId())
+                .read("$.sessions[0].sections[0].exercises[0].exerciseId");
+        for (String weight : List.of("-1", "1001", "20.001")) {
+            String body = """
+                    {"exerciseId":"%s","setsCount":1,"reps":10,"toFailure":false,"restSeconds":60,
+                    "plannedWeightKg":%s,"customSets":[]}
+                    """.formatted(exerciseId, weight);
+            api.put(admin, "/api/admin/plan-exercises/" + plan.planExerciseIds().getFirst(), body).expect(400);
+            body = """
+                    {"exerciseId":"%s","setsCount":1,"reps":10,"toFailure":false,"restSeconds":60,
+                    "customSets":[{"setIndex":1,"reps":10,"toFailure":false,"restSeconds":60,"plannedWeightKg":%s}]}
+                    """.formatted(exerciseId, weight);
+            api.put(admin, "/api/admin/plan-exercises/" + plan.planExerciseIds().getFirst(), body).expect(400);
+        }
+    }
+
 }

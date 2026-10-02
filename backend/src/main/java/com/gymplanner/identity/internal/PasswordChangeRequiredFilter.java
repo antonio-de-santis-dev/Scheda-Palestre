@@ -20,7 +20,7 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 class PasswordChangeRequiredFilter extends OncePerRequestFilter {
 
     private static final Set<String> ALLOWED = Set.of(
-            "/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/auth/change-password", "/api/auth/csrf");
+            "/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/auth/change-password", "/api/auth/csrf", "/api/auth/forgot-password", "/api/auth/reset-password");
 
     private final HandlerExceptionResolver resolver;
 

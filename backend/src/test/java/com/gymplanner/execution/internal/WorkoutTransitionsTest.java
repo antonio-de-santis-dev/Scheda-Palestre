@@ -60,6 +60,7 @@ class WorkoutTransitionsTest {
         w.begin();
         WorkoutSet set = w.getExercises().getFirst().getSets().getFirst();
         set.complete(T0);
+        w.startRest(T0, set.getRestSeconds());
         var state = WorkoutStateMapper.toState(w, T0.plusSeconds(15));
         assertThat(state.restEndsAt()).isEqualTo(T0.plusSeconds(60));
         assertThat(state.nextAction()).isEqualTo(WorkoutDtos.NextAction.WAIT_FOR_REST);

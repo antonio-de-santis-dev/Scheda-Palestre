@@ -10,13 +10,16 @@ describe('history', () => {
   it('lists workouts and shows skipped exercises in the detail', async () => {
     const done = workoutState({ status: 'COMPLETED', currentExerciseId: null, currentSetId: null, nextAction: 'FINISHED', finishedAt: '2026-10-05T09:00:00Z' });
     done.exercises[0]!.status = 'COMPLETED';
+    done.exercises[0]!.sets[0]!.weightKgPlanned = 20;
+    done.exercises[0]!.sets[0]!.weightKgUsed = 22.75;
+    done.exercises[0]!.sets[0]!.repsActual = 9;
     done.exercises[0]!.sets.forEach((s) => (s.completedAt = '2026-10-05T08:10:00Z'));
     done.exercises[1]!.status = 'SKIPPED';
     server.use(
       http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
       http.get('*/api/me/workouts', () =>
         HttpResponse.json({
-          content: [{ id: 'w-1', scheduledDate: '2026-10-05', status: 'COMPLETED', planName: 'Scheda principianti', sessionTitle: 'Giorno 1', startedAt: '2026-10-05T08:00:00Z', finishedAt: '2026-10-05T09:00:00Z', totalExercises: 2, completedExercises: 1, skippedExercises: 1 }],
+          content: [{ id: 'w-1', scheduledDate: '2026-10-05', status: 'COMPLETED', planName: 'Scheda principianti', sessionTitle: 'Giorno 1', startedAt: '2026-10-05T08:00:00Z', finishedAt: '2026-10-05T09:00:00Z', durationSeconds: 3600, totalExercises: 2, completedExercises: 1, skippedExercises: 1 }],
           page: 0, size: 20, totalElements: 1, totalPages: 1,
         }),
       ),
@@ -24,13 +27,21 @@ describe('history', () => {
     );
     renderApp('/app/history');
     const list = await screen.findByRole('list', { name: 'Allenamenti' });
+    expect(within(list).getByText(/Tempo impiegato: 1:00:00/)).toBeInTheDocument();
     expect(within(list).getByText(/1 completati, 1 saltati su 2/)).toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(within(list).getByRole('link'));
+    expect(await screen.findByText('Tempo impiegato:')).toBeInTheDocument();
+    expect(screen.getByText('1:00:00')).toBeInTheDocument();
     const trazioni = await screen.findByRole('region', { name: 'Trazioni' });
     expect(within(trazioni).getByText('Saltato')).toBeInTheDocument();
     expect(within(trazioni).getByText('MAX')).toBeInTheDocument();
-    expect(within(screen.getByRole('region', { name: 'Panca' })).getAllByText('✓ Completata')).toHaveLength(2);
+    const panca = screen.getByRole('region', { name: 'Panca' });
+    expect(within(panca).getAllByText('✓ Completata')).toHaveLength(2);
+    expect(within(panca).getByText('20 kg')).toBeInTheDocument();
+    expect(within(panca).getByText('22,75 kg')).toBeInTheDocument();
+    expect(within(panca).getByText('9')).toBeInTheDocument();
+    expect(within(panca).getByText('Non registrato')).toBeInTheDocument();
   });
 });
 

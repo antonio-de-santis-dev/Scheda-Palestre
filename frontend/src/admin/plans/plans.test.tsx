@@ -135,7 +135,7 @@ describe('plan editor', () => {
       expect(calls).toContainEqual({
         method: 'POST',
         url: '/api/admin/sections/sec-1/exercises',
-        body: { exerciseId: 'ex-3', setsCount: 3, reps: 0, toFailure: true, restSeconds: 60, customSets: [] },      }),
+        body: { exerciseId: 'ex-3', setsCount: 3, reps: 0, toFailure: true, restSeconds: 60, customSets: [], plannedWeightKg: null },      }),
     );
     // Only the active exercises of the section's group are offered.
     expect(exerciseQueries.some((q) => q.includes('muscleGroupId=mg-1') && q.includes('active=true'))).toBe(true);
@@ -173,9 +173,9 @@ describe('plan editor', () => {
     const custom = exercise({
       customized: true,
       sets: [
-        { setIndex: 1, reps: 12, toFailure: false, restSeconds: 60 },
-        { setIndex: 2, reps: 10, toFailure: false, restSeconds: 90 },
-        { setIndex: 3, reps: 0, toFailure: true, restSeconds: 0 },
+        { setIndex: 1, reps: 12, toFailure: false, restSeconds: 60, plannedWeightKg: null },
+        { setIndex: 2, reps: 10, toFailure: false, restSeconds: 90, plannedWeightKg: null },
+        { setIndex: 3, reps: 0, toFailure: true, restSeconds: 0, plannedWeightKg: null },
       ],
     });
     plan.sessions[0]!.sections[0]!.exercises = [custom];
@@ -206,9 +206,10 @@ describe('plan editor', () => {
           reps: 10,
           toFailure: false,
           restSeconds: 90,
+          plannedWeightKg: null,
           customSets: [
-            { setIndex: 1, reps: 12, toFailure: false, restSeconds: 60 },
-            { setIndex: 2, reps: 10, toFailure: false, restSeconds: 90 },
+            { setIndex: 1, reps: 12, toFailure: false, restSeconds: 60, plannedWeightKg: null },
+            { setIndex: 2, reps: 10, toFailure: false, restSeconds: 90, plannedWeightKg: null },
           ],
         },
       }),
@@ -248,5 +249,31 @@ describe('plans page', () => {
     await user.click(await screen.findByRole('button', { name: 'Elimina Forza' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(/assegnazioni attive verranno chiuse/)).toBeInTheDocument();
+  });
+});
+
+
+describe('V2 planned loads', () => {
+  it('copies the general load to custom rows and saves distinct per-set values with Italian decimals', async () => {
+    const plan = planStructure();
+    plan.sessions[0]!.sections[0]!.exercises = [exercise({ plannedWeightKg: 20 })];
+    const { calls } = setup(plan);
+    renderApp('/admin/plans/plan-1/edit');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Modifica Panca piana' }));
+    const form = screen.getByRole('form', { name: 'Modifica esercizio' });
+    expect(within(form).getByLabelText('Peso previsto (kg)')).toHaveValue('20');
+    await user.click(within(form).getByLabelText('Personalizza ogni serie'));
+    const first = await within(form).findByLabelText('Peso previsto serie 1 in kg');
+    const second = within(form).getByLabelText('Peso previsto serie 2 in kg');
+    expect(first).toHaveValue('20');
+    await user.clear(first);
+    await user.clear(second);
+    await user.type(second, '25,50');
+    await user.click(within(form).getByRole('button', { name: 'Salva esercizio' }));
+    await waitFor(() => expect(calls.find((c) => c.method === 'PUT')?.body).toMatchObject({
+      plannedWeightKg: 20,
+      customSets: [{ setIndex: 1, plannedWeightKg: null }, { setIndex: 2, plannedWeightKg: 25.5 }, { setIndex: 3, plannedWeightKg: 20 }],
+    }));
   });
 });

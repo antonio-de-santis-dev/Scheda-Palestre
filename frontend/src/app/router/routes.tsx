@@ -23,6 +23,8 @@ const fallback = <LoadingState />;
 export const routes: RouteObject[] = [
   { path: '/', element: <HomeRedirect /> },
   { path: '/login', element: <LoginPage /> },
+  { path: '/forgot-password', ...page(() => import('../../auth/RecoveryPages'), (m) => m.ForgotPasswordPage) },
+  { path: '/reset-password', ...page(() => import('../../auth/RecoveryPages'), (m) => m.ResetPasswordPage) },
   {
     path: '/change-password',
     element: (
@@ -75,6 +77,7 @@ export const routes: RouteObject[] = [
         ...page(() => import('../../user/plans/MyPlanDetailPage'), (m) => m.MyPlanDetailPage),
       },
       { path: 'schedule', ...page(() => import('../../user/schedule/SchedulePage'), (m) => m.SchedulePage) },
+      { path: 'progress', ...page(() => import('../../user/history/ProgressPage'), (m) => m.ProgressPage) },
       { path: 'history', ...page(() => import('../../user/history/HistoryPages'), (m) => m.HistoryPage) },
       {
         path: 'history/:workoutId',

@@ -4,6 +4,7 @@ export interface PlanSet {
   reps: number;
   toFailure: boolean;
   restSeconds: number;
+  plannedWeightKg: number | null;
 }
 
 export interface PlanExercise {
@@ -18,6 +19,7 @@ export interface PlanExercise {
   reps: number;
   toFailure: boolean;
   restSeconds: number;
+  plannedWeightKg: number | null;
   customized: boolean;
   sets: PlanSet[];
 }
