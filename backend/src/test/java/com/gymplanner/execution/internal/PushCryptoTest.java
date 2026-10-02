@@ -7,7 +7,6 @@ import java.security.spec.ECGenParameterSpec;
 import java.util.Base64;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
-import org.apache.http.util.EntityUtils;
 
 class PushCryptoTest {
     static byte[] fixed(java.math.BigInteger n) {
@@ -26,8 +25,8 @@ class PushCryptoTest {
         byte[] scalar=fixed(((ECPrivateKey)sender.getPrivate()).getS());byte[] padded=new byte[32];System.arraycopy(scalar,0,padded,32-scalar.length,scalar.length);
         properties.setPrivateKey(Base64.getUrlEncoder().withoutPadding().encodeToString(padded));
         var post=new PushTransport(properties).prepare("https://fcm.googleapis.com/fcm/send/test",publicKey((ECPublicKey)receiver.getPublic()),Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[16]));
-        assertThat(post.getFirstHeader("Content-Encoding").getValue()).isEqualTo("aes128gcm");
-        assertThat(post.getFirstHeader("Authorization").getValue()).startsWith("vapid");
-        assertThat(new String(EntityUtils.toByteArray(post.getEntity()),java.nio.charset.StandardCharsets.UTF_8)).doesNotContain("GymPlanner");
+        assertThat(post.getHeaders().get("Content-Encoding")).isEqualTo("aes128gcm");
+        assertThat(post.getHeaders().get("Authorization")).startsWith("vapid");
+        assertThat(new String(post.getBody(),java.nio.charset.StandardCharsets.UTF_8)).doesNotContain("GymPlanner");
     }
 }
