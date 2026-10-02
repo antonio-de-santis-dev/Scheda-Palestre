@@ -11,6 +11,8 @@ export function remainingRestMs(restEndsAt: string, serverTime: string, received
 
 interface TimerInput {
   restEndsAt: string | null;
+  restPaused?: boolean;
+  restRemainingSeconds?: number;
   serverTime: string;
   receivedAt: number;
 }
@@ -78,5 +80,5 @@ export function useRestTimer(input: TimerInput | undefined, onVisible: () => voi
   // A new response can arrive after the last tick: never use an older clock sample
   // to display a rest longer than the duration returned by the server.
   const remainingMs = restEndsAt && serverTime ? remainingRestMs(restEndsAt, serverTime, receivedAt, Math.max(now, receivedAt)) : 0;
-  return Math.ceil(remainingMs / 1000);
+  return input?.restPaused ? input.restRemainingSeconds ?? 0 : Math.ceil(remainingMs / 1000);
 }

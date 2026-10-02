@@ -115,3 +115,7 @@ revisione.
 | F | "Fine serie" bloccato durante il recupero (`REST_NOT_FINISHED`), celebrazioni una volta per transizione, guida vocale opzionale | ADR 0004 (O-06 superata) |
 
 **Prova manuale.** Vedi `GUIDA_TEST_MANUALE.md`, sezione "Nuove funzionalità (branch modifiche)".
+
+## SviluppoV2 — Fase 1
+
+Durata per allenamento e recupero avanzato. Roadmap e stato: [sviluppo-v2.md](sviluppo-v2.md).

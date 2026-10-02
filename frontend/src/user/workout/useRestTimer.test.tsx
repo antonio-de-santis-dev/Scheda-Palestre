@@ -69,3 +69,17 @@ describe('rest timer lifecycle', () => {
     expect(finished).not.toHaveBeenCalled();
   });
 });
+
+
+describe('paused recovery', () => {
+  it('holds the remaining time without ticking or firing the completion sound', () => {
+    vi.useFakeTimers();
+    const onFinished = vi.fn();
+    const { result } = renderHook(() => useRestTimer({ restEndsAt: null, restPaused: true, restRemainingSeconds: 45,
+      serverTime: new Date().toISOString(), receivedAt: Date.now() }, vi.fn(), onFinished));
+    act(() => vi.advanceTimersByTime(120_000));
+    expect(result.current).toBe(45);
+    expect(onFinished).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});

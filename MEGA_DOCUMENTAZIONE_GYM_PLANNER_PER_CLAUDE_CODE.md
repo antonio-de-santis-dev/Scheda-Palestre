@@ -1267,9 +1267,12 @@ Come USER, voglio avviare un allenamento persistente e riprenderlo dopo un ricar
 
 Come USER, voglio completare una serie con un tocco e avviare il timer.
 
-#### US-19 - Controlli avanzati timer - FUTURO
+#### US-19 - Controlli avanzati timer - V2
 
-Pausa, aggiunta tempo e salto del recupero non vanno implementati.
+Autorizzata dal proprietario il 2 ottobre 2026 sul branch `SviluppoV2`.
+Pausa, ripresa, aggiunta tempo e salto esplicito del recupero sono implementati nella Fase 1 V2.
+Il recupero rimane bloccante finché attivo o in pausa; il salto richiede conferma.
+Vedere ADR 0012 e `docs/sviluppo-v2.md`. La precedente esclusione resta riferita alla V1.
 
 #### US-20 - Saltare e concludere - Must
 

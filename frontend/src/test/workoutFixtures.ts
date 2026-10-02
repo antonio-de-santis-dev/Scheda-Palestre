@@ -12,6 +12,10 @@ export function workoutState(overrides: Partial<Raw> = {}): Raw {
     sessionTitle: 'Giorno 1',
     startedAt: '2026-10-05T08:00:00Z',
     finishedAt: null,
+    durationSeconds: 0,
+    restPaused: false,
+    restRemainingSeconds: 0,
+    restVersion: 0,
     exercises: [
       {
         id: 'e-1',

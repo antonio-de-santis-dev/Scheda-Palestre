@@ -127,7 +127,7 @@ describe('today page', () => {
                   planName: 'Scheda principianti',
                   sessionTitle: 'Giorno 2',
                   startedAt: '2026-10-04T18:00:00Z',
-                  finishedAt: null,
+                  finishedAt: null, durationSeconds: null,
                   totalExercises: 3,
                   completedExercises: 1,
                   skippedExercises: 0,

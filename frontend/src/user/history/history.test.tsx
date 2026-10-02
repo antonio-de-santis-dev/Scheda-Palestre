@@ -16,7 +16,7 @@ describe('history', () => {
       http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
       http.get('*/api/me/workouts', () =>
         HttpResponse.json({
-          content: [{ id: 'w-1', scheduledDate: '2026-10-05', status: 'COMPLETED', planName: 'Scheda principianti', sessionTitle: 'Giorno 1', startedAt: '2026-10-05T08:00:00Z', finishedAt: '2026-10-05T09:00:00Z', totalExercises: 2, completedExercises: 1, skippedExercises: 1 }],
+          content: [{ id: 'w-1', scheduledDate: '2026-10-05', status: 'COMPLETED', planName: 'Scheda principianti', sessionTitle: 'Giorno 1', startedAt: '2026-10-05T08:00:00Z', finishedAt: '2026-10-05T09:00:00Z', durationSeconds: 3600, totalExercises: 2, completedExercises: 1, skippedExercises: 1 }],
           page: 0, size: 20, totalElements: 1, totalPages: 1,
         }),
       ),
@@ -24,9 +24,12 @@ describe('history', () => {
     );
     renderApp('/app/history');
     const list = await screen.findByRole('list', { name: 'Allenamenti' });
+    expect(within(list).getByText(/Tempo impiegato: 1:00:00/)).toBeInTheDocument();
     expect(within(list).getByText(/1 completati, 1 saltati su 2/)).toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(within(list).getByRole('link'));
+    expect(await screen.findByText('Tempo impiegato:')).toBeInTheDocument();
+    expect(screen.getByText('1:00:00')).toBeInTheDocument();
     const trazioni = await screen.findByRole('region', { name: 'Trazioni' });
     expect(within(trazioni).getByText('Saltato')).toBeInTheDocument();
     expect(within(trazioni).getByText('MAX')).toBeInTheDocument();

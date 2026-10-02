@@ -434,4 +434,65 @@ class ExecutionIntegrationTest {
         api.get(user, "/api/me/calendar?from=" + MONDAY + "&to=" + MONDAY.minusDays(1)).expectCode(400, "VALIDATION_ERROR");
         api.get(user, "/api/me/calendar?from=nope&to=" + MONDAY).expect(400);
     }
+    private Api.Response rest(AuthenticatedUser who, Api.Response state, String action, Integer seconds) {
+        Number version = state.read("$.restVersion");
+        return api.post(who, "/api/me/workouts/" + state.read("$.workoutId") + "/rest",
+                "{\"action\":\"" + action + "\",\"expectedVersion\":" + version
+                        + (seconds == null ? "" : ",\"seconds\":" + seconds) + "}");
+    }
+
+    @Test
+    void recoveryControlsPersistAndRejectStaleAndForeignRequests() {
+        Api.Response state = complete(user, start(user, MONDAY).expect(201)).expect(200);
+        clock.advance(Duration.ofSeconds(15));
+        Api.Response paused = rest(user, state, "PAUSE", null).expect(200);
+        assertThat((Boolean) paused.read("$.restPaused")).isTrue();
+        clock.advance(Duration.ofMinutes(5));
+        Api.Response loaded = api.get(user, "/api/me/workouts/" + state.read("$.workoutId")).expect(200);
+        assertThat(((Number) loaded.read("$.restRemainingSeconds")).longValue()).isEqualTo(45);
+        complete(user, loaded).expectCode(422, "REST_NOT_FINISHED");
+        rest(user, state, "EXTEND", 30).expectCode(409, "REST_STATE_CHANGED");
+        rest(fixtures.createUser(), loaded, "SKIP", null).expectCode(404, "NOT_FOUND");
+        rest(user, loaded, "EXTEND", 0).expectCode(400, "VALIDATION_ERROR");
+        rest(user, loaded, "EXTEND", 301).expectCode(400, "VALIDATION_ERROR");
+        rest(user, loaded, "EXTEND", null).expectCode(400, "VALIDATION_ERROR");
+        loaded = rest(user, loaded, "EXTEND", 30).expect(200);
+        assertThat(((Number) loaded.read("$.restRemainingSeconds")).longValue()).isEqualTo(75);
+        loaded = rest(user, loaded, "RESUME", null).expect(200);
+        assertThat((Boolean) loaded.read("$.restPaused")).isFalse();
+        loaded = rest(user, loaded, "SKIP", null).expect(200);
+        complete(user, loaded).expect(200);
+    }
+
+    @Test
+    void simultaneousExtensionsApplyOnlyOnceForTheSameRevision() throws Exception {
+        Api.Response state = complete(user, start(user, MONDAY).expect(201)).expect(200);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            CountDownLatch go = new CountDownLatch(1);
+            Callable<Integer> call = () -> { go.await(); return rest(user, state, "EXTEND", 30).status(); };
+            Future<Integer> first = pool.submit(call);
+            Future<Integer> second = pool.submit(call);
+            go.countDown();
+            assertThat(List.of(first.get(), second.get())).containsExactlyInAnyOrder(200, 409);
+            Api.Response loaded = api.get(user, "/api/me/workouts/current").expect(200);
+            assertThat(((Number) loaded.read("$.restRemainingSeconds")).longValue()).isEqualTo(90);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void durationIsStableInHistoryAfterInterruptIncludingPausedRecovery() {
+        Api.Response state = complete(user, start(user, MONDAY).expect(201)).expect(200);
+        rest(user, state, "PAUSE", null).expect(200);
+        clock.advance(Duration.ofSeconds(3700));
+        Api.Response ended = api.post(user, "/api/me/workouts/" + state.read("$.workoutId") + "/interrupt", null).expect(200);
+        assertThat(((Number) ended.read("$.durationSeconds")).longValue()).isEqualTo(3700);
+        clock.advance(Duration.ofDays(2));
+        Api.Response history = api.get(user, "/api/me/workouts").expect(200);
+        assertThat(((Number) history.read("$.content[0].durationSeconds")).longValue()).isEqualTo(3700);
+        assertThat(((Number) api.get(user, "/api/me/workouts/" + state.read("$.workoutId")).read("$.durationSeconds")).longValue()).isEqualTo(3700);
+    }
+
 }

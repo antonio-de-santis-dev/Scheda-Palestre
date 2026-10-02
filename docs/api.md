@@ -249,3 +249,7 @@ rifiutata con `422 REST_NOT_FINISHED` (O-06 superata); "Salta" e "Interrompi" re
 
 Il cambio password usa `POST /api/auth/change-password` (password attuale obbligatoria) e chiude
 le altre sessioni aperte dell'utente.
+
+## Estensioni V2
+
+Durata e controlli recupero: [sviluppo-v2.md](sviluppo-v2.md#api), ADR 0012.

@@ -1,6 +1,9 @@
 package com.gymplanner.execution.internal;
 
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -14,10 +17,15 @@ final class WorkoutDtos {
     record StartWorkoutRequest(@NotNull LocalDate date) {
     }
 
+    enum RestAction { PAUSE, RESUME, EXTEND, SKIP }
+
+    record RestRequest(@NotNull RestAction action, @NotNull @PositiveOrZero Long expectedVersion,
+            @Min(1) @Max(300) Integer seconds) { }
+
     enum NextAction {
         /** The current set can be completed. */
         COMPLETE_SET,
-        /** Rest is running; completing the next set is still allowed (O-06: informative timer). */
+        /** Running or paused recovery blocks the next set, unless explicitly skipped. */
         WAIT_FOR_REST,
         /** The workout is completed or interrupted. */
         FINISHED
@@ -38,12 +46,13 @@ final class WorkoutDtos {
     record WorkoutState(UUID workoutId, WorkoutStatus status, LocalDate scheduledDate, String planName,
             String sessionTitle, Instant startedAt, Instant finishedAt, List<ExerciseState> exercises,
             UUID currentExerciseId, UUID currentSetId, Instant restEndsAt, Integer restSeconds, Instant serverTime,
-            NextAction nextAction) {
+            NextAction nextAction, long durationSeconds, boolean restPaused, long restRemainingSeconds,
+            long restVersion) {
     }
 
     record WorkoutSummary(UUID id, LocalDate scheduledDate, WorkoutStatus status, String planName,
             String sessionTitle, Instant startedAt, Instant finishedAt, int totalExercises, int completedExercises,
-            int skippedExercises) {
+            int skippedExercises, Long durationSeconds) {
 
         static WorkoutSummary of(Workout w) {
             int completed = 0;
@@ -57,7 +66,7 @@ final class WorkoutDtos {
             }
             return new WorkoutSummary(w.getId(), w.getScheduledDate(), w.getStatus(), w.getPlanNameSnapshot(),
                     w.getSessionTitleSnapshot(), w.getStartedAt(), w.getFinishedAt(), w.getExercises().size(),
-                    completed, skipped);
+                    completed, skipped, w.getFinishedAt() == null ? null : w.durationSeconds(w.getFinishedAt()));
         }
     }
 }

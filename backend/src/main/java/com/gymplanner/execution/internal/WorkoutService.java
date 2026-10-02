@@ -141,13 +141,10 @@ class WorkoutService {
         }
         // Fase F (supersedes O-06): the next set cannot start while the rest is running. A repeated
         // request for an already completed set was answered above (idempotency is preserved).
-        Optional<Instant> restEndsAt = workout.lastCompletedSet()
-                .filter(last -> last.getRestSeconds() > 0)
-                .map(last -> last.getCompletedAt().plusSeconds(last.getRestSeconds()))
-                .filter(now::isBefore);
-        if (restEndsAt.isPresent()) {
+        if (workout.remainingRestMillis(now) > 0) {
             throw new BusinessRuleException("REST_NOT_FINISHED", "The rest period is not over yet")
-                    .with("restEndsAt", restEndsAt.get())
+                    .with("restEndsAt", workout.getRestEndsAt())
+                    .with("restPaused", workout.isRestPaused())
                     .with("serverTime", now);
         }
         set.complete(now);
@@ -155,6 +152,25 @@ class WorkoutService {
             exercise.markCompleted();
             advance(workout, now);
         }
+        workout.startRest(now, set.getRestSeconds());
+        workouts.flush();
+        return WorkoutStateMapper.toState(workout, now);
+    }
+
+    /** The same workout row lock serializes recovery controls and set completion. */
+    @Transactional
+    public WorkoutState changeRest(UUID userId, UUID workoutId, WorkoutDtos.RestRequest request) {
+        Workout workout = lockOwned(userId, workoutId);
+        requireInProgress(workout);
+        if (request.expectedVersion() != workout.getRestVersion()) {
+            throw new ConflictException("REST_STATE_CHANGED", "Rest was changed by another request");
+        }
+        if ((request.action() == WorkoutDtos.RestAction.EXTEND) != (request.seconds() != null)) {
+            throw com.gymplanner.shared.error.BadRequestException.field("seconds",
+                    "Seconds are required only for EXTEND");
+        }
+        Instant now = calendar.now();
+        workout.changeRest(request.action(), request.seconds(), now);
         workouts.flush();
         return WorkoutStateMapper.toState(workout, now);
     }

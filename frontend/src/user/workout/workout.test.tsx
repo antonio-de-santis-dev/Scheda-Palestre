@@ -318,3 +318,47 @@ describe('workout screen', () => {
     expect(screen.queryByRole('button', { name: 'Fine serie' })).not.toBeInTheDocument();
   });
 });
+
+
+describe('V2 recovery controls', () => {
+  it('persists pause, extends while paused, resumes and confirms skipping recovery', async () => {
+    const now = new Date();
+    let state = workoutState({ restEndsAt: new Date(now.getTime() + 60_000).toISOString(), restSeconds: 60,
+      restRemainingSeconds: 60, restVersion: 1, serverTime: now.toISOString(), nextAction: 'WAIT_FOR_REST' });
+    const actions: string[] = [];
+    server.use(
+      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
+      http.get('*/api/me/workouts/:id', () => HttpResponse.json(state)),
+      http.post('*/api/me/workouts/:id/rest', async ({ request }) => {
+        const body = await request.json() as { action: string; expectedVersion: number; seconds?: number };
+        expect(body.expectedVersion).toBe(state.restVersion);
+        actions.push(body.action);
+        state = { ...state, restVersion: state.restVersion + 1, serverTime: new Date().toISOString() };
+        if (body.action === 'PAUSE') state = { ...state, restPaused: true, restEndsAt: null, restRemainingSeconds: 45 };
+        if (body.action === 'EXTEND') {
+          expect(body.seconds).toBe(30);
+          state = { ...state, restRemainingSeconds: 75, restSeconds: 75 };
+        }
+        if (body.action === 'RESUME') state = { ...state, restPaused: false, restEndsAt: new Date(Date.now() + 75_000).toISOString() };
+        if (body.action === 'SKIP') state = { ...state, restPaused: false, restEndsAt: null, restRemainingSeconds: 0, nextAction: 'COMPLETE_SET' };
+        return HttpResponse.json(state);
+      }),
+    );
+    renderApp('/app/workout/w-1');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Pausa recupero' }));
+    expect(await screen.findByText('Recupero in pausa')).toBeInTheDocument();
+    expect(screen.getByRole('timer')).toHaveTextContent('0:45');
+    expect(screen.getByRole('button', { name: 'Fine serie' })).toHaveAttribute('aria-disabled', 'true');
+    await user.click(screen.getByRole('button', { name: '+30 secondi' }));
+    await waitFor(() => expect(screen.getByRole('timer')).toHaveTextContent('1:15'));
+    await user.click(screen.getByRole('button', { name: 'Riprendi recupero' }));
+    expect(await screen.findByRole('button', { name: 'Pausa recupero' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Salta recupero' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Saltare il recupero?' });
+    expect(actions).toEqual(['PAUSE', 'EXTEND', 'RESUME']);
+    await user.click(within(dialog).getByRole('button', { name: 'Salta recupero' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Fine serie' })).not.toHaveAttribute('aria-disabled'));
+    expect(actions).toEqual(['PAUSE', 'EXTEND', 'RESUME', 'SKIP']);
+  });
+});
