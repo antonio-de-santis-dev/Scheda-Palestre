@@ -55,6 +55,7 @@ export function AppLayout({ home, areaLabel, items }: AppLayoutProps) {
         <div className="topbar__account">
           <ThemeToggle />
           {user ? <Link to={profile} className="avatar" aria-label={`Profilo di ${user.firstName} ${user.lastName}`}>{initials}</Link> : null}
+          <button type="button" className="topbar__logout" onClick={signOut} disabled={logout.isPending}>Esci</button>
         </div>
       </header>
       <dialog ref={drawer} id="app-navigation" className="navigation-drawer" aria-label={`Menu ${areaLabel}`}
