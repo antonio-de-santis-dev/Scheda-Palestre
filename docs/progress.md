@@ -119,3 +119,8 @@ revisione.
 ## SviluppoV2 — Fase 1
 
 Durata per allenamento e recupero avanzato. Roadmap e stato: [sviluppo-v2.md](sviluppo-v2.md).
+
+## SviluppoV2 — Fase 2
+
+Carichi generali/personalizzati, snapshot dei pesi, registrazione facoltativa dei risultati e storico dettagliato.
+Migrazione V13. Contratto e regole: ADR 0013; esiti delle verifiche nella PR.

@@ -1,6 +1,10 @@
 package com.gymplanner.execution.internal;
 
+import java.math.BigDecimal;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Max;
@@ -17,6 +21,10 @@ final class WorkoutDtos {
     record StartWorkoutRequest(@NotNull LocalDate date) {
     }
 
+    record CompleteSetRequest(
+            @DecimalMin("0") @DecimalMax("1000") @Digits(integer = 4, fraction = 2) BigDecimal weightKgUsed,
+            @DecimalMin("0") @DecimalMax("1000") @Digits(integer = 4, fraction = 0) BigDecimal repsActual) { }
+
     enum RestAction { PAUSE, RESUME, EXTEND, SKIP }
 
     record RestRequest(@NotNull RestAction action, @NotNull @PositiveOrZero Long expectedVersion,
@@ -31,7 +39,7 @@ final class WorkoutDtos {
         FINISHED
     }
 
-    record SetState(UUID id, int setIndex, int repsPlanned, boolean toFailure, int restSeconds, Instant completedAt) {
+    record SetState(UUID id, int setIndex, int repsPlanned, boolean toFailure, int restSeconds, Instant completedAt, BigDecimal weightKgPlanned, BigDecimal weightKgUsed, Integer repsActual) {
     }
 
     record ExerciseState(UUID id, int position, WorkoutExerciseStatus status, String exerciseName,

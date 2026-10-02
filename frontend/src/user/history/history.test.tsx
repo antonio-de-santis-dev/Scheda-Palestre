@@ -10,6 +10,9 @@ describe('history', () => {
   it('lists workouts and shows skipped exercises in the detail', async () => {
     const done = workoutState({ status: 'COMPLETED', currentExerciseId: null, currentSetId: null, nextAction: 'FINISHED', finishedAt: '2026-10-05T09:00:00Z' });
     done.exercises[0]!.status = 'COMPLETED';
+    done.exercises[0]!.sets[0]!.weightKgPlanned = 20;
+    done.exercises[0]!.sets[0]!.weightKgUsed = 22.75;
+    done.exercises[0]!.sets[0]!.repsActual = 9;
     done.exercises[0]!.sets.forEach((s) => (s.completedAt = '2026-10-05T08:10:00Z'));
     done.exercises[1]!.status = 'SKIPPED';
     server.use(
@@ -33,7 +36,12 @@ describe('history', () => {
     const trazioni = await screen.findByRole('region', { name: 'Trazioni' });
     expect(within(trazioni).getByText('Saltato')).toBeInTheDocument();
     expect(within(trazioni).getByText('MAX')).toBeInTheDocument();
-    expect(within(screen.getByRole('region', { name: 'Panca' })).getAllByText('✓ Completata')).toHaveLength(2);
+    const panca = screen.getByRole('region', { name: 'Panca' });
+    expect(within(panca).getAllByText('✓ Completata')).toHaveLength(2);
+    expect(within(panca).getByText('20 kg')).toBeInTheDocument();
+    expect(within(panca).getByText('22,75 kg')).toBeInTheDocument();
+    expect(within(panca).getByText('9')).toBeInTheDocument();
+    expect(within(panca).getByText('Non registrato')).toBeInTheDocument();
   });
 });
 

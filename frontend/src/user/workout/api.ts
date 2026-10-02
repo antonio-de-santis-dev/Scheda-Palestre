@@ -14,6 +14,9 @@ export interface WorkoutSetState {
   toFailure: boolean;
   restSeconds: number;
   completedAt: string | null;
+  weightKgPlanned: number | null;
+  weightKgUsed: number | null;
+  repsActual: number | null;
 }
 
 export interface WorkoutExerciseState {
@@ -110,6 +113,8 @@ export const workoutKeys = {
   workout: (id: string) => ['me', 'workout', id] as const,
 };
 
+export interface SetResultInput { weightKgUsed: number | null; repsActual: number | null; }
+
 export type RestAction = 'PAUSE' | 'RESUME' | 'EXTEND' | 'SKIP';
 
 export const workoutApi = {
@@ -117,8 +122,8 @@ export const workoutApi = {
   calendar: (from: string, to: string) => http.get<CalendarDay[]>('/api/me/calendar', { from, to }),
   start: async (date: string) => stamp(await http.post<RawState>('/api/me/workouts', { date })),
   get: async (id: string) => stamp(await http.get<RawState>(`/api/me/workouts/${id}`)),
-  completeSet: async (workoutId: string, setId: string) =>
-    stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/sets/${setId}/complete`)),
+  completeSet: async (workoutId: string, setId: string, result?: SetResultInput) =>
+    stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/sets/${setId}/complete`, result)),
   skip: async (workoutId: string, exerciseId: string) =>
     stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/exercises/${exerciseId}/skip`)),
   changeRest: async (workoutId: string, action: RestAction, expectedVersion: number, seconds?: number) =>

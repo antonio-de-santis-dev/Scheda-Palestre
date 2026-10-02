@@ -21,7 +21,7 @@ GymPlanner è una web app per palestre, **amministrata**: non esiste registrazio
   - esegue l'allenamento serie per serie con **timer di recupero**: "Fine serie" è bloccato finché
     il recupero non finisce; celebrazioni e avviso sonoro di fine recupero sono opzionali;
   - può saltare esercizi o interrompere;
-  - consulta lo **storico** e modifica telefono e password;
+  - registra facoltativamente peso usato e ripetizioni effettive per serie; consulta lo **storico** e modifica telefono e password;
   - riceve un avviso quando la durata consigliata di una scheda è terminata.
 
 Fonte di verità funzionale: `MEGA_DOCUMENTAZIONE_GYM_PLANNER_PER_CLAUDE_CODE.md`.
@@ -77,7 +77,7 @@ Monolite modulare in `backend/src/main/java/com/gymplanner/`:
   `BusinessRuleException` 422, `BadRequestException`, …) → RFC 9457 con campo `code`.
   Risorse di altri utenti → **404**, mai 403.
 - `/api/me/**`: l'utente si ricava **sempre** da `@AuthenticationPrincipal AuthenticatedUser`.
-- Schema DB solo tramite **Flyway** (`backend/src/main/resources/db/migration`, V1…V12).
+- Schema DB solo tramite **Flyway** (`backend/src/main/resources/db/migration`, V1…V13).
   **Non modificare migrazioni esistenti**: aggiungi una nuova migrazione. Hibernate è in `validate`.
 - Tabelle al plurale (`users`, mai `user`); nessun `@ManyToMany` utente-scheda.
 

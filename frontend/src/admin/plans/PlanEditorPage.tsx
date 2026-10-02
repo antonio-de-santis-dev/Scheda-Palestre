@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import { TextField } from '../../shared/components/Field';
 import { QueryState } from '../../shared/components/States';
 import { StatusBadge } from '../../shared/components/StatusBadge';
+import { formatWeight } from '../../shared/utils/weight';
 import { restText } from '../../shared/utils/format';
 import { describeSets, type PlanSection, type PlanSession, type PlanStructure } from '../../shared/api/planTypes';
 import { useActiveMuscleGroups } from '../catalog/api';
@@ -397,7 +398,7 @@ function SectionBlock({ section, index, total, readOnly, onMove, run, ask }: Sec
               ) : null}
             </span>
             <span className="exercise-row__values">
-              {describeSets(exercise)} · {restText(exercise.restSeconds)}
+              {describeSets(exercise)} · {restText(exercise.restSeconds)} · {exercise.customized ? exercise.sets.map((s) => formatWeight(s.plannedWeightKg)).join(' / ') : formatWeight(exercise.plannedWeightKg)}
               {exercise.customized ? ' · serie personalizzate' : ''}
             </span>
             {!readOnly ? (

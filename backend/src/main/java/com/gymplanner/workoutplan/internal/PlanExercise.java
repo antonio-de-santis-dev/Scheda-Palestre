@@ -1,5 +1,6 @@
 package com.gymplanner.workoutplan.internal;
 
+import java.math.BigDecimal;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -50,6 +51,9 @@ public class PlanExercise implements Positioned {
     @Column(nullable = false)
     private int restSeconds;
 
+    @Column(precision = 6, scale = 2)
+    private BigDecimal plannedWeightKg;
+
     @OneToMany(mappedBy = "planExercise", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("setIndex")
     private List<PlanSet> sets = new ArrayList<>();
@@ -71,9 +75,10 @@ public class PlanExercise implements Positioned {
         this.reps = config.reps();
         this.toFailure = config.toFailure();
         this.restSeconds = config.restSeconds();
+        this.plannedWeightKg = config.plannedWeightKg();
         this.sets.clear();
         for (ExerciseConfig.SetConfig set : config.customSets()) {
-            sets.add(new PlanSet(this, set.setIndex(), set.reps(), set.toFailure(), set.restSeconds()));
+            sets.add(new PlanSet(this, set.setIndex(), set.reps(), set.toFailure(), set.restSeconds(), set.plannedWeightKg()));
         }
     }
 
@@ -86,11 +91,11 @@ public class PlanExercise implements Positioned {
         List<ExerciseConfig.SetConfig> result = new ArrayList<>(setsCount);
         if (isCustomized()) {
             for (PlanSet s : sets) {
-                result.add(new ExerciseConfig.SetConfig(s.getSetIndex(), s.getReps(), s.isToFailure(), s.getRestSeconds()));
+                result.add(new ExerciseConfig.SetConfig(s.getSetIndex(), s.getReps(), s.isToFailure(), s.getRestSeconds(), s.getPlannedWeightKg()));
             }
         } else {
             for (int i = 1; i <= setsCount; i++) {
-                result.add(new ExerciseConfig.SetConfig(i, reps, toFailure, restSeconds));
+                result.add(new ExerciseConfig.SetConfig(i, reps, toFailure, restSeconds, plannedWeightKg));
             }
         }
         return result;
@@ -98,7 +103,7 @@ public class PlanExercise implements Positioned {
 
     ExerciseConfig config() {
         List<ExerciseConfig.SetConfig> custom = isCustomized() ? effectiveSets() : List.of();
-        return new ExerciseConfig(setsCount, reps, toFailure, restSeconds, custom);
+        return new ExerciseConfig(setsCount, reps, toFailure, restSeconds, plannedWeightKg, custom);
     }
 
     @Override
@@ -135,6 +140,8 @@ public class PlanExercise implements Positioned {
     public boolean isToFailure() {
         return toFailure;
     }
+
+    public BigDecimal getPlannedWeightKg() { return plannedWeightKg; }
 
     public int getRestSeconds() {
         return restSeconds;

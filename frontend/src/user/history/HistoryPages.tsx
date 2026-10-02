@@ -9,6 +9,7 @@ import { Pagination } from '../../shared/components/Pagination';
 import { formatDateTime, formatLongDate, formatRest, formatWorkoutDuration } from '../../shared/utils/format';
 import { repsLabel } from '../../shared/api/planTypes';
 import { useWorkout, type WorkoutSummary } from '../workout/api';
+import { formatWeight } from '../../shared/utils/weight';
 import { WorkoutDuration } from '../../shared/components/WorkoutDuration';
 import { ExerciseStatusBadge, WorkoutStatusBadge } from '../workout/ExerciseStatusBadge';
 
@@ -111,7 +112,10 @@ export function HistoryDetailPage() {
                     <thead>
                       <tr>
                         <th scope="col">Serie</th>
-                        <th scope="col">Ripetizioni</th>
+                        <th scope="col">Ripetizioni previste</th>
+                        <th scope="col">Peso previsto</th>
+                        <th scope="col">Peso usato</th>
+                        <th scope="col">Ripetizioni effettive</th>
                         <th scope="col">Recupero</th>
                         <th scope="col">Esito</th>
                       </tr>
@@ -121,6 +125,9 @@ export function HistoryDetailPage() {
                         <tr key={s.id}>
                           <th scope="row">{s.setIndex}</th>
                           <td>{repsLabel({ reps: s.repsPlanned, toFailure: s.toFailure })}</td>
+                          <td>{formatWeight(s.weightKgPlanned)}</td>
+                          <td>{s.completedAt ? s.weightKgUsed == null ? 'Non registrato' : formatWeight(s.weightKgUsed) : '—'}</td>
+                          <td>{s.completedAt ? s.repsActual ?? 'Non registrate' : '—'}</td>
                           <td>{formatRest(s.restSeconds)}</td>
                           <td>{s.completedAt ? '✓ Completata' : '— Non svolta'}</td>
                         </tr>

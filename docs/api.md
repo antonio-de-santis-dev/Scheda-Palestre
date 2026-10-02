@@ -253,3 +253,5 @@ le altre sessioni aperte dell'utente.
 ## Estensioni V2
 
 Durata e controlli recupero: [sviluppo-v2.md](sviluppo-v2.md#api), ADR 0012.
+
+Carichi previsti e risultati per serie (V2 Fase 2): [ADR 0013](decisions/0013-planned-loads-and-set-results.md#persistenza-e-api).

@@ -1,5 +1,6 @@
 package com.gymplanner.execution.internal;
 
+import java.math.BigDecimal;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -69,7 +70,11 @@ public class WorkoutExercise {
     }
 
     void addSet(int setIndex, int repsPlanned, boolean toFailure, int restSeconds) {
-        sets.add(new WorkoutSet(this, setIndex, repsPlanned, toFailure, restSeconds));
+        addSet(setIndex, repsPlanned, toFailure, restSeconds, null);
+    }
+
+    void addSet(int setIndex, int repsPlanned, boolean toFailure, int restSeconds, BigDecimal weightKgPlanned) {
+        sets.add(new WorkoutSet(this, setIndex, repsPlanned, toFailure, restSeconds, weightKgPlanned));
         this.setsPlanned = sets.size();
     }
 

@@ -141,8 +141,8 @@ La prima versione deve includere:
 
 Non rientrano nella prima versione:
 
-- pesi previsti e realmente usati;
-- ripetizioni realmente effettuate;
+- pesi previsti e realmente usati **[implementati nella Fase 2 V2, ADR 0013]**;
+- ripetizioni realmente effettuate **[implementate nella Fase 2 V2, ADR 0013]**;
 - statistiche e grafici;
 - record personali;
 - durata aggregata;

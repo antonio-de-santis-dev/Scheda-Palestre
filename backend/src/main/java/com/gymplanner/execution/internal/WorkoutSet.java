@@ -1,5 +1,6 @@
 package com.gymplanner.execution.internal;
 
+import java.math.BigDecimal;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -39,15 +40,24 @@ public class WorkoutSet {
 
     private Instant completedAt;
 
+    @Column(precision = 6, scale = 2, updatable = false)
+    private BigDecimal weightKgPlanned;
+
+    @Column(precision = 6, scale = 2)
+    private BigDecimal weightKgUsed;
+
+    private Integer repsActual;
+
     protected WorkoutSet() {
     }
 
-    WorkoutSet(WorkoutExercise workoutExercise, int setIndex, int repsPlanned, boolean toFailure, int restSeconds) {
+    WorkoutSet(WorkoutExercise workoutExercise, int setIndex, int repsPlanned, boolean toFailure, int restSeconds, BigDecimal weightKgPlanned) {
         this.workoutExercise = workoutExercise;
         this.setIndex = setIndex;
         this.repsPlanned = repsPlanned;
         this.toFailure = toFailure;
         this.restSeconds = restSeconds;
+        this.weightKgPlanned = weightKgPlanned;
     }
 
     boolean isCompleted() {
@@ -55,8 +65,18 @@ public class WorkoutSet {
     }
 
     void complete(Instant now) {
-        this.completedAt = now;
+        complete(now, null, null);
     }
+
+    void complete(Instant now, BigDecimal weightKgUsed, Integer repsActual) {
+        this.completedAt = now;
+        this.weightKgUsed = weightKgUsed;
+        this.repsActual = repsActual;
+    }
+
+    public BigDecimal getWeightKgPlanned() { return weightKgPlanned; }
+    public BigDecimal getWeightKgUsed() { return weightKgUsed; }
+    public Integer getRepsActual() { return repsActual; }
 
     public UUID getId() {
         return id;

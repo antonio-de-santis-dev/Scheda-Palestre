@@ -14,7 +14,9 @@ import { ExerciseStatusBadge, WorkoutStatusBadge } from './ExerciseStatusBadge';
 import { celebrate, transitions, type Feedback } from './feedback';
 import { useRestAlert } from './useRestAlert';
 import { WorkoutDuration } from '../../shared/components/WorkoutDuration';
-import type { RestAction } from './api';
+import type { RestAction, SetResultInput } from './api';
+import { TextField } from '../../shared/components/Field';
+import { formatWeight, setResultSchema } from '../../shared/utils/weight';
 
 /** Workout execution (US-17, US-18, US-20, US-23): usable one-handed from 360 px. */
 export function WorkoutPage() {
@@ -30,11 +32,13 @@ export function WorkoutPage() {
 function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => void }) {
   const [confirm, setConfirm] = useState<'skip' | 'interrupt' | 'restSkip' | null>(null);
   const [announcement, setAnnouncement] = useState('');
+  const [draft, setDraft] = useState({ setId: '', weightKgUsed: '', repsActual: '' });
+  const [resultErrors, setResultErrors] = useState<{ setId: string; weightKgUsed?: string; repsActual?: string }>({ setId: '' });
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   // Transitions already celebrated: refetches, retries and StrictMode never repeat them.
   const celebrated = useRef(new Set<string>());
   const restAlert = useRestAlert();
-  const complete = useWorkoutAction(state.workoutId, (setId: string) => workoutApi.completeSet(state.workoutId, setId), true);
+  const complete = useWorkoutAction(state.workoutId, ({ setId, result }: { setId: string; result: SetResultInput }) => workoutApi.completeSet(state.workoutId, setId, result), true);
   const skip = useWorkoutAction(state.workoutId, (exerciseId: string) => workoutApi.skip(state.workoutId, exerciseId), true);
   const interrupt = useWorkoutAction(state.workoutId, () => workoutApi.interrupt(state.workoutId), true);
 
@@ -71,6 +75,8 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
 
   const current = state.exercises.find((e) => e.id === state.currentExerciseId) ?? null;
   const currentSet = current?.sets.find((s) => s.id === state.currentSetId) ?? null;
+  const values = draft.setId === currentSet?.id ? draft : { setId: currentSet?.id ?? '', weightKgUsed: '', repsActual: '' };
+  const validation: { weightKgUsed?: string; repsActual?: string } = resultErrors.setId === currentSet?.id ? resultErrors : {};
   const finished = state.status !== 'IN_PROGRESS';
   const done = state.exercises.filter((e) => e.status === 'COMPLETED' || e.status === 'SKIPPED').length;
   const totalSets = state.exercises.reduce((n, e) => n + e.setsPlanned, 0);
@@ -198,6 +204,17 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
             </div>
           ) : null}
 
+          <fieldset className="set-results" disabled={busy}>
+            <legend>Dati della serie (facoltativi)</legend>
+            <p className="small muted">Peso previsto: {formatWeight(currentSet.weightKgPlanned)}. I campi vuoti restano non registrati.</p>
+            <div className="form-grid form-grid--2">
+              <TextField label="Peso usato (kg)" inputMode="decimal" placeholder="Non registrato" value={values.weightKgUsed}
+                error={validation.weightKgUsed} onChange={(e) => setDraft({ ...values, weightKgUsed: e.target.value })} />
+              <TextField label="Ripetizioni effettive" inputMode="numeric" placeholder="Non registrate" value={values.repsActual}
+                error={validation.repsActual} onChange={(e) => setDraft({ ...values, repsActual: e.target.value })} />
+            </div>
+          </fieldset>
+
           {/* aria-disabled (not disabled): the button stays in the tab order and says why it waits. */}
           <Button
             size="lg"
@@ -211,12 +228,19 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
               if (resting || busy) {
                 return;
               }
+              const parsed = setResultSchema.safeParse(values);
+              if (!parsed.success) {
+                const fields = parsed.error.flatten().fieldErrors;
+                setResultErrors({ setId: currentSet.id, weightKgUsed: fields.weightKgUsed?.[0], repsActual: fields.repsActual?.[0] });
+                return;
+              }
+              setResultErrors({ setId: currentSet.id });
               setAnnouncement('');
               setFeedback(null);
               skip.reset();
               rest.reset();
               const before = state;
-              complete.mutate(currentSet.id, { onSuccess: (after) => onActionSuccess(before, after) });
+              complete.mutate({ setId: currentSet.id, result: parsed.data }, { onSuccess: (after) => onActionSuccess(before, after) });
             }}
           >
             Fine serie

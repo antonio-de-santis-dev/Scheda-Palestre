@@ -1,6 +1,10 @@
 package com.gymplanner.workoutplan.internal;
 
+import java.math.BigDecimal;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -43,7 +47,8 @@ final class PlanDtos {
             @Min(1) @Max(20) int setIndex,
             @Min(0) @Max(100) int reps,
             boolean toFailure,
-            @Min(0) @Max(600) int restSeconds) {
+            @Min(0) @Max(600) int restSeconds,
+            @DecimalMin("0") @DecimalMax("1000") @Digits(integer = 4, fraction = 2) BigDecimal plannedWeightKg) {
     }
 
     record PlanExerciseRequest(
@@ -52,7 +57,8 @@ final class PlanDtos {
             @Min(0) @Max(100) int reps,
             boolean toFailure,
             @Min(0) @Max(600) int restSeconds,
-            @Valid @Size(max = 20) List<SetRequest> customSets) {
+            @Valid @Size(max = 20) List<SetRequest> customSets,
+            @DecimalMin("0") @DecimalMax("1000") @Digits(integer = 4, fraction = 2) BigDecimal plannedWeightKg) {
     }
 
     record PlanListItem(UUID id, String name, String description, Integer durationWeeks, int sessionCount,

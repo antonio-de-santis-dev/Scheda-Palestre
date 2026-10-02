@@ -87,7 +87,8 @@ class WorkoutService {
                         .forEach(exercise -> {
                             WorkoutExercise we = workout.addExercise(exercise.id(), exercise.exerciseName(),
                                     section.muscleGroupName());
-                            exercise.sets().forEach(s -> we.addSet(s.setIndex(), s.reps(), s.toFailure(), s.restSeconds()));
+                            exercise.sets().forEach(s -> we.addSet(s.setIndex(), s.reps(), s.toFailure(),
+                                    s.restSeconds(), s.plannedWeightKg()));
                         }));
         workout.begin();
         try {
@@ -125,7 +126,7 @@ class WorkoutService {
      * without advancing twice. The completion instant comes from the server clock.
      */
     @Transactional
-    public WorkoutState completeSet(UUID userId, UUID workoutId, UUID setId) {
+    public WorkoutState completeSet(UUID userId, UUID workoutId, UUID setId, WorkoutDtos.CompleteSetRequest result) {
         Workout workout = lockOwned(userId, workoutId);
         WorkoutSet set = workout.findSet(setId).orElseThrow(() -> new NotFoundException("Set"));
         Instant now = calendar.now();
@@ -147,7 +148,8 @@ class WorkoutService {
                     .with("restPaused", workout.isRestPaused())
                     .with("serverTime", now);
         }
-        set.complete(now);
+        set.complete(now, result == null ? null : result.weightKgUsed(),
+                result == null || result.repsActual() == null ? null : result.repsActual().intValueExact());
         if (exercise.nextSet().isEmpty()) {
             exercise.markCompleted();
             advance(workout, now);

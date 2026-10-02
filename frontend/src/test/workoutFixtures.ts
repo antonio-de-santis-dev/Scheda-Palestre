@@ -26,8 +26,8 @@ export function workoutState(overrides: Partial<Raw> = {}): Raw {
         setsPlanned: 2,
         setsCompleted: 0,
         sets: [
-          { id: 's-1', setIndex: 1, repsPlanned: 10, toFailure: false, restSeconds: 60, completedAt: null },
-          { id: 's-2', setIndex: 2, repsPlanned: 10, toFailure: false, restSeconds: 60, completedAt: null },
+          { id: 's-1', setIndex: 1, repsPlanned: 10, toFailure: false, restSeconds: 60, completedAt: null, weightKgPlanned: null, weightKgUsed: null, repsActual: null },
+          { id: 's-2', setIndex: 2, repsPlanned: 10, toFailure: false, restSeconds: 60, completedAt: null, weightKgPlanned: null, weightKgUsed: null, repsActual: null },
         ],
       },
       {
@@ -38,7 +38,7 @@ export function workoutState(overrides: Partial<Raw> = {}): Raw {
         muscleGroupName: 'Dorso',
         setsPlanned: 1,
         setsCompleted: 0,
-        sets: [{ id: 's-3', setIndex: 1, repsPlanned: 0, toFailure: true, restSeconds: 90, completedAt: null }],
+        sets: [{ id: 's-3', setIndex: 1, repsPlanned: 0, toFailure: true, restSeconds: 90, completedAt: null, weightKgPlanned: null, weightKgUsed: null, repsActual: null }],
       },
     ],
     currentExerciseId: 'e-1',

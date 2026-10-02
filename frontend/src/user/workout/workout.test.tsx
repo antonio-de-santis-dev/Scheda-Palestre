@@ -362,3 +362,57 @@ describe('V2 recovery controls', () => {
     expect(actions).toEqual(['PAUSE', 'EXTEND', 'RESUME', 'SKIP']);
   });
 });
+
+
+describe('V2 set results', () => {
+  it('records used load and actual reps only on completion and resets inputs for the next set', async () => {
+    let body: unknown;
+    let state = workoutState();
+    state.exercises[0]!.sets[0]!.weightKgPlanned = 20;
+    server.use(
+      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
+      http.get('*/api/me/workouts/:id', () => HttpResponse.json(state)),
+      http.post('*/api/me/workouts/:id/sets/:setId/complete', async ({ request }) => {
+        body = await request.json();
+        state = structuredClone(state);
+        state.currentSetId = 's-2';
+        state.exercises[0]!.sets[0] = { ...state.exercises[0]!.sets[0]!, completedAt: new Date().toISOString(), weightKgUsed: 22.75, repsActual: 9 };
+        state.exercises[0]!.setsCompleted = 1;
+        return HttpResponse.json(state);
+      }),
+    );
+    renderApp('/app/workout/w-1');
+    const user = userEvent.setup();
+    expect(await screen.findByText(/Peso previsto: 20 kg/)).toBeInTheDocument();
+    const used = screen.getByLabelText('Peso usato (kg)');
+    const reps = screen.getByLabelText('Ripetizioni effettive');
+    expect(used).toHaveValue('');
+    expect(reps).toHaveValue('');
+    await user.type(used, '22,75');
+    await user.type(reps, '9');
+    expect(body).toBeUndefined();
+    await user.click(screen.getByRole('button', { name: 'Fine serie' }));
+    await waitFor(() => expect(body).toEqual({ weightKgUsed: 22.75, repsActual: 9 }));
+    await waitFor(() => expect(screen.getByLabelText('Peso usato (kg)')).toHaveValue(''));
+    expect(screen.getByLabelText('Ripetizioni effettive')).toHaveValue('');
+  });
+
+  it('retains invalid drafts and does not send or truncate them', async () => {
+    let called = false;
+    server.use(
+      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
+      http.get('*/api/me/workouts/:id', () => HttpResponse.json(workoutState())),
+      http.post('*/api/me/workouts/:id/sets/:setId/complete', () => { called = true; return HttpResponse.json(workoutState()); }),
+    );
+    renderApp('/app/workout/w-1');
+    const user = userEvent.setup();
+    const weight = await screen.findByLabelText('Peso usato (kg)');
+    await user.type(weight, '22.755');
+    await user.type(screen.getByLabelText('Ripetizioni effettive'), '8.5');
+    await user.click(screen.getByRole('button', { name: 'Fine serie' }));
+    expect(await screen.findByText('Inserisci kg con massimo 2 decimali')).toBeInTheDocument();
+    expect(screen.getByText('Inserisci un numero intero di ripetizioni')).toBeInTheDocument();
+    expect(weight).toHaveValue('22.755');
+    expect(called).toBe(false);
+  });
+});

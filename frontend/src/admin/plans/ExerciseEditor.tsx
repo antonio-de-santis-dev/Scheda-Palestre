@@ -9,6 +9,7 @@ import {
   Combobox,
   type ComboboxOption,
 } from '../../shared/components/Combobox';
+import { optionalWeightSchema } from '../../shared/utils/weight';
 import { ErrorAlert } from '../../shared/components/Alert';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import { useActiveExercisesOfGroup } from '../catalog/api';
@@ -17,6 +18,7 @@ import type { PlanExerciseInput } from './api';
 
 const setSchema = z
     .object({
+      plannedWeightKg: optionalWeightSchema,
       reps: z.number({ message: 'Numero' }).int().min(0).max(100),
       toFailure: z.boolean(),
       restSeconds: z
@@ -32,6 +34,7 @@ const setSchema = z
 
 const schema = z
     .object({
+      plannedWeightKg: optionalWeightSchema,
       exerciseId: z.string().min(1, "Scegli l'esercizio"),
       setsCount: z
           .number({ message: 'Inserisci un numero' })
@@ -97,6 +100,7 @@ export function ExerciseEditor({
     resolver: zodResolver<FormInput, unknown, FormValues>(schema),
     defaultValues: {
       exerciseId: initial?.exerciseId ?? '',
+      plannedWeightKg: initial?.plannedWeightKg?.toString() ?? '',
       setsCount: initial?.setsCount ?? 3,
       reps: initial?.toFailure ? 0 : (initial?.reps ?? 10),
       toFailure: initial?.toFailure ?? false,
@@ -107,13 +111,14 @@ export function ExerciseEditor({
             reps: s.reps,
             toFailure: s.toFailure,
             restSeconds: s.restSeconds,
+            plannedWeightKg: s.plannedWeightKg?.toString() ?? '',
           }))
           : [],
     },
   });
 
   const { fields, append, remove } =
-      useFieldArray<FormInput, 'customSets'>({
+      useFieldArray<FormInput, 'customSets', 'id', FormValues>({
         control,
         name: 'customSets',
       });
@@ -137,6 +142,7 @@ export function ExerciseEditor({
         reps,
         toFailure: failure,
         restSeconds,
+        plannedWeightKg,
       } = getValues();
 
       for (let i = fields.length; i < target; i++) {
@@ -145,6 +151,7 @@ export function ExerciseEditor({
               reps: failure ? 0 : reps,
               toFailure: failure,
               restSeconds,
+              plannedWeightKg,
             },
             { shouldFocus: false },
         );
@@ -192,12 +199,14 @@ export function ExerciseEditor({
     reps: values.toFailure ? 0 : values.reps,
     toFailure: values.toFailure,
     restSeconds: values.restSeconds,
+    plannedWeightKg: values.plannedWeightKg,
     customSets: values.custom
         ? values.customSets.map((set, index) => ({
           setIndex: index + 1,
           reps: set.toFailure ? 0 : set.reps,
           toFailure: set.toFailure,
           restSeconds: set.restSeconds,
+          plannedWeightKg: set.plannedWeightKg,
         }))
         : [],
   });
@@ -223,7 +232,7 @@ export function ExerciseEditor({
         >
           {error ? <ErrorAlert error={error} /> : null}
 
-          <Controller<FormInput, 'exerciseId'>
+          <Controller<FormInput, 'exerciseId', FormValues>
               control={control}
               name="exerciseId"
               render={({ field }) => (
@@ -277,6 +286,10 @@ export function ExerciseEditor({
                 {...register('reps', { valueAsNumber: true })}
             />
 
+            <TextField label="Peso previsto (kg)" inputMode="decimal" placeholder="Facoltativo"
+                hint="Vuoto = non indicato; 0 = nessun carico esterno. Massimo 1000 kg."
+                error={errors.plannedWeightKg?.message} {...register('plannedWeightKg')} />
+
             <Checkbox
                 label="A cedimento (MAX)"
                 {...register('toFailure')}
@@ -301,6 +314,7 @@ export function ExerciseEditor({
                     <th scope="col">Ripetizioni</th>
                     <th scope="col">MAX</th>
                     <th scope="col">Recupero (s)</th>
+                    <th scope="col">Peso previsto (kg)</th>
                   </tr>
                   </thead>
 
@@ -362,6 +376,11 @@ export function ExerciseEditor({
                                 )}
                             />
                           </td>
+                          <td>
+                            <input className="input" inputMode="decimal" aria-label={`Peso previsto serie ${index + 1} in kg`}
+                              aria-invalid={rowErrors?.plannedWeightKg ? true : undefined}
+                              {...register(`customSets.${index}.plannedWeightKg` as const)} />
+                          </td>
                         </tr>
                     );
                   })}
@@ -371,7 +390,7 @@ export function ExerciseEditor({
                 {errors.customSets ? (
                     <p className="field__error" role="alert">
                       Controlla i valori delle serie: ripetizioni 1-100
-                      (o MAX), recupero 0-600 secondi.
+                      (o MAX), recupero 0-600 secondi, peso 0-1000 kg con massimo 2 decimali.
                     </p>
                 ) : null}
               </div>
