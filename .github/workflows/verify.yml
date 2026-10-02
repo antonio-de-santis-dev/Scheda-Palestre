@@ -48,15 +48,15 @@ jobs:
 
   compose:
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: CiPassword2026
+      GYM_ADMIN_USERNAME: ci-admin
+      GYM_ADMIN_EMAIL: ci-admin@example.test
+      GYM_ADMIN_PASSWORD: CiPassword2026
+      GYM_DOMAIN: gym.example.test
     steps:
       - uses: actions/checkout@v4
       - name: Validate development Compose
         run: docker compose --profile app config --quiet
       - name: Validate production Compose
-        env:
-          POSTGRES_PASSWORD: CiPassword2026
-          GYM_ADMIN_USERNAME: ci-admin
-          GYM_ADMIN_EMAIL: ci-admin@example.test
-          GYM_ADMIN_PASSWORD: CiPassword2026
-          GYM_DOMAIN: gym.example.test
         run: docker compose -f compose.production.yaml config --quiet

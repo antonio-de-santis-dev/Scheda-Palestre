@@ -21,7 +21,7 @@ Branch: `fix/clean-code`. Il nome `fix` è incompatibile con il branch remoto gi
 - Frontend: 85 test passati (13 file), ESLint passato, build TypeScript/Vite passata.
 - YAML di entrambi i Compose letto e controllato per alias e dipendenze; validazione Docker completa demandata al workflow.
 - Nuovi test backend: budget di una chiamata al repository per più piani, ordine delle sessioni, piani vuoti e richiesta vuota senza accesso al DB.
-- La verifica Maven locale è in corso con Java 21. L'ambiente non dispone di Docker: i test di integrazione PostgreSQL devono passare in GitHub Actions prima di integrare questa tranche.
+- Backend: `./mvnw --batch-mode verify` passato in GitHub Actions con Java 21: **208 test, 0 errori, 0 fallimenti, 0 saltati**, inclusi PostgreSQL/Testcontainers, migrazioni e ArchUnit. Run di verifica del codice: `36986341466`, commit `44833128666538f613b61f5d0aa5e10f34590656`. Il workflow di validazione Compose usa valori dimostrativi per tutte le variabili obbligatorie in entrambi gli ambienti.
 
 Comandi:
 
