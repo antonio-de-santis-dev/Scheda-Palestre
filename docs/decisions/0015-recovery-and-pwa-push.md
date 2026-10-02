@@ -5,7 +5,9 @@ Stato: implementato in SviluppoV2. Funzioni esterne disabilitate per default.
 ## Recupero password (Fase 5)
 
 POST `/api/auth/forgot-password` con `{email}` ritorna sempre 202 per email sintatticamente
-valide, anche inesistenti, disattivate, rate limited o con servizio disabilitato.
+valide quando il servizio è configurato, anche inesistenti, disattivate o rate limited.
+Servizio disabilitato o origine/mittente mancanti/non validi: 503 `RECOVERY_UNAVAILABLE`,
+uguale per ogni account, senza simulare una conferma di invio.
 CSRF obbligatorio. Richieste per finestra di un'ora: massimo 3 per email e 20 per indirizzo
 remoto. L'indirizzo è quello ottenuto dal servlet, non un header inviato dal chiamante;
 configurare correttamente il proxy se più utenti condividono l'indirizzo remoto.
@@ -80,7 +82,9 @@ Generare una coppia VAPID sulla propria macchina:
 `node scripts/generate-vapid.mjs`. Scrive `.env.vapid` (0600, ignorato da git), non
 sovrascrive una coppia esistente e non stampa le chiavi. Copiare le due variabili nei
 segreti/variabili backend e conservare la coppia: cambiarla richiede nuove sottoscrizioni.
-Il frontend deve avere origine HTTPS, proxy `/api` stesso dominio e build pubblicata.
+Il frontend pubblico deve avere origine HTTPS, proxy `/api` stesso dominio e build pubblicata.
+Per il solo recupero password in sviluppo è ammesso HTTP su localhost/127.0.0.1/::1;
+PWA/push mantengono i propri requisiti di origine sicura e build.
 In locale dev il worker non si registra; usare build + preview per provare la PWA.
 
 ## Verifiche e limiti
@@ -92,3 +96,14 @@ Frontend: invio/validazione/ripristino, link scaduto, consenso e rollback push,
 service worker non intercetta API/scritture/cross-origin e usa offline generico.
 Non equivalgono a una consegna reale SMTP o push su dispositivi; provarla nell'ambiente
 HTTPS dopo configurazione. Nessun invio di prova a indirizzi reali viene eseguito dai test.
+
+## Configurazione email locale
+
+Dalla root: `python3 scripts/configure-recovery.py --url http://localhost:5173 --sender ACCOUNT-GMAIL`.
+Password per app richiesta con input nascosto (non passarla come argomento o nel codice).
+Il comando aggiorna soltanto le variabili di recupero nella `.env` ignorata da git,
+preserva le variabili DB, normalizza i separatori della password e scrive con permessi 0600.
+Riavviare il backend, poi richiedere il recupero usando l'email dell'account GymPlanner
+che si vuole recuperare: il mittente SMTP non sostituisce l'email registrata nel DB.
+Un 400 richiede di leggere il JSON Problem Details (code/errors) della risposta nella
+scheda Network del browser; un 401 di `/api/auth/me` prima del login è normale.

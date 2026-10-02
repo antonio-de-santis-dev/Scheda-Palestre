@@ -43,4 +43,13 @@ describe('password recovery', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Link non valido');
     expect(screen.queryByLabelText(/^Nuova password/)).not.toBeInTheDocument();
   });
+  it('shows an honest unavailable-service message', async () => {
+    server.use(http.post('*/api/auth/forgot-password', () => problem(503, 'RECOVERY_UNAVAILABLE')));
+    renderApp('/forgot-password'); const user = userEvent.setup();
+    await user.type(await screen.findByLabelText(/^Email/), 'mario@example.test');
+    await user.click(screen.getByRole('button', { name: 'Invia link di recupero' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('non è disponibile');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
 });

@@ -9,13 +9,13 @@ import { isApiError } from '../shared/errors/ApiError';
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
-  const request = useMutation({ mutationFn: () => http.post('/api/auth/forgot-password', { email }) });
+  const request = useMutation({ mutationFn: () => http.post('/api/auth/forgot-password', { email: email.trim() }) });
   return <main className="auth-page"><section className="auth-card">
     <h1>Recupera password</h1>
     <p>Inserisci l’email associata al tuo account.</p>
     {request.isSuccess ? <p role="status">Se l’indirizzo corrisponde a un account attivo, riceverai un link per scegliere una nuova password. Controlla anche lo spam.</p> : <form className="form" onSubmit={(e) => { e.preventDefault(); request.mutate(); }}>
       {request.error ? <ErrorAlert error={request.error} /> : null}
-      <TextField label="Email" type="email" autoComplete="email" required maxLength={255} value={email} onChange={(e) => setEmail(e.target.value)} />
+      <TextField label="Email" error={isApiError(request.error) && request.error.fieldErrors.some((e) => e.field === 'email') ? 'Inserisci un indirizzo email valido.' : undefined} type="email" autoComplete="email" required maxLength={255} value={email} onChange={(e) => setEmail(e.target.value)} />
       <Button type="submit" loading={request.isPending}>Invia link di recupero</Button>
     </form>}
     <Link to="/login">Torna al login</Link>

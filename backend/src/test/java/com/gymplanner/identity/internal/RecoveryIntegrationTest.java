@@ -56,14 +56,15 @@ class RecoveryIntegrationTest {
         api.get(user,"/api/me/profile").expect(401);
         assertThat(jdbc.queryForObject("select must_change_password from users where id = ?",Boolean.class,user.id())).isFalse();
     }
-    @Test void responsesDoNotRevealUnknownInactiveOrDisabledAccounts() {
+    @Test void responsesDoNotRevealUnknownOrInactiveAccounts() {
         api.post(null,"/api/auth/forgot-password","{\"email\":\"absent@example.test\"}").expect(202);
         assertThat(events.stream(RecoveryRequested.class)).isEmpty();
         jdbc.update("update users set active = false where id = ?",user.id());
         api.post(null,"/api/auth/forgot-password","{\"email\":\""+email+"\"}").expect(202);
         assertThat(events.stream(RecoveryRequested.class)).isEmpty();
         properties.setEnabled(false);
-        api.post(null,"/api/auth/forgot-password","{\"email\":\""+email+"\"}").expect(202);
+        api.post(null,"/api/auth/forgot-password","{\"email\":\""+email+"\"}").expectCode(503,"RECOVERY_UNAVAILABLE");
+        api.post(null,"/api/auth/forgot-password","{\"email\":\"absent@example.test\"}").expectCode(503,"RECOVERY_UNAVAILABLE");
     }
     @Test void expiredReplacedAndVersionChangedTokensCannotResetPasswords() {
         String old=request(); String current=request();
@@ -90,6 +91,18 @@ class RecoveryIntegrationTest {
             var second=executor.submit(() -> { gate.await(); return reset(token,"SecondPassword123").status(); });
             gate.countDown(); assertThat(List.of(first.get(),second.get())).containsExactlyInAnyOrder(204,400);
         }
+    }
+    @Test void localHttpOriginIssuesALinkAndSurroundingEmailWhitespaceIsAccepted() {
+        properties.setPublicUrl("http://localhost:5173");
+        api.post(null,"/api/auth/forgot-password","{\"email\":\"  "+email+"  \"}").expect(202);
+        assertThat(events.stream(RecoveryRequested.class).findFirst().orElseThrow().link()).startsWith("http://localhost:5173/reset-password#token=");
+    }
+    @Test void unsafeOriginsReturnTheSameUnavailableResponseForEveryEmail() {
+        for (String origin : List.of("http://gym.example.test", "http://localhost.evil.test", "https://gym.test/login", "https://user@gym.test", "https://gym.test?x=1")) {
+            properties.setPublicUrl(origin);
+            api.post(null,"/api/auth/forgot-password","{\"email\":\""+email+"\"}").expectCode(503,"RECOVERY_UNAVAILABLE");
+        }
+        assertThat(events.stream(RecoveryRequested.class)).isEmpty();
     }
     @Test void csrfAndEmailValidationRemainRequired() throws Exception {
         mvc.perform(post("/api/auth/forgot-password").contentType(MediaType.APPLICATION_JSON).content("{\"email\":\""+email+"\"}")).andExpect(status().isForbidden());

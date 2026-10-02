@@ -1,7 +1,6 @@
 package com.gymplanner.identity.internal;
 
 import com.gymplanner.shared.error.BadRequestException;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -32,12 +31,8 @@ class RecoveryService {
 
     @Transactional
     public void request(String email, String remoteAddress) {
-        if (!properties.isEnabled()) return;
-        URI origin;
-        try { origin = URI.create(properties.getPublicUrl()); } catch (Exception e) { return; }
-        if (!"https".equals(origin.getScheme()) || origin.getHost() == null || origin.getQuery() != null
-                || origin.getFragment() != null || origin.getUserInfo() != null
-                || !(origin.getPath().isEmpty() || origin.getPath().equals("/")) || properties.getFrom().isBlank()) return;
+        if (!properties.isEnabled() || !RecoveryProperties.validPublicUrl(properties.getPublicUrl())
+                || properties.getFrom().isBlank()) throw new RecoveryUnavailableException();
         var now = clock.instant();
         jdbc.update("delete from recovery_rate_limits where window_start < ?", Timestamp.from(now.minus(Duration.ofHours(1))));
         if (!allow("ip:" + remoteAddress, 20) || !allow("email:" + email.strip().toLowerCase(java.util.Locale.ROOT), 3)) return;

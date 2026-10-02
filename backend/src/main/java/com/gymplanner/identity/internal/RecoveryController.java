@@ -14,7 +14,9 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class RecoveryController {
-    record Forgot(@NotBlank @Email @Size(max=255) String email) {}
+    record Forgot(@NotBlank @Email @Size(max=255) String email) {
+        Forgot { email = email == null ? null : email.strip(); }
+    }
     record Reset(@NotBlank @Size(max=128) String token, @NotBlank @Size(max=128) String newPassword) {}
     private final RecoveryService recovery;
     @PostMapping("/forgot-password")

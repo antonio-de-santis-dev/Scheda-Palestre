@@ -12,8 +12,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-record RecoveryRequested(String email, String link) {}
-
 @Configuration(proxyBeanMethods = false)
 @EnableAsync
 class RecoveryAsyncConfig {

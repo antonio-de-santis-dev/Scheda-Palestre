@@ -93,6 +93,12 @@ Confrontare il volume con kg × ripetizioni delle sole serie con entrambi i valo
 verificare che una serie senza risultati non aggiunga volume e che 0 rimanga 0.
 I record rimangono globali cambiando periodo. Un utente diverso non vede questi dati.
 
+## Email in locale
+
+Configurazione guidata senza modificare il DB: `python3 scripts/configure-recovery.py --url http://localhost:5173 --sender ACCOUNT-GMAIL`.
+Password per app richiesta con input nascosto; riavviare il backend dopo il comando.
+Dettagli e diagnosi 400/503: ADR 0015.
+
 ## Avvio locale
 
 ```bash

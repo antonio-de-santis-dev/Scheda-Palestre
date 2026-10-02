@@ -2,6 +2,7 @@ import { isApiError } from './ApiError';
 
 /** Italian messages for the application error codes returned by the backend. */
 const MESSAGES: Record<string, string> = {
+  RECOVERY_UNAVAILABLE: 'Il recupero password via email non è disponibile al momento. Contatta la palestra.',
   NETWORK_ERROR: 'Connessione assente o server non raggiungibile. Controlla la rete e riprova.',
   TIMEOUT: 'Il server non ha risposto in tempo. Riprova.',
   INVALID_CREDENTIALS: 'Credenziali non valide.',
