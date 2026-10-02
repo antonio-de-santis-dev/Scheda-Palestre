@@ -259,3 +259,7 @@ Carichi previsti e risultati per serie (V2 Fase 2): [ADR 0013](decisions/0013-pl
 ## SviluppoV2 — Fase 3
 
 Filtri dello storico e `GET /api/me/progress`: contratto in [ADR 0014](decisions/0014-progress-and-history.md).
+
+## SviluppoV2 — Fasi 4–5
+
+Recupero password e push: [ADR 0015](decisions/0015-recovery-and-pwa-push.md).

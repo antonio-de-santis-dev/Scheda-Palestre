@@ -130,3 +130,8 @@ Migrazione V13. Contratto e regole: ADR 0013; esiti delle verifiche nella PR.
 Storico filtrabile, statistiche/grafici del periodo e record personali globali.
 Migrazione V14 per identità snapshot; nessun risultato inventato. Contratto: ADR 0014.
 Esiti delle verifiche nella PR.
+
+## SviluppoV2 — Fasi 4–5
+
+PWA, push fine recupero, recupero password SMTP. Migrazioni V15/V16.
+Codice implementato; attivazione esterna e prove di consegna richiedono ambiente configurato. ADR 0015.

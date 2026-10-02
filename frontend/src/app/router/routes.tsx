@@ -23,6 +23,8 @@ const fallback = <LoadingState />;
 export const routes: RouteObject[] = [
   { path: '/', element: <HomeRedirect /> },
   { path: '/login', element: <LoginPage /> },
+  { path: '/forgot-password', ...page(() => import('../../auth/RecoveryPages'), (m) => m.ForgotPasswordPage) },
+  { path: '/reset-password', ...page(() => import('../../auth/RecoveryPages'), (m) => m.ResetPasswordPage) },
   {
     path: '/change-password',
     element: (

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PwaSettings } from '../../pwa/PwaSettings';
 import { Link, useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -89,6 +90,7 @@ export function ProfilePage() {
               ) : null}
               <ChangePasswordForm onChanged={() => setPasswordChanged(true)} />
             </section>
+            {p.role === 'USER' ? <PwaSettings /> : null}
             <section className="card profile-preferences" aria-labelledby="preferences-title">
               <h2 id="preferences-title">Preferenze</h2>
               <SelectField label="Tema" value={theme} onChange={(e) => setTheme(e.target.value as ThemePreference)}>

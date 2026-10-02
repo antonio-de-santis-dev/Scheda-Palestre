@@ -9,8 +9,8 @@ Questo documento distingue ciò che il codice implementa dai prossimi incrementi
 | 1 | Durata allenamenti; pausa/ripresa, estensione e salto recupero | Implementata, vedere verifiche sotto |
 | 2 | Carichi previsti/usati e ripetizioni effettive per serie | Implementata, ADR 0013 |
 | 3 | Storico avanzato, statistiche, grafici e record usando dati reali | Implementata, ADR 0014 |
-| 4 | PWA e notifiche push | Da sviluppare; richiederà configurazione origine HTTPS e chiavi push |
-| 5 | Recupero password via email | Da sviluppare; richiederà servizio invio, credenziali e URL pubblico |
+| 4 | PWA e notifiche push | Implementata; attivazione ambiente HTTPS e VAPID, ADR 0015 |
+| 5 | Recupero password via email | Implementata; attivazione SMTP e URL pubblico, ADR 0015 |
 
 ## Fase 1
 
@@ -45,6 +45,13 @@ Dettagli e contratto: [ADR 0013](decisions/0013-planned-loads-and-set-results.md
 - V14 additiva, nessun backfill di risultati.
 
 Contratto e calcoli: [ADR 0014](decisions/0014-progress-and-history.md).
+
+## Fasi 4–5
+
+- PWA installabile, icone e pagina offline generica; cache solo statica, nessun dato personale.
+- Consenso push da Profilo; avviso a fine recupero, rimozione subscription al logout e revoca dopo cambio password.
+- Recupero password da Login, link monouso 20 minuti, token solo hash in DB, limiti richieste e sessioni precedenti invalidate.
+- Servizi esterni disabilitati per default; configurazione runtime in [ADR 0015](decisions/0015-recovery-and-pwa-push.md).
 
 ## API
 

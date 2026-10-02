@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Navigate, useLocation, useNavigate } from 'react-router';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router';
 import { LogIn } from 'lucide-react';
 import { Button } from '../shared/components/Button';
 import { PasswordField, TextField } from '../shared/components/Field';
@@ -77,6 +77,7 @@ export function LoginPage() {
             Accedi
           </Button>
         </form>
+          <p><Link to="/forgot-password">Password dimenticata?</Link></p>
         <p className="small muted auth-help">Al primo accesso ti chiederemo di creare una nuova password.</p>
       </div><div className="auth-theme"><ThemeToggle /></div></div>
     </main>

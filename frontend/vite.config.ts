@@ -1,12 +1,16 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 
 const backend = process.env.GYM_BACKEND_URL ?? 'http://localhost:8080';
 
 // The SPA talks to the backend on the same origin: in development Vite proxies /api.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), { name: 'gymplanner-service-worker', generateBundle() {
+    this.emitFile({ type: 'asset', fileName: 'sw.js', source: readFileSync(new URL('./src/pwa/sw.js', import.meta.url), 'utf8').replace('__BUILD_ID__', randomUUID()) });
+  } }],
   server: {
     port: 5173,
     proxy: {

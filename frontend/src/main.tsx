@@ -12,6 +12,10 @@ import './shared/styles/design.css';
 import { AppProviders } from './app/providers/AppProviders';
 import { routes } from './app/router/routes';
 
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => { void navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => { /* App remains usable without PWA support. */ }); });
+}
+
 const router = createBrowserRouter(routes);
 
 const container = document.getElementById('root');

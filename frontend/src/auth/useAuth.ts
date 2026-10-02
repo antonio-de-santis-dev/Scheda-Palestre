@@ -27,7 +27,11 @@ export function useLogin() {
 export function useLogout() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: authApi.logout,
+    mutationFn: async () => {
+      const { disablePush } = await import('../pwa/push');
+      try { await disablePush(); } catch { /* Logout proceeds even if push unsubscribe fails. */ }
+      await authApi.logout();
+    },
     onSettled: () => {
       queryClient.clear();
       queryClient.setQueryData<CurrentUser | null>(AUTH_KEY, null);
