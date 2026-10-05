@@ -27,9 +27,13 @@ Il cambiamento riguarda soltanto questo allenamento: la scheda condivisa dell’
 
 La lista contiene esattamente tutti gli esercizi TODO/IN_PROGRESS, senza duplicati. `WorkoutState.executionVersion` aumenta con riordino, completamento serie, salto, interruzione o chiusura assegnazione. La revisione è controllata sotto lock pessimistico del workout. Una replica della stessa ultima modifica non modifica nuovamente l’ordine; uno stato superato restituisce 409 `WORKOUT_STATE_CHANGED` e il frontend risincronizza. Ordini non validi restituiscono 400 `INVALID_EXERCISE_ORDER`. Le risorse altrui restano 404, ADMIN non può usare gli endpoint USER. CSRF resta obbligatorio.
 
-Migrazione additiva `V12__workout_execution_order.sql`: revisioni iniziali 0 e vincolo posizione DEFERRABLE per scambi atomici. Prima di attivare il nuovo esercizio viene eseguito un flush del precedente, conservando il vincolo “un solo IN_PROGRESS”.
+Migrazione additiva `V17__workout_execution_order.sql`: revisioni iniziali 0 e vincolo posizione DEFERRABLE per scambi atomici. Prima di attivare il nuovo esercizio viene eseguito un flush del precedente, conservando il vincolo “un solo IN_PROGRESS”.
 
-**V12 di SviluppoV2 è un’altra migrazione.** I prossimi passi non devono copiare ciecamente migrazioni V12–V16 da quel branch: su fixV2 aggiungere versioni successive, senza modificare V12 dopo la sua applicazione. Questa tranche va provata su un database della linea delpy/fixV2 arrivato a V11, non su un DB già migrato con SviluppoV2.
+**Compatibilità del database:** le migrazioni V12–V16 di SviluppoV2 sono conservate byte per byte, così Flyway può validare anche il database già usato con quel branch. Il riordino è ora V17. Queste migrazioni aggiungono lo schema compatibile, ma questa tranche non abilita le restanti funzionalità V2. I successivi passi aggiungeranno migrazioni da V18 in avanti quando necessarie.
+
+Il primo commit di fixV2 aveva usato V12 per il riordino: il database locale del proprietario aveva già V12 per il recupero e ne rifiutava il checksum. Questa correzione ripristina la V12 applicata e conserva la cronologia. Non eseguire Flyway repair né modificare flyway_schema_history per nascondere il conflitto. Se un altro database ha già applicato la vecchia V12 *di riordino* di fixV2, serve una procedura distinta basata sulla sua cronologia: questa correzione riguarda la linea originale V1–V11 oppure V2–V16.
+
+Dopo un cambio branch avviare una volta con `./mvnw clean spring-boot:run` per rimuovere eventuali risorse residue in target. Poi l’avvio abituale rimane `./mvnw spring-boot:run`.
 
 ### Verifica automatica
 
