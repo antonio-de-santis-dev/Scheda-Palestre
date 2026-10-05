@@ -5,7 +5,7 @@ Base richiesta: `fixV2` da `4f1f997`. Ogni passo viene provato dal proprietario 
 | Passo | Funzione | Stato |
 |---|---|---|
 | 1 | Riordinare gli esercizi durante l’allenamento | Implementato, in verifica |
-| 2 | Esercizi completati in fondo alla lista | Da fare dopo la prova del passo 1 |
+| 2 | Esercizi completati in fondo alla lista | Implementato, in verifica |
 | 3 | Durata allenamento da timestamp backend, nello storico | Da fare |
 | 4 | Recupero persistente: pausa/ripresa, +30s, salto confermato, controllo versione | Da fare |
 | 5 | Storico filtrabile con filtri URL, risultati peso/ripetizioni, statistiche e record | Da fare |
@@ -13,9 +13,9 @@ Base richiesta: `fixV2` da `4f1f997`. Ogni passo viene provato dal proprietario 
 
 ## Passo 1: ordine durante l’esecuzione
 
-Nel percorso Esercizi compaiono Su/Giù sugli esercizi ancora da svolgere. Il primo fra gli incompleti diventa quello corrente. È possibile cambiare prima di iniziare oppure fra le serie, anche durante il recupero. Cambiare ordine non sospende il recupero e non cancella alcuna serie. Tornando a un esercizio parzialmente svolto si riparte dalla prima serie incompleta. Completati/saltati restano chiusi.
+Nel percorso Esercizi compare una maniglia da trascinare sugli esercizi ancora da svolgere. Funziona con mouse, touch e penna; da tastiera Spazio seleziona, le frecce spostano, Invio salva ed Esc annulla. L’ordine viene mostrato in anteprima e salvato una volta al rilascio, con scorrimento automatico vicino ai bordi dello schermo. Il primo fra gli incompleti diventa quello corrente. È possibile cambiare prima di iniziare oppure fra le serie, anche durante il recupero. Cambiare ordine non sospende il recupero e non cancella alcuna serie. Tornando a un esercizio parzialmente svolto si riparte dalla prima serie incompleta. Completati/saltati restano chiusi.
 
-Il cambiamento riguarda soltanto questo allenamento: la scheda condivisa dell’ADMIN resta invariata. Le posizioni degli incompleti vengono scambiate negli spazi già disponibili; i completati non vengono automaticamente spostati in questa tranche (passo 2).
+Il cambiamento riguarda soltanto questo allenamento: la scheda condivisa dell’ADMIN resta invariata. Le posizioni degli incompleti vengono scambiate negli spazi già disponibili; la lista mostra sempre prima gli incompleti nell’ordine salvato, poi completati e saltati nell’ordine delle loro posizioni. Gli esercizi chiusi non hanno maniglie, non sono destinazioni di trascinamento e non entrano nella richiesta di riordino. La disposizione in fondo si aggiorna dopo il completamento e resta coerente dopo un refresh, senza modificare i risultati registrati.
 
 ### API e persistenza
 
@@ -37,7 +37,7 @@ Dopo un cambio branch avviare una volta con `./mvnw clean spring-boot:run` per r
 
 ### Verifica automatica
 
-- Frontend: tre nuove prove per ordine persistito/refresh, esercizio corrente e serie/recupero conservati; risincronizzazione 409; blocco azioni durante il salvataggio e workout chiusi.
+- Frontend: prove per trascinamento mouse/touch, anteprima e salvataggio singolo, annullamento, completati in fondo e bloccati, invalidazione di una selezione dopo aggiornamenti server; oltre alle prove per ordine persistito/refresh, esercizio corrente e serie/recupero conservati; risincronizzazione 409; blocco azioni durante il salvataggio e workout chiusi.
 - Integrazioni PostgreSQL: ordine persistito e ripresa di un esercizio parziale; scheda originale immutata; retry; revisione obsoleta; esecuzione del nuovo primo esercizio; impossibilità di riaprire completati; input non valido e isolamento utenti/ruoli; riordini identici e differenti concorrenti.
 - Workflow Verify attivato anche sui push `fixV2`, senza deploy.
 
@@ -67,11 +67,11 @@ npm ci
 npm run dev
 ```
 
-1. Aprire una sessione con almeno due esercizi e spostare il secondo in cima con Su. Verificare il cambio dell’esercizio corrente.
+1. Aprire una sessione con almeno due esercizi e trascinare il secondo in cima dalla maniglia. Verificare il cambio dell’esercizio corrente.
 2. Completare una serie di un esercizio con più serie, spostarlo sotto un altro e verificare che il recupero non sparisca né riparta.
 3. Ricaricare: ordine e serie svolte devono restare. Riportare l’esercizio parziale in cima: deve proporre la serie successiva.
-4. Finire l’esercizio scelto: deve avanzare secondo il nuovo ordine. Completati/saltati non devono avere pulsanti di riordino.
+4. Finire l’esercizio scelto: deve avanzare secondo il nuovo ordine. Completati/saltati devono comparire in fondo senza maniglie.
 5. Aprire lo stesso allenamento in due schede: salvare un ordine nella prima, poi nella seconda. La seconda deve allinearsi allo stato recente, senza sovrascrivere un ordine obsoleto.
-6. Controllare che l’ADMIN veda la scheda originale e provare i pulsanti anche da telefono.
+6. Controllare che l’ADMIN veda la scheda originale e provare il trascinamento anche da telefono.
 
 L’applicazione della migrazione è automatica all’avvio backend tramite Flyway; non eliminare il database per provarla.

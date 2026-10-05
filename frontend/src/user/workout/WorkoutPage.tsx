@@ -1,6 +1,6 @@
 import { useRef, useState, type CSSProperties } from 'react';
 import { Link, useParams } from 'react-router';
-import { ArrowDown, ArrowUp, CheckCheck, Hourglass, OctagonX, PartyPopper, SkipForward, TimerReset, Trophy, Volume2, VolumeX } from 'lucide-react';
+import { CheckCheck, Hourglass, OctagonX, PartyPopper, SkipForward, TimerReset, Trophy, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '../../shared/components/Button';
 import { Alert, ErrorAlert } from '../../shared/components/Alert';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
@@ -10,9 +10,10 @@ import { formatDuration, formatRest } from '../../shared/utils/format';
 import { repsLabel } from '../../shared/api/planTypes';
 import { STALE_STATE_CODES, useWorkout, useWorkoutAction, workoutApi, type WorkoutState } from './api';
 import { useRestTimer } from './useRestTimer';
-import { ExerciseStatusBadge, WorkoutStatusBadge } from './ExerciseStatusBadge';
+import { WorkoutStatusBadge } from './ExerciseStatusBadge';
 import { celebrate, transitions, type Feedback } from './feedback';
 import { useRestAlert } from './useRestAlert';
+import { WorkoutExerciseList } from './WorkoutExerciseList';
 
 /** Workout execution (US-17, US-18, US-20, US-23): usable one-handed from 360 px. */
 export function WorkoutPage() {
@@ -39,16 +40,11 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
   const reorder = useWorkoutAction(state.workoutId,
     (args: { exerciseIds: string[]; expectedVersion: number }) =>
       workoutApi.reorder(state.workoutId, args.exerciseIds, args.expectedVersion), true);
-  const busy = complete.isPending || skip.isPending || interrupt.isPending || reorder.isPending;
-  const pending = state.exercises.filter((e) => e.status === 'TODO' || e.status === 'IN_PROGRESS')
-    .sort((a, b) => a.position - b.position);
-  const move = (exerciseId: string, offset: number) => {
-    if (busy) return;
-    const ids = pending.map((e) => e.id);
-    const from = ids.indexOf(exerciseId);
-    const to = from + offset;
-    if (from < 0 || to < 0 || to >= ids.length) return;
-    [ids[from], ids[to]] = [ids[to]!, ids[from]!];
+  const [dragging, setDragging] = useState(false);
+  const saving = complete.isPending || skip.isPending || interrupt.isPending || reorder.isPending;
+  const busy = saving || dragging;
+  const saveOrder = (ids: string[]) => {
+    if (saving) return;
     complete.reset(); skip.reset(); interrupt.reset(); reorder.reset();
     setFeedback(null);
     reorder.mutate({ exerciseIds: ids, expectedVersion: state.executionVersion }, {
@@ -253,37 +249,8 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
         <h2 id="exercise-list-title" style={{ fontSize: 'var(--text-xl)' }}>
           Esercizi
         </h2>
-        {!finished && pending.length > 1 ? (
-          <p className="small muted">Sposta gli esercizi con Su e Giù. Il primo da svolgere diventa quello corrente; le serie già svolte e il recupero restano salvati.</p>
-        ) : null}
-        <ol className="list workout-exercises">
-          {state.exercises.map((e) => (
-            <li key={e.id} className={`list-item${e.id === state.currentExerciseId ? ' list-item--current' : ''}${e.status === 'COMPLETED' ? ' list-item--done' : ''}`}>
-              <div className="list-item__main">
-                <div className="list-item__title">
-                  <span className="exercise-row__number" aria-hidden="true">{e.position}</span>{e.exerciseName}
-                </div>
-                <div className="list-item__meta">
-                  {e.muscleGroupName} · {e.setsCompleted}/{e.setsPlanned} serie ·{' '}
-                  {e.sets.map((s) => repsLabel({ reps: s.repsPlanned, toFailure: s.toFailure })).join(' / ')}
-                </div>
-              </div>
-              <div className="workout-exercise-controls">
-                <ExerciseStatusBadge status={e.status} />
-                {!finished && pending.some((item) => item.id === e.id) && pending.length > 1 ? (
-                  <div className="row" role="group" aria-label={`Ordine di ${e.exerciseName}`}>
-                    <Button variant="secondary" size="sm" aria-label={`Sposta su ${e.exerciseName}`}
-                      icon={<ArrowUp size={18} aria-hidden="true" />} disabled={busy || pending[0]?.id === e.id}
-                      onClick={() => move(e.id, -1)}>Su</Button>
-                    <Button variant="secondary" size="sm" aria-label={`Sposta giù ${e.exerciseName}`}
-                      icon={<ArrowDown size={18} aria-hidden="true" />} disabled={busy || pending.at(-1)?.id === e.id}
-                      onClick={() => move(e.id, 1)}>Giù</Button>
-                  </div>
-                ) : null}
-              </div>
-            </li>
-          ))}
-        </ol>
+        <WorkoutExerciseList key={`${state.workoutId}:${state.executionVersion}:${state.status}`}
+          state={state} busy={saving} onSave={saveOrder} onDraggingChange={setDragging} />
       </section>
 
       </div>
