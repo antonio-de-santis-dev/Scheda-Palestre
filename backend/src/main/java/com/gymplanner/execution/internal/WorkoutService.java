@@ -90,7 +90,7 @@ class WorkoutService {
                 .forEach(section -> section.exercises().stream()
                         .sorted(Comparator.comparingInt(PlanStructure.Exercise::position))
                         .forEach(exercise -> {
-                            WorkoutExercise we = workout.addExercise(exercise.id(), exercise.exerciseName(),
+                            WorkoutExercise we = workout.addExercise(exercise.id(), exercise.exerciseId(), exercise.exerciseName(),
                                     section.muscleGroupName());
                             exercise.sets().forEach(s -> we.addSet(s.setIndex(), s.reps(), s.toFailure(), s.restSeconds()));
                         }));

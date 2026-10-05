@@ -58,6 +58,105 @@ class HistoryIntegrationTest {
         clock.reset();
     }
 
+    private Api.Response startAt(LocalDate day) {
+        clock.setDate(day);
+        return api.post(user, "/api/me/workouts", "{\"date\":\"" + day + "\"}").expect(201);
+    }
+
+    private void interrupt(Api.Response state) {
+        api.post(user, "/api/me/workouts/" + state.read("$.workoutId") + "/interrupt", null).expect(200);
+    }
+
+    @Test
+    void catalogIdentitySurvivesRenameAndRemovalOfThePlanEntry() {
+        UUID entryId = plan.planExerciseIds().getFirst();
+        UUID catalogId = jdbc.queryForObject("select exercise_id from plan_exercises where id = ?", UUID.class, entryId);
+        Api.Response initial = startAt(MONDAY);
+        String workoutId = initial.read("$.workoutId");
+        String snapshotName = initial.read("$.exercises[0].exerciseName");
+        assertThat((String) initial.read("$.exercises[0].identity.source")).isEqualTo("CATALOG");
+        assertThat((String) initial.read("$.exercises[0].identity.id")).isEqualTo(catalogId.toString());
+        interrupt(initial);
+        jdbc.update("update exercises set name = 'Nome nuovo' where id = ?", catalogId);
+        jdbc.update("delete from plan_exercises where id = ?", entryId);
+        jdbc.update("delete from exercises where id = ?", catalogId);
+        Api.Response history = api.get(user, "/api/me/workouts/" + workoutId).expect(200);
+        assertThat((String) history.read("$.exercises[0].exerciseName")).isEqualTo(snapshotName);
+        assertThat((String) history.read("$.exercises[0].identity.id")).isEqualTo(catalogId.toString());
+        assertThat(jdbc.queryForObject("select catalog_exercise_id from workout_exercises where id = ?", UUID.class,
+                UUID.fromString(history.read("$.exercises[0].id")))).isEqualTo(catalogId);
+    }
+
+    @Test
+    void sameCatalogExerciseAcrossDifferentPlanEntriesKeepsTheSameIdentity() {
+        UUID a = plan.planExerciseIds().getFirst(), b = plan.planExerciseIds().get(2);
+        UUID catalogId = jdbc.queryForObject("select exercise_id from plan_exercises where id = ?", UUID.class, a);
+        // A second occurrence in the same section is allowed and has a different plan-entry UUID.
+        UUID section = jdbc.queryForObject("select muscle_section_id from plan_exercises where id = ?", UUID.class, a);
+        jdbc.update("update plan_exercises set muscle_section_id = ?, position = 3, exercise_id = ? where id = ?", section, catalogId, b);
+        Api.Response state = startAt(MONDAY);
+        assertThat((List<String>) state.read("$.exercises[*].identity.id"))
+                .containsExactly(catalogId.toString(),
+                        jdbc.queryForObject("select exercise_id from plan_exercises where id = ?", UUID.class, plan.planExerciseIds().get(1)).toString(),
+                        catalogId.toString());
+        assertThat((List<String>) state.read("$.exercises[*].id")).doesNotHaveDuplicates();
+        assertThat((List<String>) state.read("$.exercises[*].identity.source")).containsOnly("CATALOG");
+    }
+
+    @Test
+    void duplicatedPlansKeepCatalogIdentityEvenWithDifferentEntryAndSnapshotIds() {
+        Api.Response original = startAt(MONDAY);
+        Api.Response copy = api.post(admin, "/api/admin/plans/" + plan.planId() + "/duplicate", null).expect(201);
+        AuthenticatedUser other = fixtures.createUser();
+        String assignment = api.post(admin, "/api/admin/assignments", """
+                {"planId":"%s","userIds":["%s"],"startDate":"%s","activate":true}"""
+                .formatted(copy.read("$.id"), other.id(), MONDAY)).expect(201).read("$[0].id");
+        api.put(other, "/api/me/assignments/" + assignment + "/schedule", "{\"weekdays\":[1]}").expect(200);
+        Api.Response second = api.post(other, "/api/me/workouts", "{\"date\":\"" + MONDAY + "\"}").expect(201);
+        assertThat((String) copy.read("$.sessions[0].sections[0].exercises[0].id"))
+                .isNotEqualTo(plan.planExerciseIds().getFirst().toString());
+        assertThat((String) second.read("$.exercises[0].id")).isNotEqualTo(original.read("$.exercises[0].id"));
+        assertThat((Map<String, Object>) second.read("$.exercises[0].identity"))
+                .isEqualTo(original.read("$.exercises[0].identity"));
+        api.get(other, "/api/me/workouts/" + original.read("$.workoutId")).expect(404);
+    }
+
+    @Test
+    void equalNamesInDifferentGroupsDoNotShareAnIdentity() {
+        UUID a = plan.planExerciseIds().getFirst(), b = plan.planExerciseIds().get(2);
+        UUID catalogA = jdbc.queryForObject("select exercise_id from plan_exercises where id = ?", UUID.class, a);
+        UUID catalogB = jdbc.queryForObject("select exercise_id from plan_exercises where id = ?", UUID.class, b);
+        jdbc.update("update exercises set name = 'Omonimo' where id in (?, ?)", catalogA, catalogB);
+        Api.Response monday = startAt(MONDAY); interrupt(monday);
+        Api.Response tuesday = startAt(MONDAY.plusDays(1));
+        assertThat((String) monday.read("$.exercises[0].exerciseName")).isEqualTo(tuesday.read("$.exercises[0].exerciseName"));
+        assertThat((String) monday.read("$.exercises[0].identity.id")).isEqualTo(catalogA.toString());
+        assertThat((String) tuesday.read("$.exercises[0].identity.id")).isEqualTo(catalogB.toString());
+        assertThat(catalogA).isNotEqualTo(catalogB);
+    }
+
+    @Test
+    void legacyIdentityStaysSeparateFromCatalogAndSurvivesDeletingThePlanEntry() {
+        Api.Response state = startAt(MONDAY);
+        String id = state.read("$.workoutId");
+        UUID snapshotId = UUID.fromString(state.read("$.exercises[0].id"));
+        UUID entryId = plan.planExerciseIds().getFirst();
+        // Simulate an old snapshot: its saved legacy UUID is not a catalog identity.
+        jdbc.update("update workout_exercises set catalog_exercise_id = null where id = ?", snapshotId);
+        interrupt(state);
+        Api.Response legacy = api.get(user, "/api/me/workouts/" + id).expect(200);
+        assertThat((String) legacy.read("$.exercises[0].identity.source")).isEqualTo("LEGACY");
+        assertThat((String) legacy.read("$.exercises[0].identity.id")).isEqualTo(entryId.toString());
+        jdbc.update("delete from plan_exercises where id = ?", entryId);
+        Api.Response reopened = api.get(user, "/api/me/workouts/" + id).expect(200);
+        assertThat((Map<String, Object>) reopened.read("$.exercises[0].identity")).isEqualTo(legacy.read("$.exercises[0].identity"));
+        // A legacy snapshot whose original reference is already lost keeps its own UUID.
+        jdbc.update("update workout_exercises set legacy_exercise_id = null where id = ?", snapshotId);
+        reopened = api.get(user, "/api/me/workouts/" + id).expect(200);
+        assertThat((String) reopened.read("$.exercises[0].identity.id")).isEqualTo(snapshotId.toString());
+        assertThat((String) reopened.read("$.exercises[0].identity.source")).isEqualTo("LEGACY");
+    }
+
     @Test
     void historyListsWorkoutsNewestFirstWithSkippedExercises() {
         // Monday: first exercise completed, second skipped.

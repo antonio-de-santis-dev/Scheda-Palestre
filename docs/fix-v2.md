@@ -9,9 +9,20 @@ Base richiesta: `fixV2` da `4f1f997`. Ogni passo viene provato dal proprietario 
 | 3 | Durata allenamento da timestamp backend, nello storico | Integrato in delpy, merge 2d3e34d |
 | 4 | Recupero persistente: pausa/ripresa, +30s, salto confermato, controllo versione | Integrato in delpy, merge 13d15e7 |
 | 5a | Storico filtrabile con filtri URL | Integrato in delpy, merge c7d55d5 |
-| 5b | Risultati effettivi: peso e ripetizioni per serie | Implementato, in verifica su fixV2 |
-| 5c | Identità storica, volume, statistiche, grafici e record | Da fare dopo la prova dei risultati |
+| 5b | Risultati effettivi: peso e ripetizioni per serie | Integrato in delpy, merge 1cff5cb |
+| 5c | Identità storica degli esercizi | Implementato, in verifica su fixV2 |
+| 5d | Volume, statistiche, grafici e record | Da fare dopo la prova dell’identità |
 | Finale | Verifiche complete e deploy | Da fare |
+
+## Passo 5c: identità storica degli esercizi
+
+Ogni esercizio restituito nello stato o nel dettaglio storico include `identity: {source, id}`. La chiave completa è la coppia: `CATALOG` + UUID del catalogo oppure `LEGACY` + UUID storico; UUID dei due ambiti non vengono confusi. Nome e gruppo rimangono i valori dello snapshot, ma non sono usati come chiave.
+
+Per i nuovi allenamenti l’UUID del catalogo viene preso dalla struttura pubblica della scheda all’avvio e conservato nella colonna `catalog_exercise_id` della V14 originale. Non ci sono collegamenti JPA o FK al catalogo: rinomina, spostamento, rimozione della voce dalla scheda o eliminazione del catalogo non cambiano l’identità già salvata. Più occorrenze dello stesso esercizio, anche in schede diverse, hanno la stessa identità; esercizi distinti omonimi rimangono distinti.
+
+Per i dati precedenti si conserva `legacy_exercise_id`, che rappresenta la vecchia voce della scheda quando ancora disponibile, oppure il singolo snapshot. La nuova V19 colma solo le identità mancanti dei workout creati da fixV2 dopo V14: usa il vecchio `plan_exercise_id` se ancora presente, altrimenti l’UUID del workout exercise. Non deduce mai un catalogo dal nome o dalla scheda attuale. Se il riferimento originale è già perso, registrazioni separate non vengono unite. Il dettaglio segnala questa limitazione per gli esercizi legacy. Le migrazioni precedenti non vengono modificate; risultati, ordine e timer sono conservati.
+
+Prova locale: aprire un vecchio storico e verificare l’avviso di identità limitata; iniziare un nuovo allenamento e controllare `exercises[].identity` nella risposta API. Rinominarne o rimuoverne l’esercizio dalla scheda tramite ADMIN: riaprendo lo storico nome originario e identità devono restare. Due esercizi distinti con lo stesso nome devono avere UUID diversi. Questa base sarà usata per volume e record nei prossimi passi, dopo la prova.
 
 ## Passo 5b: risultati effettivi per serie
 

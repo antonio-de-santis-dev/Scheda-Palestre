@@ -265,3 +265,7 @@ le altre sessioni aperte dell'utente.
 ### Risultati effettivi delle serie (fixV2)
 
 Il completamento serie `POST /api/me/workouts/{id}/sets/{setId}/complete` accetta il corpo facoltativo `{ "weightKgUsed": 32.75, "repsActual": 8 }`. Campi opzionali/null: risultato non registrato; zero: risultato esplicito. Peso tra 0 e 1000 con massimo due decimali; ripetizioni intere tra 0 e 1000. `SetState` restituisce `weightKgUsed` e `repsActual` anche nello storico. I valori previsti restano distinti. Retry identico idempotente; payload diverso su serie completata: 409 `SET_RESULTS_CHANGED`, senza modifiche. Richieste legacy senza corpo continuano a funzionare e non cancellano risultati salvati. Nessuna nuova migrazione: colonne V13.
+
+### Identità storica degli esercizi (fixV2)
+
+`ExerciseState.identity` contiene `{ "source": "CATALOG", "id": "UUID" }` per snapshot nuovi, oppure `source: "LEGACY"` per riferimenti storici limitati. La chiave è la coppia source/id: non usare nome o gruppo per collegare esercizi. L’UUID del catalogo è persistito all’avvio e resta disponibile dopo rinomina/eliminazione della voce originaria. I legacy conservano la vecchia voce della scheda o il proprio UUID di snapshot, senza deduzione del catalogo. La V19 riempie esclusivamente identità legacy mancanti e conserva riferimenti già salvati; risultati e recuperi restano invariati.

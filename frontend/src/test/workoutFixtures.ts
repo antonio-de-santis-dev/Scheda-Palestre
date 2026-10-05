@@ -17,6 +17,7 @@ export function workoutState(overrides: Partial<Raw> = {}): Raw {
     exercises: [
       {
         id: 'e-1',
+        identity: { source: 'CATALOG', id: 'catalog-1' },
         position: 1,
         status: 'IN_PROGRESS',
         exerciseName: 'Panca',
@@ -30,6 +31,7 @@ export function workoutState(overrides: Partial<Raw> = {}): Raw {
       },
       {
         id: 'e-2',
+        identity: { source: 'CATALOG', id: 'catalog-2' },
         position: 2,
         status: 'TODO',
         exerciseName: 'Trazioni',

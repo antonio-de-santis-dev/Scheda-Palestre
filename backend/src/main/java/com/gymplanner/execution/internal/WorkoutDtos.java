@@ -52,8 +52,14 @@ final class WorkoutDtos {
             BigDecimal weightKgUsed, Integer repsActual) {
     }
 
+    enum IdentitySource { CATALOG, LEGACY }
+
+    /** The source is part of the key: a legacy plan-entry UUID is never a catalog UUID. */
+    record ExerciseIdentity(IdentitySource source, UUID id) {
+    }
+
     record ExerciseState(UUID id, int position, WorkoutExerciseStatus status, String exerciseName,
-            String muscleGroupName, int setsPlanned, int setsCompleted, List<SetState> sets) {
+            String muscleGroupName, int setsPlanned, int setsCompleted, List<SetState> sets, ExerciseIdentity identity) {
     }
 
     /**
