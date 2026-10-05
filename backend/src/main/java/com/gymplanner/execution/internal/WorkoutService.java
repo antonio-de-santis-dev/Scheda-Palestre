@@ -114,8 +114,8 @@ class WorkoutService {
     /** Essential history (US-24): newest first, values taken from the snapshot. */
     @Transactional(readOnly = true)
     public org.springframework.data.domain.Page<WorkoutDtos.WorkoutSummary> history(UUID userId,
-            org.springframework.data.domain.Pageable pageable) {
-        return workouts.findByUserId(userId, pageable).map(WorkoutDtos.WorkoutSummary::of);
+            org.springframework.data.domain.Pageable pageable, WorkoutHistoryFilter filter) {
+        return workouts.findAll(filter.ownedBy(userId), pageable).map(WorkoutDtos.WorkoutSummary::of);
     }
 
     @Transactional(readOnly = true)

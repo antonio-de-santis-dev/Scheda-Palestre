@@ -61,9 +61,14 @@ class WorkoutController {
 
     @GetMapping("/workouts")
     PageResponse<WorkoutDtos.WorkoutSummary> history(@AuthenticationPrincipal AuthenticatedUser user,
-            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
-        Sort sort = Sort.by(Sort.Order.desc("scheduledDate"), Sort.Order.desc("startedAt"));
-        return PageResponse.of(workouts.history(user.id(), Paging.of(page, size, sort)), s -> s);
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) WorkoutStatus status,
+            @RequestParam(required = false) String q) {
+        Sort sort = Sort.by(Sort.Order.desc("scheduledDate"), Sort.Order.desc("startedAt"), Sort.Order.desc("id"));
+        return PageResponse.of(workouts.history(user.id(), Paging.of(page, size, sort),
+                new WorkoutHistoryFilter(from, to, status, q)), s -> s);
     }
 
     /** Full state of one of the user's workouts (resume after reload, history detail). */

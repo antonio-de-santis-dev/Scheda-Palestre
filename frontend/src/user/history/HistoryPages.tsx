@@ -1,8 +1,12 @@
 import { useSearchParams, useParams, Link } from 'react-router';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { History } from 'lucide-react';
 import { http } from '../../shared/api/http';
 import type { Page } from '../../shared/api/types';
+import { Alert } from '../../shared/components/Alert';
+import { Button } from '../../shared/components/Button';
+import { HistoryFilterForm } from './HistoryFilterForm';
+import { HISTORY_FILTER_KEYS, historyFilterError, historyPage, readHistoryFilters, type HistoryFilters } from './filters';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { EmptyState, QueryState } from '../../shared/components/States';
 import { Pagination } from '../../shared/components/Pagination';
@@ -12,35 +16,57 @@ import { useWorkout, type WorkoutSummary } from '../workout/api';
 import { WorkoutDuration } from '../workout/WorkoutDuration';
 import { ExerciseStatusBadge, WorkoutStatusBadge } from '../workout/ExerciseStatusBadge';
 
-function useHistory(page: number) {
+function useHistory(page: number, filters: HistoryFilters, enabled: boolean) {
   return useQuery({
-    queryKey: ['me', 'history', page],
-    queryFn: () => http.get<Page<WorkoutSummary>>('/api/me/workouts', { page, size: 20 }),
-    placeholderData: keepPreviousData,
+    queryKey: ['me', 'history', page, filters],
+    queryFn: () => http.get<Page<WorkoutSummary>>('/api/me/workouts', { page, size: 20, ...filters }),
+    enabled,
   });
 }
 
 /** US-24: essential history with snapshot values. */
 export function HistoryPage() {
   const [params, setParams] = useSearchParams();
-  const page = Number(params.get('page') ?? '0') || 0;
-  const query = useHistory(page);
+  const page = historyPage(params);
+  const filters = readHistoryFilters(params);
+  const invalid = historyFilterError(filters);
+  const query = useHistory(page, filters, !invalid);
+  const filtered = HISTORY_FILTER_KEYS.some((key) => !!filters[key]);
+  const changePage = (nextPage: number) => {
+    const next = new URLSearchParams(params);
+    if (nextPage) next.set('page', String(nextPage)); else next.delete('page');
+    setParams(next);
+  };
+  const apply = (values: HistoryFilters) => {
+    const next = new URLSearchParams(params);
+    next.delete('page');
+    for (const key of HISTORY_FILTER_KEYS) {
+      if (values[key]) next.set(key, values[key]); else next.delete(key);
+    }
+    setParams(next);
+  };
+  const search = params.toString();
   return (
     <>
       <PageHeader title="Storico" subtitle="I tuoi allenamenti, dal più recente." />
-      <QueryState isLoading={query.isLoading} error={query.error} onRetry={() => void query.refetch()}>
+      <HistoryFilterForm key={search} filters={filters} onApply={apply}
+        onReset={() => apply({ from: '', to: '', status: '', q: '' })} />
+      {invalid ? <Alert tone="error"><p>{invalid}</p></Alert> : <QueryState isLoading={query.isLoading} error={query.error} onRetry={() => void query.refetch()}>
         {query.data && query.data.content.length === 0 ? (
-          <EmptyState title="Nessun allenamento ancora" icon={<History size={40} />}>
-            <p>Gli allenamenti svolti compariranno qui.</p>
+          <EmptyState title={query.data.totalElements > 0 ? 'Nessun allenamento in questa pagina'
+            : filtered ? 'Nessun allenamento corrisponde ai filtri' : 'Nessun allenamento ancora'} icon={<History size={40} />}>
+            <p>{filtered ? 'Modifica o azzera i filtri per cercare altri allenamenti.' : 'Gli allenamenti svolti compariranno qui.'}</p>
+            {query.data.totalElements > 0 ? <Button variant="secondary" onClick={() => changePage(0)}>Vai alla prima pagina</Button> : null}
           </EmptyState>
         ) : (
           <>
+            {query.data ? <p className="small muted" role="status">{query.data.totalElements} allenamenti</p> : null}
             <ul className="list" aria-label="Allenamenti">
               {query.data?.content.map((w) => (
                 <li key={w.id} className="list-item">
                   <div className="list-item__main">
                     <div className="list-item__title">
-                      <Link to={`/app/history/${w.id}`}>
+                      <Link to={`/app/history/${w.id}${search ? `?${search}` : ''}`}>
                         {w.sessionTitle} · {formatLongDate(w.scheduledDate)}
                       </Link>
                     </div>
@@ -57,17 +83,19 @@ export function HistoryPage() {
             <Pagination
               page={query.data?.page ?? 0}
               totalPages={query.data?.totalPages ?? 0}
-              onChange={(p) => setParams({ page: String(p) })}
+              onChange={changePage}
             />
           </>
         )}
-      </QueryState>
+      </QueryState>}
     </>
   );
 }
 
 export function HistoryDetailPage() {
   const { workoutId = '' } = useParams();
+  const [params] = useSearchParams();
+  const search = params.toString();
   const query = useWorkout(workoutId);
   const w = query.data;
   return (
@@ -75,7 +103,7 @@ export function HistoryDetailPage() {
       <PageHeader
         title={w ? w.sessionTitle : 'Allenamento'}
         subtitle={w ? `${w.planName} · ${formatLongDate(w.scheduledDate)}` : undefined}
-        back={{ to: '/app/history', label: 'Storico' }}
+        back={{ to: `/app/history${search ? `?${search}` : ''}`, label: 'Storico' }}
       />
       <QueryState isLoading={query.isLoading} error={query.error} onRetry={() => void query.refetch()}>
         {w ? (
