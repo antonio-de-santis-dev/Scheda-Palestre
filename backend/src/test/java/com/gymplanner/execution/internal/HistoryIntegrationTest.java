@@ -158,6 +158,46 @@ class HistoryIntegrationTest {
     }
 
     @Test
+    void volumeIsConsistentInActionsHistoryAndReloadWithMissingResults() {
+        Api.Response initial = startAt(MONDAY);
+        String id = initial.read("$.workoutId");
+        Api.Response saved = api.post(user, "/api/me/workouts/" + id + "/sets/" + initial.read("$.currentSetId") + "/complete",
+                "{\"weightKgUsed\":32.75,\"repsActual\":8}").expect(200);
+        assertThat(((Number) saved.read("$.volume.recordedKgReps")).doubleValue()).isEqualTo(262);
+        assertThat((Integer) saved.read("$.volume.recordedSets")).isEqualTo(1);
+        assertThat(((Number) saved.read("$.exercises[0].volume.recordedKgReps")).doubleValue()).isEqualTo(262);
+        clock.advance(java.time.Duration.ofSeconds(60));
+        Api.Response finished = api.post(user, "/api/me/workouts/" + id + "/sets/" + saved.read("$.currentSetId") + "/complete",
+                "{\"weightKgUsed\":40}").expect(200);
+        assertThat((Integer) finished.read("$.volume.completedSets")).isEqualTo(2);
+        assertThat((Integer) finished.read("$.volume.recordedSets")).isEqualTo(1);
+        assertThat((Integer) finished.read("$.volume.missingWeightSets")).isZero();
+        assertThat((Integer) finished.read("$.volume.missingRepsSets")).isEqualTo(1);
+        Api.Response reloaded = api.get(user, "/api/me/workouts/" + id).expect(200);
+        Api.Response history = api.get(user, "/api/me/workouts", Map.of("status", "COMPLETED", "q", "Storico")).expect(200);
+        assertThat((Map<String, Object>) reloaded.read("$.volume")).isEqualTo(finished.read("$.volume"));
+        assertThat((Map<String, Object>) history.read("$.content[0].volume")).isEqualTo(finished.read("$.volume"));
+    }
+
+    @Test
+    void partiallyPerformedExerciseRetainsRecordedVolumeWhenSkippedAndInterrupted() {
+        UUID entryId = plan.planExerciseIds().getFirst();
+        jdbc.update("update plan_exercises set sets_count = 2, rest_seconds = 0 where id = ?", entryId);
+        Api.Response initial = startAt(MONDAY);
+        String id = initial.read("$.workoutId");
+        api.post(user, "/api/me/workouts/" + id + "/sets/" + initial.read("$.currentSetId") + "/complete",
+                "{\"weightKgUsed\":25,\"repsActual\":8}").expect(200);
+        Api.Response skipped = api.post(user, "/api/me/workouts/" + id + "/exercises/" + initial.read("$.currentExerciseId") + "/skip", null).expect(200);
+        interrupt(skipped);
+        Api.Response loaded = api.get(user, "/api/me/workouts/" + id).expect(200);
+        assertThat(((Number) loaded.read("$.volume.recordedKgReps")).doubleValue()).isEqualTo(200);
+        assertThat((Integer) loaded.read("$.volume.completedSets")).isEqualTo(1);
+        assertThat((Integer) loaded.read("$.volume.missingRepsSets")).isZero();
+        assertThat((String) loaded.read("$.exercises[0].status")).isEqualTo("SKIPPED");
+        assertThat((Integer) loaded.read("$.exercises[0].volume.recordedSets")).isEqualTo(1);
+    }
+
+    @Test
     void historyListsWorkoutsNewestFirstWithSkippedExercises() {
         // Monday: first exercise completed, second skipped.
         Api.Response state = api.post(user, "/api/me/workouts", "{\"date\":\"" + MONDAY + "\"}").expect(201);

@@ -10,6 +10,14 @@ export interface RestRequest { action: RestAction; expectedVersion: number; expe
 
 export type NextAction = 'COMPLETE_SET' | 'WAIT_FOR_REST' | 'FINISHED';
 
+export interface VolumeSummary {
+  recordedKgReps: number | null;
+  completedSets: number;
+  recordedSets: number;
+  missingWeightSets: number;
+  missingRepsSets: number;
+}
+
 export interface SetResults { weightKgUsed: number | null; repsActual: number | null }
 
 export interface WorkoutSetState extends SetResults {
@@ -25,6 +33,7 @@ export interface ExerciseIdentity { source: 'CATALOG' | 'LEGACY'; id: string }
 
 export interface WorkoutExerciseState {
   identity: ExerciseIdentity;
+  volume: VolumeSummary;
   id: string;
   position: number;
   status: ExerciseStatus;
@@ -46,6 +55,7 @@ export interface WorkoutState {
   finishedAt: string | null;
   /** Final seconds calculated by the backend from persisted start/end instants. */
   durationSeconds: number | null;
+  volume: VolumeSummary;
   exercises: WorkoutExerciseState[];
   currentExerciseId: string | null;
   currentSetId: string | null;
@@ -70,6 +80,7 @@ export interface WorkoutSummary {
   finishedAt: string | null;
   /** Final seconds calculated by the backend from persisted start/end instants. */
   durationSeconds: number | null;
+  volume: VolumeSummary;
   totalExercises: number;
   completedExercises: number;
   skippedExercises: number;

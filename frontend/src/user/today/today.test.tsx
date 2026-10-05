@@ -128,6 +128,7 @@ describe('today page', () => {
                   sessionTitle: 'Giorno 2',
                   startedAt: '2026-10-04T18:00:00Z',
                   finishedAt: null, durationSeconds: null,
+                  volume: { recordedKgReps: null, completedSets: 0, recordedSets: 0, missingWeightSets: 0, missingRepsSets: 0 },
                   totalExercises: 3,
                   completedExercises: 1,
                   skippedExercises: 0,

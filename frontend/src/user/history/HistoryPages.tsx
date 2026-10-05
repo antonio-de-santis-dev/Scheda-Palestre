@@ -13,6 +13,7 @@ import { Pagination } from '../../shared/components/Pagination';
 import { formatDateTime, formatLongDate, formatRest } from '../../shared/utils/format';
 import { repsLabel } from '../../shared/api/planTypes';
 import { useWorkout, type WorkoutSummary } from '../workout/api';
+import { WorkoutVolume } from './WorkoutVolume';
 import { WorkoutDuration } from '../workout/WorkoutDuration';
 import { ExerciseStatusBadge, WorkoutStatusBadge } from '../workout/ExerciseStatusBadge';
 
@@ -75,6 +76,7 @@ export function HistoryPage() {
                       {w.skippedExercises ? `, ${w.skippedExercises} saltati` : ''} su {w.totalExercises}
                     </div>
                     <div className="list-item__meta"><WorkoutDuration status={w.status} seconds={w.durationSeconds} /></div>
+                    <div className="list-item__meta"><WorkoutVolume volume={w.volume} /></div>
                   </div>
                   <WorkoutStatusBadge status={w.status} />
                 </li>
@@ -116,6 +118,8 @@ export function HistoryDetailPage() {
               </span>
             </div>
             <p className="small" style={{ margin: 0 }}><WorkoutDuration status={w.status} seconds={w.durationSeconds} /></p>
+            <WorkoutVolume volume={w.volume} detailed />
+            <p className="small muted" style={{ margin: 0 }}>Volume registrato = somma del peso usato × ripetizioni effettive delle serie completate. I dati mancanti non vengono stimati.</p>
             {w.status === 'IN_PROGRESS' ? (
               <Link to={`/app/workout/${w.workoutId}`} className="btn btn--primary">
                 Riprendi allenamento
@@ -132,6 +136,7 @@ export function HistoryDetailPage() {
                   </div>
                   <ExerciseStatusBadge status={e.status} />
                 </div>
+                <WorkoutVolume volume={e.volume} detailed />
                 {e.identity?.source === 'LEGACY' ? (
                   <p className="small muted">Identità storica limitata: questo esercizio sarà confrontabile solo con le registrazioni che conservano la stessa identità, senza associazioni basate sul nome.</p>
                 ) : null}
