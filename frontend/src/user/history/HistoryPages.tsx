@@ -9,6 +9,7 @@ import { Pagination } from '../../shared/components/Pagination';
 import { formatDateTime, formatLongDate, formatRest } from '../../shared/utils/format';
 import { repsLabel } from '../../shared/api/planTypes';
 import { useWorkout, type WorkoutSummary } from '../workout/api';
+import { WorkoutDuration } from '../workout/WorkoutDuration';
 import { ExerciseStatusBadge, WorkoutStatusBadge } from '../workout/ExerciseStatusBadge';
 
 function useHistory(page: number) {
@@ -47,6 +48,7 @@ export function HistoryPage() {
                       {w.planName} · {w.completedExercises} completati
                       {w.skippedExercises ? `, ${w.skippedExercises} saltati` : ''} su {w.totalExercises}
                     </div>
+                    <div className="list-item__meta"><WorkoutDuration status={w.status} seconds={w.durationSeconds} /></div>
                   </div>
                   <WorkoutStatusBadge status={w.status} />
                 </li>
@@ -85,6 +87,7 @@ export function HistoryDetailPage() {
                 {w.finishedAt ? ` · concluso ${formatDateTime(w.finishedAt)}` : ''}
               </span>
             </div>
+            <p className="small" style={{ margin: 0 }}><WorkoutDuration status={w.status} seconds={w.durationSeconds} /></p>
             {w.status === 'IN_PROGRESS' ? (
               <Link to={`/app/workout/${w.workoutId}`} className="btn btn--primary">
                 Riprendi allenamento

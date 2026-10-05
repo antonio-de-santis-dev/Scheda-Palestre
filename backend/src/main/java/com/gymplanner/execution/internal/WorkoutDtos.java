@@ -44,12 +44,12 @@ final class WorkoutDtos {
     record WorkoutState(UUID workoutId, WorkoutStatus status, LocalDate scheduledDate, String planName,
             String sessionTitle, Instant startedAt, Instant finishedAt, List<ExerciseState> exercises,
             UUID currentExerciseId, UUID currentSetId, Instant restEndsAt, Integer restSeconds, Instant serverTime,
-            NextAction nextAction, long executionVersion) {
+            NextAction nextAction, long executionVersion, Long durationSeconds) {
     }
 
     record WorkoutSummary(UUID id, LocalDate scheduledDate, WorkoutStatus status, String planName,
             String sessionTitle, Instant startedAt, Instant finishedAt, int totalExercises, int completedExercises,
-            int skippedExercises) {
+            int skippedExercises, Long durationSeconds) {
 
         static WorkoutSummary of(Workout w) {
             int completed = 0;
@@ -63,7 +63,7 @@ final class WorkoutDtos {
             }
             return new WorkoutSummary(w.getId(), w.getScheduledDate(), w.getStatus(), w.getPlanNameSnapshot(),
                     w.getSessionTitleSnapshot(), w.getStartedAt(), w.getFinishedAt(), w.getExercises().size(),
-                    completed, skipped);
+                    completed, skipped, w.durationSeconds());
         }
     }
 }

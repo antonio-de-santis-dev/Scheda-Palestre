@@ -84,3 +84,14 @@ export function formatRest(seconds: number): string {
 export function restText(seconds: number): string {
   return seconds === 0 ? 'nessun recupero' : `recupero ${formatRest(seconds)}`;
 }
+
+/** Elapsed workout time: hours never wrap at midnight. The backend owns the calculation. */
+export function formatWorkoutDuration(seconds: number | null | undefined): string {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return 'Non disponibile';
+  const total = Math.floor(seconds);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor(total % 3600 / 60);
+  const remainder = total % 60;
+  return [hours ? `${hours} h` : '', minutes ? `${minutes} min` : '',
+    remainder || (!hours && !minutes) ? `${remainder} s` : ''].filter(Boolean).join(' ');
+}

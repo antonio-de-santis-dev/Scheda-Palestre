@@ -13,6 +13,7 @@ import { useRestTimer } from './useRestTimer';
 import { WorkoutStatusBadge } from './ExerciseStatusBadge';
 import { celebrate, transitions, type Feedback } from './feedback';
 import { useRestAlert } from './useRestAlert';
+import { WorkoutDuration } from './WorkoutDuration';
 import { WorkoutExerciseList } from './WorkoutExerciseList';
 
 /** Workout execution (US-17, US-18, US-20, US-23): usable one-handed from 360 px. */
@@ -300,6 +301,7 @@ function FinishedCard({ state }: { state: WorkoutState }) {
       <p>
         {completed} esercizi completati{skipped ? `, ${skipped} saltati` : ''} su {state.exercises.length}.
       </p>
+      <p><WorkoutDuration status={state.status} seconds={state.durationSeconds} /></p>
       <Link to="/app/today" className="btn btn--primary">
         Torna a Oggi
       </Link>
