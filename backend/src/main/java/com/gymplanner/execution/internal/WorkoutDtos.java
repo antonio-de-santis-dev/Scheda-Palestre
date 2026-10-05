@@ -1,6 +1,8 @@
 package com.gymplanner.execution.internal;
 
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -12,6 +14,10 @@ final class WorkoutDtos {
     }
 
     record StartWorkoutRequest(@NotNull LocalDate date) {
+    }
+
+    record ReorderExercisesRequest(@NotEmpty List<@NotNull UUID> exerciseIds,
+            @NotNull @PositiveOrZero Long expectedVersion) {
     }
 
     enum NextAction {
@@ -38,7 +44,7 @@ final class WorkoutDtos {
     record WorkoutState(UUID workoutId, WorkoutStatus status, LocalDate scheduledDate, String planName,
             String sessionTitle, Instant startedAt, Instant finishedAt, List<ExerciseState> exercises,
             UUID currentExerciseId, UUID currentSetId, Instant restEndsAt, Integer restSeconds, Instant serverTime,
-            NextAction nextAction) {
+            NextAction nextAction, long executionVersion) {
     }
 
     record WorkoutSummary(UUID id, LocalDate scheduledDate, WorkoutStatus status, String planName,

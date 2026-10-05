@@ -10,9 +10,10 @@ import { formatDuration, formatRest } from '../../shared/utils/format';
 import { repsLabel } from '../../shared/api/planTypes';
 import { STALE_STATE_CODES, useWorkout, useWorkoutAction, workoutApi, type WorkoutState } from './api';
 import { useRestTimer } from './useRestTimer';
-import { ExerciseStatusBadge, WorkoutStatusBadge } from './ExerciseStatusBadge';
+import { WorkoutStatusBadge } from './ExerciseStatusBadge';
 import { celebrate, transitions, type Feedback } from './feedback';
 import { useRestAlert } from './useRestAlert';
+import { WorkoutExerciseList } from './WorkoutExerciseList';
 
 /** Workout execution (US-17, US-18, US-20, US-23): usable one-handed from 360 px. */
 export function WorkoutPage() {
@@ -36,6 +37,24 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
   const skip = useWorkoutAction(state.workoutId, (exerciseId: string) => workoutApi.skip(state.workoutId, exerciseId), true);
   const interrupt = useWorkoutAction(state.workoutId, () => workoutApi.interrupt(state.workoutId), true);
 
+  const reorder = useWorkoutAction(state.workoutId,
+    (args: { exerciseIds: string[]; expectedVersion: number }) =>
+      workoutApi.reorder(state.workoutId, args.exerciseIds, args.expectedVersion), true);
+  const [dragging, setDragging] = useState(false);
+  const saving = complete.isPending || skip.isPending || interrupt.isPending || reorder.isPending;
+  const busy = saving || dragging;
+  const saveOrder = (ids: string[]) => {
+    if (saving) return;
+    complete.reset(); skip.reset(); interrupt.reset(); reorder.reset();
+    setFeedback(null);
+    reorder.mutate({ exerciseIds: ids, expectedVersion: state.executionVersion }, {
+      onSuccess: (after) => {
+        const first = after.exercises.find((e) => e.id === after.currentExerciseId);
+        setAnnouncement(`Ordine salvato. Esercizio corrente: ${first?.exerciseName ?? ''}.`);
+      },
+    });
+  };
+
   const remaining = useRestTimer(state, refetch, () => {
     setAnnouncement('Recupero terminato: puoi completare la prossima serie.');
     restAlert.play();
@@ -58,7 +77,7 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
     void celebrate(main.kind);
   };
 
-  const error = complete.error ?? skip.error ?? interrupt.error;
+  const error = reorder.error ?? complete.error ?? skip.error ?? interrupt.error;
   // Stale screens (e.g. set completed from another tab) are re-synced by the mutation hook.
   const stale = isApiError(error) && STALE_STATE_CODES.includes(error.code);
 
@@ -169,7 +188,7 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
               </span>
               <span className="timer__value">{formatDuration(remaining)}</span>
             </div>
-          ) : announcement ? (
+          ) : announcement.startsWith('Recupero terminato') ? (
             <div className="timer timer--done" role="status">
               <span className="timer__label">
                 <TimerReset size={22} aria-hidden="true" />
@@ -187,8 +206,9 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
             aria-describedby={resting ? 'rest-hint' : undefined}
             icon={resting ? <Hourglass size={26} aria-hidden="true" /> : <CheckCheck size={26} aria-hidden="true" />}
             loading={complete.isPending}
+            disabled={busy}
             onClick={() => {
-              if (resting) {
+              if (resting || busy) {
                 return;
               }
               setAnnouncement('');
@@ -215,10 +235,10 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
 
       {!finished && current ? (
         <div className="workout-actions">
-          <Button variant="secondary" icon={<SkipForward size={20} aria-hidden="true" />} onClick={() => setConfirm('skip')}>
+          <Button variant="secondary" icon={<SkipForward size={20} aria-hidden="true" />} disabled={busy} onClick={() => setConfirm('skip')}>
             Salta esercizio
           </Button>
-          <Button variant="secondary" icon={<OctagonX size={20} aria-hidden="true" />} onClick={() => setConfirm('interrupt')}>
+          <Button variant="secondary" icon={<OctagonX size={20} aria-hidden="true" />} disabled={busy} onClick={() => setConfirm('interrupt')}>
             Interrompi
           </Button>
         </div>
@@ -229,22 +249,8 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
         <h2 id="exercise-list-title" style={{ fontSize: 'var(--text-xl)' }}>
           Esercizi
         </h2>
-        <ol className="list workout-exercises">
-          {state.exercises.map((e) => (
-            <li key={e.id} className={`list-item${e.id === state.currentExerciseId ? ' list-item--current' : ''}${e.status === 'COMPLETED' ? ' list-item--done' : ''}`}>
-              <div className="list-item__main">
-                <div className="list-item__title">
-                  <span className="exercise-row__number" aria-hidden="true">{e.position}</span>{e.exerciseName}
-                </div>
-                <div className="list-item__meta">
-                  {e.muscleGroupName} · {e.setsCompleted}/{e.setsPlanned} serie ·{' '}
-                  {e.sets.map((s) => repsLabel({ reps: s.repsPlanned, toFailure: s.toFailure })).join(' / ')}
-                </div>
-              </div>
-              <ExerciseStatusBadge status={e.status} />
-            </li>
-          ))}
-        </ol>
+        <WorkoutExerciseList key={`${state.workoutId}:${state.executionVersion}:${state.status}`}
+          state={state} busy={saving} onSave={saveOrder} onDraggingChange={setDragging} />
       </section>
 
       </div>

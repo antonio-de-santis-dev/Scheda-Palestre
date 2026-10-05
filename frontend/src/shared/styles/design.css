@@ -1051,3 +1051,26 @@ body:has(.navigation-drawer[open]) {
   }
 
 }
+
+/* Grip sorting works with mouse, pen and touch; the rest of each row scrolls normally. */
+.workout-exercise-controls { display: flex; align-items: center; flex-shrink: 0; }
+.exercise-drag-handle {
+  display: grid; place-items: center; flex-shrink: 0;
+  min-width: 44px; min-height: 44px; padding: 0;
+  border: 0; border-radius: var(--radius-md); background: transparent;
+  color: var(--color-text-muted); cursor: grab; touch-action: none; user-select: none;
+}
+.exercise-drag-handle:hover { background: var(--color-bg); color: var(--color-text); }
+.exercise-drag-handle:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.exercise-drag-handle:disabled { opacity: .4; cursor: default; }
+.list-item--dragging {
+  position: relative; z-index: 1; outline: 2px solid var(--color-primary);
+  border-radius: var(--radius-md); box-shadow: 0 8px 24px #0003;
+}
+.list-item--dragging .exercise-drag-handle { cursor: grabbing; color: var(--color-primary); }
+.workout-exercises .list-item__main { min-width: 0; }
+.workout-exercises .list-item__title { overflow-wrap: anywhere; }
+@media (max-width: 420px) {
+  .workout-exercises .list-item { gap: var(--space-2); }
+  .workout-exercise-controls { margin-left: auto; }
+}

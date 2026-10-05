@@ -29,6 +29,7 @@ export interface WorkoutExerciseState {
 
 export interface WorkoutState {
   workoutId: string;
+  executionVersion: number;
   status: WorkoutStatus;
   scheduledDate: string;
   planName: string;
@@ -114,6 +115,8 @@ export const workoutApi = {
     stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/sets/${setId}/complete`)),
   skip: async (workoutId: string, exerciseId: string) =>
     stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/exercises/${exerciseId}/skip`)),
+  reorder: async (workoutId: string, exerciseIds: string[], expectedVersion: number) =>
+    stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/exercises/reorder`, { exerciseIds, expectedVersion })),
   interrupt: async (workoutId: string) => stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/interrupt`)),
 };
 
@@ -133,7 +136,7 @@ export function useWorkout(id: string) {
 const retryNetwork = (failureCount: number, error: unknown) => failureCount < 3 && isApiError(error) && error.isNetwork;
 
 /** Errors meaning "the screen is stale": the state is reloaded from the server. */
-export const STALE_STATE_CODES = ['SET_NOT_CURRENT', 'WORKOUT_NOT_IN_PROGRESS', 'EXERCISE_NOT_IN_PROGRESS', 'REST_NOT_FINISHED'];
+export const STALE_STATE_CODES = ['SET_NOT_CURRENT', 'WORKOUT_NOT_IN_PROGRESS', 'EXERCISE_NOT_IN_PROGRESS', 'REST_NOT_FINISHED', 'WORKOUT_STATE_CHANGED', 'INVALID_EXERCISE_ORDER'];
 
 export function useWorkoutAction<TArgs>(workoutId: string, fn: (args: TArgs) => Promise<WorkoutState>, idempotent: boolean) {
   const queryClient = useQueryClient();
