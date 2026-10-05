@@ -261,3 +261,7 @@ le altre sessioni aperte dell'utente.
 ### Filtri dello storico (fixV2)
 
 `GET /api/me/workouts` accetta `from` e `to` (date ISO inclusive sulla data dell’allenamento, opzionali anche singolarmente), `status` (`COMPLETED`, `INTERRUPTED`, `IN_PROGRESS`) e `q` (nome della scheda o della sessione salvato nello snapshot, sottostringa senza distinzione di maiuscole, massimo 100 caratteri dopo trim). Testo vuoto significa nessun filtro; i caratteri LIKE `%`, `_` e backslash sono letterali. I filtri si combinano con AND e includono sempre l’utente autenticato. La pagina e il totale sono riferiti ai risultati filtrati; l’ordine è `scheduledDate DESC, startedAt DESC, id DESC`. Intervalli invertiti e query troppo lunghe ricevono 400 `INVALID_HISTORY_FILTER`; date/esiti non validi ricevono 400. Le risposte mantengono il formato `PageResponse<WorkoutSummary>` precedente.
+
+### Risultati effettivi delle serie (fixV2)
+
+Il completamento serie `POST /api/me/workouts/{id}/sets/{setId}/complete` accetta il corpo facoltativo `{ "weightKgUsed": 32.75, "repsActual": 8 }`. Campi opzionali/null: risultato non registrato; zero: risultato esplicito. Peso tra 0 e 1000 con massimo due decimali; ripetizioni intere tra 0 e 1000. `SetState` restituisce `weightKgUsed` e `repsActual` anche nello storico. I valori previsti restano distinti. Retry identico idempotente; payload diverso su serie completata: 409 `SET_RESULTS_CHANGED`, senza modifiche. Richieste legacy senza corpo continuano a funzionare e non cancellano risultati salvati. Nessuna nuova migrazione: colonne V13.

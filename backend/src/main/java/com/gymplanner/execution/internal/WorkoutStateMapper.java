@@ -23,7 +23,7 @@ final class WorkoutStateMapper {
                         (int) e.getSets().stream().filter(WorkoutSet::isCompleted).count(),
                         e.getSets().stream()
                                 .map(s -> new SetState(s.getId(), s.getSetIndex(), s.getRepsPlanned(), s.isToFailure(),
-                                        s.getRestSeconds(), s.getCompletedAt()))
+                                        s.getRestSeconds(), s.getCompletedAt(), s.getWeightKgUsed(), s.getRepsActual()))
                                 .toList()))
                 .toList();
 
