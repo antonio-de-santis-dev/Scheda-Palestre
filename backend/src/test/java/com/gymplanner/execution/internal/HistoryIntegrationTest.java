@@ -282,6 +282,70 @@ class HistoryIntegrationTest {
     }
 
     @Test
+    void monthlyProgressIsChronologicalAcrossYearsAndReconcilesWithTotals() {
+        Api.Response first = startAt(MONDAY);
+        String id = first.read("$.workoutId");
+        Api.Response partial = api.post(user, "/api/me/workouts/" + id + "/sets/" + first.read("$.currentSetId") + "/complete",
+                "{\"weightKgUsed\":30,\"repsActual\":8}").expect(200);
+        clock.advance(java.time.Duration.ofSeconds(61));
+        api.post(user, "/api/me/workouts/" + id + "/exercises/" + partial.read("$.currentExerciseId") + "/skip", null).expect(200);
+        jdbc.update("update workouts set scheduled_date = '2025-12-31' where id = ?", UUID.fromString(id));
+        Api.Response second = startAt(MONDAY.plusDays(1)); interrupt(second);
+        jdbc.update("update workouts set scheduled_date = '2026-01-01' where id = ?", UUID.fromString(second.read("$.workoutId")));
+        Api.Response third = startAt(MONDAY.plusDays(2));
+        Api.Response progress = api.get(user, "/api/me/workout-progress?size=1&page=999").expect(200);
+        assertThat((List<String>) progress.read("$[*].month")).containsExactly("2025-12-01", "2026-01-01", "2026-10-01");
+        Api.Response totals = api.get(user, "/api/me/workout-stats").expect(200);
+        List<Number> counts = progress.read("$[*].totals.totalWorkouts");
+        assertThat(counts.stream().mapToLong(Number::longValue).sum()).isEqualTo(((Number) totals.read("$.totalWorkouts")).longValue());
+        assertThat(((Number) progress.read("$[0].totals.volume.recordedKgReps")).doubleValue()).isEqualTo(240);
+        assertThat(((Number) progress.read("$[0].totals.recordedDurationSeconds")).longValue()).isEqualTo(61);
+        assertThat(((Number) progress.read("$[1].totals.recordedDurationSeconds")).longValue()).isZero();
+        assertThat((Object) progress.read("$[1].totals.volume.recordedKgReps")).isNull();
+        assertThat((Object) progress.read("$[2].totals.recordedDurationSeconds")).isNull();
+        assertThat((Integer) progress.read("$[2].totals.volume.completedSets")).isZero();
+        Api.Response filtered = api.get(user, "/api/me/workout-progress", Map.of("from", "2026-01-01", "to", "2026-01-31", "status", "INTERRUPTED", "q", "Storico")).expect(200);
+        assertThat((List<String>) filtered.read("$[*].month")).containsExactly("2026-01-01");
+        assertThat(((Number) filtered.read("$[0].totals.totalWorkouts")).longValue()).isEqualTo(1);
+    }
+
+    @Test
+    void monthlyProgressDistinguishesMissingVolumeFromZeroAndPartialTotals() {
+        Api.Response initial = startAt(MONDAY);
+        api.post(user, "/api/me/workouts/" + initial.read("$.workoutId") + "/sets/" + initial.read("$.currentSetId") + "/complete",
+                "{\"weightKgUsed\":0,\"repsActual\":7}").expect(200);
+        interrupt(initial);
+        Api.Response next = startAt(MONDAY.plusDays(1));
+        api.post(user, "/api/me/workouts/" + next.read("$.workoutId") + "/sets/" + next.read("$.currentSetId") + "/complete", null).expect(200);
+        interrupt(next);
+        Api.Response progress = api.get(user, "/api/me/workout-progress").expect(200);
+        assertThat(((Number) progress.read("$[0].totals.volume.recordedKgReps")).doubleValue()).isZero();
+        assertThat((Integer) progress.read("$[0].totals.volume.completedSets")).isEqualTo(2);
+        assertThat((Integer) progress.read("$[0].totals.volume.recordedSets")).isEqualTo(1);
+        assertThat((Integer) progress.read("$[0].totals.volume.missingWeightSets")).isEqualTo(1);
+        assertThat((Integer) progress.read("$[0].totals.volume.missingRepsSets")).isEqualTo(1);
+    }
+
+    @Test
+    void monthlyProgressPreservesLiteralSearchPrivacyAndFilterValidation() {
+        Api.Response initial = startAt(MONDAY); interrupt(initial);
+        jdbc.update("update workouts set plan_name_snapshot = ? where id = ?", "Storico 100% _ \\ speciale", UUID.fromString(initial.read("$.workoutId")));
+        for (String q : List.of("100%", "_", "\\", "' OR 1=1 --", "inesistente")) {
+            Map<String, String> filter = Map.of("q", q, "from", MONDAY.toString(), "to", MONDAY.toString(), "status", "INTERRUPTED");
+            Api.Response stats = api.get(user, "/api/me/workout-stats", filter).expect(200);
+            Api.Response progress = api.get(user, "/api/me/workout-progress", filter).expect(200);
+            List<Number> counts = progress.read("$[*].totals.totalWorkouts");
+            assertThat(counts.stream().mapToLong(Number::longValue).sum()).isEqualTo(((Number) stats.read("$.totalWorkouts")).longValue());
+        }
+        assertThat((List<Object>) api.get(fixtures.createUser(), "/api/me/workout-progress?userId=" + user.id()).expect(200).read("$")).isEmpty();
+        api.get(admin, "/api/me/workout-progress").expect(403);
+        api.get(null, "/api/me/workout-progress").expect(401);
+        api.get(user, "/api/me/workout-progress?from=2026-10-06&to=2026-10-05").expectCode(400, "INVALID_HISTORY_FILTER");
+        api.get(user, "/api/me/workout-progress?from=wrong").expect(400);
+        api.get(user, "/api/me/workout-progress?status=wrong").expect(400);
+    }
+
+    @Test
     void historyListsWorkoutsNewestFirstWithSkippedExercises() {
         // Monday: first exercise completed, second skipped.
         Api.Response state = api.post(user, "/api/me/workouts", "{\"date\":\"" + MONDAY + "\"}").expect(201);

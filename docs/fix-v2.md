@@ -12,10 +12,20 @@ Base richiesta: `fixV2` da `4f1f997`. Ogni passo viene provato dal proprietario 
 | 5b | Risultati effettivi: peso e ripetizioni per serie | Integrato in delpy, merge 1cff5cb |
 | 5c | Identità storica degli esercizi | Integrato in delpy, merge de56e3a |
 | 5d | Volume registrato e copertura dei dati | Integrato in delpy, merge d19abef |
-| 5e | Riepiloghi aggregati sui filtri dello storico | Implementato, in verifica su fixV2 |
-| 5f | Grafici dei progressi | Da fare dopo la prova dei riepiloghi |
+| 5e | Riepiloghi aggregati sui filtri dello storico | Integrato in delpy, merge b57de4f |
+| 5f | Grafici dei progressi mensili | Implementato, in verifica su fixV2 |
 | 5g | Record di peso e ripetizioni per esercizio | Da fare dopo i grafici |
 | Finale | Verifiche complete e deploy | Da fare |
+
+## Passo 5f: grafici dei progressi mensili
+
+Lo storico include un grafico a colonne con selettore di volume registrato, durata registrata (asse in minuti, valori esatti in tabella) oppure numero di allenamenti. Ogni colonna rappresenta un mese con allenamenti nei filtri; i mesi senza allenamenti non vengono inventati né disegnati come zero. I mesi sono ordinati cronologicamente, distinguendo gli anni. Valori mancanti: N/D senza colonna; zero registrato: punto sulla linea di base e valore 0; copertura parziale: asterisco e tratteggio. Nome/valore di ogni mese sono disponibili come testo accessibile e titolo SVG. Una tabella apribile espone dati esatti, esiti e copertura di durata/volume. Grafico e tabella scorrono orizzontalmente su schermi piccoli e sono utilizzabili da tastiera. Nessuna nuova libreria o animazione.
+
+`GET /api/me/workout-progress` restituisce una lista `{month, totals}`, dove month è il primo giorno del mese e totals usa il contratto del riepilogo. Una sola query aggregata PostgreSQL; stessi criteri SQL condivisi con i riepiloghi, sempre con ownership della sessione. Date inclusive sul singolo allenamento prima di aggregare: selezionare parte di un mese non include workout fuori intervallo. Il volume e la durata mantengono le regole precedenti e le coperture distinte, senza stime o arrotondamenti aggiuntivi nei dati. Nessuna paginazione e nessuna migrazione.
+
+La scelta del grafico è conservata nell’URL `chart=duration` oppure `chart=workouts`; il default è volume. Cambiare il dato o la pagina non rifà la richiesta dei dati mensili; cambiare i filtri carica il nuovo dataset, nascondendo quello precedente durante il caricamento. I filtri, il grafico e i link al dettaglio rimangono coerenti dopo refresh e navigazione. Errori e retry del grafico sono separati dall’elenco e dai riepiloghi.
+
+Prova locale: nello storico cambiare i tre dati, aprire la tabella e confrontare valori con i riepiloghi nello stesso intervallo. Provare serie senza risultati e serie con zero; verificare N/D, zero e segnalazioni di copertura parziale. Applicare date, esito e nome, cambiare pagina e ricaricare. Da telefono scorrere tutti i mesi; da tastiera usare selettore, area scorrevole e tabella. I record per esercizio restano il passo successivo dopo questa prova.
 
 ## Passo 5e: riepilogo aggregato dei filtri
 
