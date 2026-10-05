@@ -32,6 +32,7 @@ class WorkoutController {
 
     private final WorkoutService workouts;
     private final TodayService today;
+    private final WorkoutHistoryStatsService historyStats;
 
     @GetMapping("/today")
     TodayService.TodayResponse today(@AuthenticationPrincipal AuthenticatedUser user,
@@ -69,6 +70,14 @@ class WorkoutController {
         Sort sort = Sort.by(Sort.Order.desc("scheduledDate"), Sort.Order.desc("startedAt"), Sort.Order.desc("id"));
         return PageResponse.of(workouts.history(user.id(), Paging.of(page, size, sort),
                 new WorkoutHistoryFilter(from, to, status, q)), s -> s);
+    }
+
+    @GetMapping("/workout-stats")
+    WorkoutHistoryStatsService.HistoryStats stats(@AuthenticationPrincipal AuthenticatedUser user,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) WorkoutStatus status, @RequestParam(required = false) String q) {
+        return historyStats.get(user.id(), new WorkoutHistoryFilter(from, to, status, q));
     }
 
     /** Full state of one of the user's workouts (resume after reload, history detail). */

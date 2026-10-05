@@ -11,9 +11,21 @@ Base richiesta: `fixV2` da `4f1f997`. Ogni passo viene provato dal proprietario 
 | 5a | Storico filtrabile con filtri URL | Integrato in delpy, merge c7d55d5 |
 | 5b | Risultati effettivi: peso e ripetizioni per serie | Integrato in delpy, merge 1cff5cb |
 | 5c | Identità storica degli esercizi | Integrato in delpy, merge de56e3a |
-| 5d | Volume registrato e copertura dei dati | Implementato, in verifica su fixV2 |
-| 5e | Riepiloghi aggregati, grafici dei progressi e record | Da fare dopo la prova del volume |
+| 5d | Volume registrato e copertura dei dati | Integrato in delpy, merge d19abef |
+| 5e | Riepiloghi aggregati sui filtri dello storico | Implementato, in verifica su fixV2 |
+| 5f | Grafici dei progressi | Da fare dopo la prova dei riepiloghi |
+| 5g | Record di peso e ripetizioni per esercizio | Da fare dopo i grafici |
 | Finale | Verifiche complete e deploy | Da fare |
+
+## Passo 5e: riepilogo aggregato dei filtri
+
+Lo storico mostra un riepilogo di tutti gli allenamenti corrispondenti a `from`, `to`, `status`, `q`, indipendente dalla pagina visualizzata. Riporta numero totale, completati, interrotti e in corso, durata registrata complessiva e volume registrato con copertura dei dati. Cambiare pagina non altera i totali. Cambiare filtro aggiorna riepilogo ed elenco, senza presentare il riepilogo precedente come se appartenesse ai nuovi criteri. Refresh e URL conservano i filtri. Errori e retry del riepilogo sono separati dall’elenco, che rimane consultabile.
+
+`GET /api/me/workout-stats` usa gli stessi criteri validati dello storico: date scheduledDate inclusive, esito e sottostringa case-insensitive dei nomi snapshot con caratteri LIKE cercati letteralmente. L’utente viene sempre dalla sessione; query userId esterne non lo cambiano. Nessuna paginazione. Una sola query SQL con CTE aggrega in PostgreSQL, senza caricare tutti i workout o le serie nel backend, e ottiene conteggi e somme dalla stessa fotografia del database.
+
+La durata somma i secondi interi di ogni allenamento concluso con timestamp coerenti. In corso esclusi; conclusi senza durata valida conteggiati come mancanti. Nessuna durata valida significa null, mentre durate valide inferiori a un secondo sommano a zero. Il volume conserva le regole del passo 5d, inclusi dati parziali e serie completate di allenamenti in corso/interrotti. Durata e volume quindi hanno coperture esplicitamente distinte. Nessuna nuova migrazione.
+
+Prova locale: selezionare un intervallo con più allenamenti ed esiti, confrontare i numeri con lo storico, cambiare pagina e verificare totali invariati. Applicare nome/esito, ricaricare e controllare il riepilogo. Confrontare la somma delle durate finali e dei volumi registrati; dati mancanti e allenamenti ancora in corso devono essere segnalati senza inventare risultati.
 
 ## Passo 5d: volume dai risultati registrati
 

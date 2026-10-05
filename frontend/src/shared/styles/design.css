@@ -1080,3 +1080,9 @@ body:has(.navigation-drawer[open]) {
 
 .history-filters { margin-bottom: var(--space-4); }
 .history-filters .row { flex-wrap: wrap; }
+
+.history-stats { margin: var(--space-4) 0; }
+.history-stats__counts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.history-stats__counts dt { color: var(--color-text-muted); font-size: var(--text-sm); }
+.history-stats__counts dd { margin: 0; font-size: var(--text-xl); font-weight: 700; }
+@media (min-width: 640px) { .history-stats__counts { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
