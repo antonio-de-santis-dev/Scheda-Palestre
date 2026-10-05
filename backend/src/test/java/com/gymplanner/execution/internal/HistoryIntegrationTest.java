@@ -198,6 +198,90 @@ class HistoryIntegrationTest {
     }
 
     @Test
+    void statisticsAggregateAllMatchingWorkoutsAndIgnorePagination() {
+        Api.Response monday = startAt(MONDAY);
+        String mondayId = monday.read("$.workoutId");
+        Api.Response partial = api.post(user, "/api/me/workouts/" + mondayId + "/sets/" + monday.read("$.currentSetId") + "/complete",
+                "{\"weightKgUsed\":32.75,\"repsActual\":8}").expect(200);
+        clock.advance(java.time.Duration.ofSeconds(61));
+        api.post(user, "/api/me/workouts/" + mondayId + "/exercises/" + partial.read("$.currentExerciseId") + "/skip", null).expect(200);
+        Api.Response tuesday = startAt(MONDAY.plusDays(1));
+        clock.advance(java.time.Duration.ofSeconds(120)); interrupt(tuesday);
+        Api.Response wednesday = startAt(MONDAY.plusDays(2));
+        api.post(user, "/api/me/workouts/" + wednesday.read("$.workoutId") + "/sets/" + wednesday.read("$.currentSetId") + "/complete",
+                "{\"weightKgUsed\":0,\"repsActual\":0}").expect(200);
+        Api.Response stats = api.get(user, "/api/me/workout-stats?size=1&page=1").expect(200);
+        assertThat(((Number) stats.read("$.totalWorkouts")).longValue()).isEqualTo(3);
+        assertThat(((Number) stats.read("$.completedWorkouts")).longValue()).isEqualTo(1);
+        assertThat(((Number) stats.read("$.interruptedWorkouts")).longValue()).isEqualTo(1);
+        assertThat(((Number) stats.read("$.inProgressWorkouts")).longValue()).isEqualTo(1);
+        assertThat(((Number) stats.read("$.recordedDurationSeconds")).longValue()).isEqualTo(181);
+        assertThat(((Number) stats.read("$.workoutsWithDuration")).longValue()).isEqualTo(2);
+        assertThat(((Number) stats.read("$.volume.recordedKgReps")).doubleValue()).isEqualTo(262);
+        assertThat((Integer) stats.read("$.volume.completedSets")).isEqualTo(2);
+        assertThat((Integer) stats.read("$.volume.recordedSets")).isEqualTo(2);
+        Api.Response filtered = api.get(user, "/api/me/workout-stats", Map.of("from", MONDAY.plusDays(1).toString(),
+                "to", MONDAY.plusDays(2).toString(), "q", "Storico")).expect(200);
+        assertThat(((Number) filtered.read("$.totalWorkouts")).longValue()).isEqualTo(2);
+        assertThat(((Number) filtered.read("$.volume.recordedKgReps")).doubleValue()).isZero();
+        filtered = api.get(user, "/api/me/workout-stats?status=COMPLETED").expect(200);
+        assertThat(((Number) filtered.read("$.recordedDurationSeconds")).longValue()).isEqualTo(61);
+        assertThat((Integer) filtered.read("$.volume.completedSets")).isEqualTo(1);
+    }
+
+    @Test
+    void statisticsDistinguishMissingDurationAndResultsFromExplicitZeroDuration() {
+        Api.Response initial = startAt(MONDAY);
+        String id = initial.read("$.workoutId");
+        api.post(user, "/api/me/workouts/" + id + "/sets/" + initial.read("$.currentSetId") + "/complete", null).expect(200);
+        interrupt(initial);
+        jdbc.update("update workouts set finished_at = started_at - interval '1 second' where id = ?", UUID.fromString(id));
+        Api.Response next = startAt(MONDAY.plusDays(1));
+        api.post(user, "/api/me/workouts/" + next.read("$.workoutId") + "/sets/" + next.read("$.currentSetId") + "/complete",
+                "{\"weightKgUsed\":30}").expect(200);
+        interrupt(next);
+        Api.Response stats = api.get(user, "/api/me/workout-stats").expect(200);
+        assertThat(((Number) stats.read("$.recordedDurationSeconds")).longValue()).isZero();
+        assertThat(((Number) stats.read("$.workoutsWithDuration")).longValue()).isEqualTo(1);
+        assertThat(((Number) stats.read("$.workoutsMissingDuration")).longValue()).isEqualTo(1);
+        assertThat((Object) stats.read("$.volume.recordedKgReps")).isNull();
+        assertThat((Integer) stats.read("$.volume.completedSets")).isEqualTo(2);
+        assertThat((Integer) stats.read("$.volume.recordedSets")).isZero();
+        assertThat((Integer) stats.read("$.volume.missingWeightSets")).isEqualTo(1);
+        assertThat((Integer) stats.read("$.volume.missingRepsSets")).isEqualTo(2);
+    }
+
+    @Test
+    void statisticsSearchMatchesHistoryForLiteralWildcardsAndHistoricalNames() {
+        Api.Response initial = startAt(MONDAY); interrupt(initial);
+        UUID id = UUID.fromString(initial.read("$.workoutId"));
+        jdbc.update("update workouts set plan_name_snapshot = ? where id = ?", "Storico 100% _ \\ speciale", id);
+        for (String q : List.of("100%", "_", "\\", "Giorno 1", "' OR 1=1 --", "inesistente")) {
+            Map<String, String> filter = Map.of("q", q, "from", MONDAY.toString(), "to", MONDAY.toString(), "status", "INTERRUPTED");
+            Api.Response history = api.get(user, "/api/me/workouts", filter).expect(200);
+            Api.Response stats = api.get(user, "/api/me/workout-stats", filter).expect(200);
+            assertThat(((Number) stats.read("$.totalWorkouts")).longValue()).isEqualTo(((Number) history.read("$.totalElements")).longValue());
+        }
+    }
+
+    @Test
+    void statisticsRejectInvalidFiltersAndIsolateUsersAndRoles() {
+        startAt(MONDAY);
+        AuthenticatedUser other = fixtures.createUser();
+        Api.Response empty = api.get(other, "/api/me/workout-stats?userId=" + user.id()).expect(200);
+        assertThat(((Number) empty.read("$.totalWorkouts")).longValue()).isZero();
+        assertThat((Object) empty.read("$.recordedDurationSeconds")).isNull();
+        assertThat((Object) empty.read("$.volume.recordedKgReps")).isNull();
+        assertThat((Integer) empty.read("$.volume.completedSets")).isZero();
+        api.get(admin, "/api/me/workout-stats").expect(403);
+        api.get(null, "/api/me/workout-stats").expect(401);
+        api.get(user, "/api/me/workout-stats?from=2026-10-06&to=2026-10-05").expectCode(400, "INVALID_HISTORY_FILTER");
+        api.get(user, "/api/me/workout-stats?from=wrong").expect(400);
+        api.get(user, "/api/me/workout-stats?status=wrong").expect(400);
+        api.get(user, "/api/me/workout-stats", Map.of("q", "x".repeat(101))).expectCode(400, "INVALID_HISTORY_FILTER");
+    }
+
+    @Test
     void historyListsWorkoutsNewestFirstWithSkippedExercises() {
         // Monday: first exercise completed, second skipped.
         Api.Response state = api.post(user, "/api/me/workouts", "{\"date\":\"" + MONDAY + "\"}").expect(201);
