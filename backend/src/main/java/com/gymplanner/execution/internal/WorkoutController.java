@@ -80,6 +80,14 @@ class WorkoutController {
         return historyStats.get(user.id(), new WorkoutHistoryFilter(from, to, status, q));
     }
 
+    @GetMapping("/workout-progress")
+    List<WorkoutHistoryStatsService.MonthlyProgress> progress(@AuthenticationPrincipal AuthenticatedUser user,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) WorkoutStatus status, @RequestParam(required = false) String q) {
+        return historyStats.progress(user.id(), new WorkoutHistoryFilter(from, to, status, q));
+    }
+
     /** Full state of one of the user's workouts (resume after reload, history detail). */
     @GetMapping("/workouts/{id}")
     WorkoutState get(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id) {

@@ -5,6 +5,7 @@ import { http } from '../../shared/api/http';
 import type { Page } from '../../shared/api/types';
 import { Alert } from '../../shared/components/Alert';
 import { Button } from '../../shared/components/Button';
+import { HistoryProgress } from './HistoryProgress';
 import { HistoryStats } from './HistoryStats';
 import { HistoryFilterForm } from './HistoryFilterForm';
 import { HISTORY_FILTER_KEYS, historyFilterError, historyPage, readHistoryFilters, type HistoryFilters } from './filters';
@@ -53,7 +54,7 @@ export function HistoryPage() {
       <PageHeader title="Storico" subtitle="I tuoi allenamenti, dal più recente." />
       <HistoryFilterForm key={search} filters={filters} onApply={apply}
         onReset={() => apply({ from: '', to: '', status: '', q: '' })} />
-      {!invalid ? <HistoryStats filters={filters} /> : null}
+      {!invalid ? <><HistoryStats filters={filters} /><HistoryProgress filters={filters} /></> : null}
       {invalid ? <Alert tone="error"><p>{invalid}</p></Alert> : <QueryState isLoading={query.isLoading} error={query.error} onRetry={() => void query.refetch()}>
         {query.data && query.data.content.length === 0 ? (
           <EmptyState title={query.data.totalElements > 0 ? 'Nessun allenamento in questa pagina'

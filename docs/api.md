@@ -277,3 +277,7 @@ Il completamento serie `POST /api/me/workouts/{id}/sets/{setId}/complete` accett
 ### Riepilogo filtrato dello storico (fixV2)
 
 `GET /api/me/workout-stats?from=2026-10-01&to=2026-10-05&status=COMPLETED&q=Scheda` restituisce `totalWorkouts`, `completedWorkouts`, `interruptedWorkouts`, `inProgressWorkouts`, `recordedDurationSeconds`, `workoutsWithDuration`, `workoutsMissingDuration`, `volume` (contratto del volume precedente). Criteri e validazione come nell’elenco, inclusi ownership e nomi storici con wildcard letterali. Aggrega tutti i risultati filtrati, senza paginazione. Durata: somma dei secondi interi dei workout conclusi con timestamp coerenti; null se non disponibili, zero se validi ma inferiori a un secondo. Allenamenti in corso esclusi dalla durata, inclusi nei conteggi e nel volume delle serie già completate. Una sola query SQL aggregata, nessuna nuova migrazione.
+
+### Progressi mensili (fixV2)
+
+`GET /api/me/workout-progress` accetta from/to/status/q come riepilogo ed elenco. Restituisce `[{ "month": "2026-10-01", "totals": { ...contratto workout-stats... } }]`, ordinato per mese/anno, soltanto per mesi con workout filtrati. Le date filtrano i singoli workout prima dell’aggregazione. Query unica con criteri SQL condivisi col riepilogo; utente dalla sessione, nessuna paginazione/migrazione. Null e zero restano distinti; durata esclude workout in corso, volume include serie già completate. `chart` è soltanto una scelta frontend conservata nell’URL, non cambia il dataset backend.
