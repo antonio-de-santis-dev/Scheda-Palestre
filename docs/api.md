@@ -249,3 +249,7 @@ rifiutata con `422 REST_NOT_FINISHED` (O-06 superata); "Salta" e "Interrompi" re
 
 Il cambio password usa `POST /api/auth/change-password` (password attuale obbligatoria) e chiude
 le altre sessioni aperte dell'utente.
+
+### Durata definitiva dell’allenamento (fixV2)
+
+`WorkoutState` e `WorkoutSummary` includono `durationSeconds` (`long` nullable). Il backend calcola i secondi interi tra i timestamp persistiti `startedAt` e `finishedAt` per gli allenamenti conclusi o interrotti, includendo i recuperi. Il campo è `null` per gli allenamenti ancora in corso o privi di timestamp validi. La lettura e i retry di azioni già applicate non modificano il valore finale. Anche lo storico precedente è coperto senza migrazioni o backfill aggiuntivi.

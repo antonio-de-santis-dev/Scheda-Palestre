@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -161,6 +162,14 @@ public class Workout {
 
     public LocalDate getScheduledDate() {
         return scheduledDate;
+    }
+
+    /** Final elapsed wall time, including rest, reconstructed from persisted server instants. */
+    Long durationSeconds() {
+        if (isInProgress() || startedAt == null || finishedAt == null || finishedAt.isBefore(startedAt)) {
+            return null;
+        }
+        return Duration.between(startedAt, finishedAt).getSeconds();
     }
 
     public Instant getStartedAt() {

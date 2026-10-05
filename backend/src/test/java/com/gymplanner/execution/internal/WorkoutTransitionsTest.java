@@ -91,4 +91,27 @@ class WorkoutTransitionsTest {
         assertThat(state.nextAction()).isEqualTo(WorkoutDtos.NextAction.FINISHED);
         assertThat(state.finishedAt()).isEqualTo(T0.plusSeconds(5));
     }
+    @Test
+    void finalDurationUsesPersistedInstantsAndDoesNotGrowWithTheResponseClock() {
+        Workout w = workout();
+        assertThat(WorkoutStateMapper.toState(w, T0.plusSeconds(60)).durationSeconds()).isNull();
+        w.complete(T0.plusMillis(3_723_456));
+        assertThat(WorkoutStateMapper.toState(w, T0.plusSeconds(90_000)).durationSeconds()).isEqualTo(3723L);
+        assertThat(WorkoutDtos.WorkoutSummary.of(w).durationSeconds()).isEqualTo(3723L);
+        Workout interrupted = workout();
+        interrupted.interrupt(T0.plusSeconds(90_061));
+        assertThat(WorkoutDtos.WorkoutSummary.of(interrupted).durationSeconds()).isEqualTo(90061L);
+    }
+
+    @Test
+    void subsecondWorkoutIsZeroWhileMissingOrReversedTimestampsStayUnknown() {
+        Workout w = workout();
+        w.complete(T0.plusMillis(999));
+        assertThat(w.durationSeconds()).isZero();
+        w.complete(null);
+        assertThat(w.durationSeconds()).isNull();
+        w.complete(T0.minusSeconds(1));
+        assertThat(w.durationSeconds()).isNull();
+    }
+
 }

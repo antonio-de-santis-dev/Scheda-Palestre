@@ -36,6 +36,8 @@ export interface WorkoutState {
   sessionTitle: string;
   startedAt: string;
   finishedAt: string | null;
+  /** Final seconds calculated by the backend from persisted start/end instants. */
+  durationSeconds: number | null;
   exercises: WorkoutExerciseState[];
   currentExerciseId: string | null;
   currentSetId: string | null;
@@ -55,6 +57,8 @@ export interface WorkoutSummary {
   sessionTitle: string;
   startedAt: string;
   finishedAt: string | null;
+  /** Final seconds calculated by the backend from persisted start/end instants. */
+  durationSeconds: number | null;
   totalExercises: number;
   completedExercises: number;
   skippedExercises: number;

@@ -220,6 +220,8 @@ class ExecutionIntegrationTest {
         assertThat((Object) state.read("$.restEndsAt")).isNull();
         assertThat((String) state.read("$.serverTime")).isNotNull();
 
+        assertThat((Object) state.read("$.durationSeconds")).isNull();
+
         // Set 1 -> rest timer of 60 s starts from the server instant.
         Instant now = clock.instant();
         state = complete(user, state).expect(200);
@@ -250,10 +252,41 @@ class ExecutionIntegrationTest {
         assertThat((String) state.read("$.nextAction")).isEqualTo("FINISHED");
         assertThat((Object) state.read("$.restEndsAt")).isNull();
         assertThat((String) state.read("$.finishedAt")).isNotNull();
+        assertThat(((Number) state.read("$.durationSeconds")).longValue()).isEqualTo(210L);
+        String workoutId = state.read("$.workoutId");
+        String finishedAt = state.read("$.finishedAt");
+        String lastSetId = state.read("$.exercises[1].sets[1].id");
+        clock.advance(Duration.ofDays(2));
+        Api.Response retried = api.post(user, "/api/me/workouts/" + workoutId + "/sets/" + lastSetId + "/complete", null).expect(200);
+        assertThat((String) retried.read("$.finishedAt")).isEqualTo(finishedAt);
+        assertThat(((Number) retried.read("$.durationSeconds")).longValue()).isEqualTo(210L);
+        assertThat(((Number) api.get(user, "/api/me/workouts/" + workoutId).expect(200).read("$.durationSeconds")).longValue()).isEqualTo(210L);
+        assertThat(((Number) api.get(user, "/api/me/workouts").expect(200).read("$.content[0].durationSeconds")).longValue()).isEqualTo(210L);
         assertThat((List<String>) state.read("$.exercises[*].status")).containsExactly("COMPLETED", "COMPLETED");
         assertThat(jdbc.queryForObject("select count(*) from workout_sets ws join workout_exercises we on we.id = ws.workout_exercise_id "
                 + "where we.workout_id = ? and ws.completed_at is not null", Integer.class,
                 UUID.fromString(state.read("$.workoutId")))).isEqualTo(4);
+    }
+
+    @Test
+    void interruptedDurationSurvivesRetryReloadAndHistoryUsingTheStoredServerTimestamps() {
+        Api.Response initial = start(user, MONDAY).expect(201);
+        String workoutId = initial.read("$.workoutId");
+        String url = "/api/me/workouts/" + workoutId;
+        clock.advance(Duration.ofMillis(3_723_456));
+        Api.Response interrupted = api.post(user, url + "/interrupt", null).expect(200);
+        assertThat(((Number) interrupted.read("$.durationSeconds")).longValue()).isEqualTo(3723L);
+        Instant started = Instant.parse(interrupted.read("$.startedAt"));
+        Instant finished = Instant.parse(interrupted.read("$.finishedAt"));
+        assertThat(Duration.between(started, finished).getSeconds()).isEqualTo(3723L);
+        assertThat(jdbc.queryForObject("select finished_at from workouts where id = ?", java.sql.Timestamp.class,
+                UUID.fromString(workoutId)).toInstant()).isEqualTo(finished);
+        clock.advance(Duration.ofDays(1));
+        Api.Response retry = api.post(user, url + "/interrupt", null).expect(200);
+        assertThat((String) retry.read("$.finishedAt")).isEqualTo(interrupted.read("$.finishedAt"));
+        assertThat(((Number) retry.read("$.durationSeconds")).longValue()).isEqualTo(3723L);
+        assertThat(((Number) api.get(user, url).expect(200).read("$.durationSeconds")).longValue()).isEqualTo(3723L);
+        assertThat(((Number) api.get(user, "/api/me/workouts").expect(200).read("$.content[0].durationSeconds")).longValue()).isEqualTo(3723L);
     }
 
     @Test

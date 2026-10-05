@@ -8,7 +8,7 @@ import { workoutState } from '../../test/workoutFixtures';
 
 describe('history', () => {
   it('lists workouts and shows skipped exercises in the detail', async () => {
-    const done = workoutState({ status: 'COMPLETED', currentExerciseId: null, currentSetId: null, nextAction: 'FINISHED', finishedAt: '2026-10-05T09:00:00Z' });
+    const done = workoutState({ status: 'COMPLETED', currentExerciseId: null, currentSetId: null, nextAction: 'FINISHED', finishedAt: '2026-10-05T09:00:00Z', durationSeconds: 3600 });
     done.exercises[0]!.status = 'COMPLETED';
     done.exercises[0]!.sets.forEach((s) => (s.completedAt = '2026-10-05T08:10:00Z'));
     done.exercises[1]!.status = 'SKIPPED';
@@ -16,7 +16,7 @@ describe('history', () => {
       http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
       http.get('*/api/me/workouts', () =>
         HttpResponse.json({
-          content: [{ id: 'w-1', scheduledDate: '2026-10-05', status: 'COMPLETED', planName: 'Scheda principianti', sessionTitle: 'Giorno 1', startedAt: '2026-10-05T08:00:00Z', finishedAt: '2026-10-05T09:00:00Z', totalExercises: 2, completedExercises: 1, skippedExercises: 1 }],
+          content: [{ id: 'w-1', scheduledDate: '2026-10-05', status: 'COMPLETED', planName: 'Scheda principianti', sessionTitle: 'Giorno 1', startedAt: '2026-10-05T08:00:00Z', finishedAt: '2026-10-05T09:00:00Z', durationSeconds: 3600, totalExercises: 2, completedExercises: 1, skippedExercises: 1 }],
           page: 0, size: 20, totalElements: 1, totalPages: 1,
         }),
       ),
@@ -25,13 +25,36 @@ describe('history', () => {
     renderApp('/app/history');
     const list = await screen.findByRole('list', { name: 'Allenamenti' });
     expect(within(list).getByText(/1 completati, 1 saltati su 2/)).toBeInTheDocument();
+    expect(within(list).getByText('Durata: 1 h')).toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(within(list).getByRole('link'));
     const trazioni = await screen.findByRole('region', { name: 'Trazioni' });
+    expect(screen.getByText('Durata: 1 h')).toBeInTheDocument();
     expect(within(trazioni).getByText('Saltato')).toBeInTheDocument();
     expect(within(trazioni).getByText('MAX')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Panca' })).getAllByText('✓ Completata')).toHaveLength(2);
   });
+  it.each([
+    { status: 'INTERRUPTED' as const, seconds: 3661, label: 'Durata: 1 h 1 min 1 s' },
+    { status: 'COMPLETED' as const, seconds: 90061, label: 'Durata: 25 h 1 min 1 s' },
+    { status: 'COMPLETED' as const, seconds: 0, label: 'Durata: 0 s' },
+    { status: 'COMPLETED' as const, seconds: null, label: 'Durata: Non disponibile' },
+    { status: 'IN_PROGRESS' as const, seconds: null, label: 'Durata disponibile alla conclusione' },
+  ])('shows server duration for $status ($seconds), unchanged after reopening', async ({ status, seconds, label }) => {
+    const state = workoutState({ status, durationSeconds: seconds,
+      finishedAt: status === 'IN_PROGRESS' ? null : '2026-10-05T09:00:00Z' });
+    server.use(
+      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
+      http.get('*/api/me/workouts/:id', () => HttpResponse.json(state)),
+    );
+    // The server value is authoritative: this test deliberately differs from the client-side timestamp delta.
+    const view = renderApp('/app/history/w-1');
+    expect(await screen.findByText(label)).toBeInTheDocument();
+    view.unmount();
+    renderApp('/app/history/w-1');
+    expect(await screen.findByText(label)).toBeInTheDocument();
+  });
+
 });
 
 describe('profile', () => {
