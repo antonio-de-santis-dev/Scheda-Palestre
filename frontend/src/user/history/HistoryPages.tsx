@@ -138,7 +138,9 @@ export function HistoryDetailPage() {
                     <thead>
                       <tr>
                         <th scope="col">Serie</th>
-                        <th scope="col">Ripetizioni</th>
+                        <th scope="col">Ripetizioni previste</th>
+                        <th scope="col">Ripetizioni effettive</th>
+                        <th scope="col">Peso usato (kg)</th>
                         <th scope="col">Recupero</th>
                         <th scope="col">Esito</th>
                       </tr>
@@ -148,6 +150,8 @@ export function HistoryDetailPage() {
                         <tr key={s.id}>
                           <th scope="row">{s.setIndex}</th>
                           <td>{repsLabel({ reps: s.repsPlanned, toFailure: s.toFailure })}</td>
+                          <td>{s.completedAt ? s.repsActual ?? 'Non registrate' : '—'}</td>
+                          <td>{s.completedAt ? (s.weightKgUsed == null ? 'Non registrato' : s.weightKgUsed.toLocaleString('it-IT', { maximumFractionDigits: 2 })) : '—'}</td>
                           <td>{formatRest(s.restSeconds)}</td>
                           <td>{s.completedAt ? '✓ Completata' : '— Non svolta'}</td>
                         </tr>

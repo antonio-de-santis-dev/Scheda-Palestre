@@ -1,6 +1,6 @@
 import { useRef, useState, type CSSProperties } from 'react';
 import { Link, useParams } from 'react-router';
-import { CheckCheck, Hourglass, Pause, Play, Plus, OctagonX, PartyPopper, SkipForward, TimerReset, Trophy, Volume2, VolumeX } from 'lucide-react';
+import { Hourglass, Pause, Play, Plus, OctagonX, PartyPopper, SkipForward, TimerReset, Trophy, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '../../shared/components/Button';
 import { Alert, ErrorAlert } from '../../shared/components/Alert';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
@@ -8,13 +8,14 @@ import { QueryState } from '../../shared/components/States';
 import { isApiError } from '../../shared/errors/ApiError';
 import { formatDuration, formatRest } from '../../shared/utils/format';
 import { repsLabel } from '../../shared/api/planTypes';
-import { STALE_STATE_CODES, useWorkout, useWorkoutAction, workoutApi, type RestAction, type RestRequest, type WorkoutState } from './api';
+import { STALE_STATE_CODES, useWorkout, useWorkoutAction, workoutApi, type SetResults, type RestAction, type RestRequest, type WorkoutState } from './api';
 import { useRestTimer } from './useRestTimer';
 import { WorkoutStatusBadge } from './ExerciseStatusBadge';
 import { celebrate, transitions, type Feedback } from './feedback';
 import { useRestAlert } from './useRestAlert';
 import { WorkoutDuration } from './WorkoutDuration';
 import { WorkoutExerciseList } from './WorkoutExerciseList';
+import { CompleteSetForm } from './CompleteSetForm';
 
 /** Workout execution (US-17, US-18, US-20, US-23): usable one-handed from 360 px. */
 export function WorkoutPage() {
@@ -35,7 +36,7 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
   // Transitions already celebrated: refetches, retries and StrictMode never repeat them.
   const celebrated = useRef(new Set<string>());
   const restAlert = useRestAlert();
-  const complete = useWorkoutAction(state.workoutId, (setId: string) => workoutApi.completeSet(state.workoutId, setId), true);
+  const complete = useWorkoutAction(state.workoutId, (args: { setId: string; results: SetResults }) => workoutApi.completeSet(state.workoutId, args.setId, args.results), true);
   const skip = useWorkoutAction(state.workoutId, (exerciseId: string) => workoutApi.skip(state.workoutId, exerciseId), true);
   const interrupt = useWorkoutAction(state.workoutId, () => workoutApi.interrupt(state.workoutId), true);
 
@@ -227,35 +228,15 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
             </div>
           ) : null}
 
-          {/* aria-disabled (not disabled): the button stays in the tab order and says why it waits. */}
-          <Button
-            size="lg"
-            block
-            className={resting ? 'btn--waiting' : undefined}
-            aria-disabled={resting || undefined}
-            aria-describedby={resting ? 'rest-hint' : undefined}
-            icon={resting ? <Hourglass size={26} aria-hidden="true" /> : <CheckCheck size={26} aria-hidden="true" />}
-            loading={complete.isPending}
-            disabled={busy}
-            onClick={() => {
-              if (resting || busy) {
-                return;
-              }
+          <CompleteSetForm key={currentSet.id} busy={busy} loading={complete.isPending}
+            resting={resting} paused={state.restPaused} remaining={remaining}
+            onComplete={(results) => {
               setAnnouncement('');
               setFeedback(null);
               skip.reset(); recovery.reset(); reorder.reset(); interrupt.reset();
               const before = state;
-              complete.mutate(currentSet.id, { onSuccess: (after) => onActionSuccess(before, after) });
-            }}
-          >
-            Fine serie
-            {resting ? <span className="btn__sub" aria-hidden="true">{state.restPaused ? 'recupero in pausa' : `tra ${formatDuration(remaining)}`}</span> : null}
-          </Button>
-          {resting ? (
-            <p id="rest-hint" className="small muted center" style={{ margin: 'var(--space-2) 0 0' }}>
-              Disponibile al termine del recupero. Puoi comunque saltare l'esercizio o interrompere l'allenamento.
-            </p>
-          ) : null}
+              complete.mutate({ setId: currentSet.id, results }, { onSuccess: (after) => onActionSuccess(before, after) });
+            }} />
         </section>
       ) : (
         <Alert tone="info">

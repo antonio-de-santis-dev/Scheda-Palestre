@@ -8,9 +8,26 @@ Base richiesta: `fixV2` da `4f1f997`. Ogni passo viene provato dal proprietario 
 | 2 | Esercizi completati in fondo alla lista | Verificato e pubblicato su delpy |
 | 3 | Durata allenamento da timestamp backend, nello storico | Integrato in delpy, merge 2d3e34d |
 | 4 | Recupero persistente: pausa/ripresa, +30s, salto confermato, controllo versione | Integrato in delpy, merge 13d15e7 |
-| 5a | Storico filtrabile con filtri URL | Implementato, in verifica su fixV2 |
-| 5b | Risultati peso/ripetizioni, identità storica, statistiche, grafici e record | Da fare dopo la prova dei filtri |
+| 5a | Storico filtrabile con filtri URL | Integrato in delpy, merge c7d55d5 |
+| 5b | Risultati effettivi: peso e ripetizioni per serie | Implementato, in verifica su fixV2 |
+| 5c | Identità storica, volume, statistiche, grafici e record | Da fare dopo la prova dei risultati |
 | Finale | Verifiche complete e deploy | Da fare |
+
+## Passo 5b: risultati effettivi per serie
+
+Prima di Fine serie si possono registrare peso usato (kg) e ripetizioni effettive, anche per serie MAX. Entrambi sono facoltativi: un campo vuoto resta `null`, mentre zero è registrato come valore esplicito. Non viene copiato il numero previsto dalla scheda. Peso 0–1000 kg, massimo due decimali; ripetizioni intere 0–1000. Il frontend accetta anche la virgola decimale. Ogni nuova serie apre campi vuoti; il recupero continua a bloccare il completamento ma permette di preparare i risultati.
+
+`POST /api/me/workouts/{id}/sets/{setId}/complete` accetta un corpo facoltativo:
+
+```json
+{"weightKgUsed":32.75,"repsActual":8}
+```
+
+Il salvataggio è atomico sotto il lock dell’allenamento, insieme a completamento, avanzamento e recupero. Una replica con gli stessi risultati restituisce lo stato senza riscrivere timestamp o timer; 30 e 30.00 sono equivalenti. Un corpo diverso su una serie già completata riceve 409 `SET_RESULTS_CHANGED`: i dati salvati sono immutabili e il client si riallinea. I retry di rete conservano il payload catturato al clic. Il vecchio endpoint senza corpo continua a funzionare: registra risultati mancanti e, se ripetuto, non cancella dati esistenti. Accessi altrui, serie non corrente e recupero non terminato mantengono i controlli precedenti.
+
+Si usano le colonne `weight_kg_used` e `reps_actual` già aggiunte dalla V13 originale, senza modificare migrazioni. Il dettaglio storico distingue ripetizioni previste, ripetizioni effettive e peso usato, indica i campi non registrati nelle serie completate e mostra un trattino per quelle non svolte. Non vengono stimati risultati passati dalla scheda.
+
+Prova locale: completare una serie con 32,75 kg e 8 ripetizioni; la serie successiva deve avere campi vuoti. Terminare o interrompere, aprire lo storico e ricaricare: i risultati devono restare. Provare una serie con campi vuoti e una con zero, anche MAX; lo storico deve distinguerle. Provare valori negativi, oltre il limite, peso con tre decimali e ripetizioni frazionarie: non devono completare la serie. Volume, grafici e record saranno aggiunti dopo questa prova.
 
 ## Passo 5a: filtri dello storico conservati nell’URL
 

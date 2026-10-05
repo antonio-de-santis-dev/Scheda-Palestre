@@ -79,8 +79,8 @@ class WorkoutController {
 
     @PostMapping("/workouts/{id}/sets/{setId}/complete")
     WorkoutState completeSet(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id,
-            @PathVariable UUID setId) {
-        return workouts.completeSet(user.id(), id, setId);
+            @PathVariable UUID setId, @Valid @RequestBody(required = false) WorkoutDtos.CompleteSetRequest request) {
+        return workouts.completeSet(user.id(), id, setId, request);
     }
 
     @PostMapping("/workouts/{id}/exercises/{exerciseId}/skip")

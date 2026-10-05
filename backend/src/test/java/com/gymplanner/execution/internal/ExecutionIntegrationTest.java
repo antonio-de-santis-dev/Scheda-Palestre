@@ -87,6 +87,114 @@ class ExecutionIntegrationTest {
         return api.post(who, "/api/me/workouts/" + workoutId + "/sets/" + setId + "/complete", null);
     }
 
+    private static String completeUrl(Api.Response state) {
+        return "/api/me/workouts/" + state.read("$.workoutId") + "/sets/" + state.read("$.currentSetId") + "/complete";
+    }
+
+    @Test
+    void actualResultsPersistWithoutChangingPrescribedRepetitions() {
+        Api.Response initial = start(user, MONDAY).expect(201);
+        Api.Response saved = api.post(user, completeUrl(initial), "{\"weightKgUsed\":32.75,\"repsActual\":8}").expect(200);
+        assertThat(((Number) saved.read("$.exercises[0].sets[0].weightKgUsed")).doubleValue()).isEqualTo(32.75);
+        assertThat((Integer) saved.read("$.exercises[0].sets[0].repsActual")).isEqualTo(8);
+        assertThat((Integer) saved.read("$.exercises[0].sets[0].repsPlanned")).isEqualTo(10);
+        UUID setId = UUID.fromString(initial.read("$.currentSetId"));
+        assertThat(jdbc.queryForObject("select weight_kg_used from workout_sets where id = ?",
+                java.math.BigDecimal.class, setId)).isEqualByComparingTo("32.75");
+        assertThat(jdbc.queryForObject("select reps_actual from workout_sets where id = ?", Integer.class, setId)).isEqualTo(8);
+        api.post(user, "/api/me/workouts/" + initial.read("$.workoutId") + "/interrupt", null).expect(200);
+        Api.Response reopened = api.get(user, "/api/me/workouts/" + initial.read("$.workoutId")).expect(200);
+        assertThat((Integer) reopened.read("$.exercises[0].sets[0].repsActual")).isEqualTo(8);
+        assertThat(((Number) reopened.read("$.exercises[0].sets[0].weightKgUsed")).doubleValue()).isEqualTo(32.75);
+        assertThat(jdbc.queryForObject("select reps from plan_exercises where id = ?", Integer.class,
+                plan.planExerciseIds().getFirst())).isEqualTo(10);
+    }
+
+    @Test
+    void resultRetriesAreIdempotentAndCannotOverwriteCompletedSets() {
+        Api.Response initial = start(user, MONDAY).expect(201);
+        String url = completeUrl(initial);
+        Api.Response saved = api.post(user, url, "{\"weightKgUsed\":30,\"repsActual\":9}").expect(200);
+        clock.advance(Duration.ofSeconds(1));
+        Api.Response repeated = api.post(user, url, "{\"weightKgUsed\":30.00,\"repsActual\":9}").expect(200);
+        assertThat((Number) repeated.read("$.executionVersion")).isEqualTo(saved.read("$.executionVersion"));
+        assertThat((Number) repeated.read("$.restVersion")).isEqualTo(saved.read("$.restVersion"));
+        assertThat((String) repeated.read("$.restEndsAt")).isEqualTo(saved.read("$.restEndsAt"));
+        assertThat((String) repeated.read("$.exercises[0].sets[0].completedAt")).isEqualTo(saved.read("$.exercises[0].sets[0].completedAt"));
+        api.post(user, url, "{\"weightKgUsed\":40,\"repsActual\":9}").expectCode(409, "SET_RESULTS_CHANGED");
+        api.post(user, url, "{\"weightKgUsed\":30,\"repsActual\":10}").expectCode(409, "SET_RESULTS_CHANGED");
+        api.post(user, url, "{}").expectCode(409, "SET_RESULTS_CHANGED");
+        // Legacy retries with no body remain compatible and never erase stored results.
+        Api.Response legacy = api.post(user, url, null).expect(200);
+        assertThat((Integer) legacy.read("$.exercises[0].sets[0].repsActual")).isEqualTo(9);
+    }
+
+    @Test
+    void missingResultsRemainNullAndZeroIsAnExplicitResult() {
+        Api.Response initial = start(user, MONDAY).expect(201);
+        Api.Response missing = complete(user, initial).expect(200);
+        assertThat((Object) missing.read("$.exercises[0].sets[0].weightKgUsed")).isNull();
+        assertThat((Object) missing.read("$.exercises[0].sets[0].repsActual")).isNull();
+        clock.advance(Duration.ofSeconds(60));
+        Api.Response zero = api.post(user, completeUrl(missing), "{\"weightKgUsed\":0,\"repsActual\":0}").expect(200);
+        assertThat(((Number) zero.read("$.exercises[0].sets[1].weightKgUsed")).doubleValue()).isZero();
+        assertThat((Integer) zero.read("$.exercises[0].sets[1].repsActual")).isZero();
+        clock.advance(Duration.ofSeconds(60));
+        Api.Response partial = api.post(user, completeUrl(zero), "{\"repsActual\":7}").expect(200);
+        assertThat((Integer) partial.read("$.exercises[1].sets[0].repsActual")).isEqualTo(7);
+        assertThat((Object) partial.read("$.exercises[1].sets[0].weightKgUsed")).isNull();
+    }
+
+    @Test
+    void invalidActualResultsDoNotCompleteTheSet() {
+        Api.Response initial = start(user, MONDAY).expect(201);
+        for (String body : List.of("{\"weightKgUsed\":-1}", "{\"weightKgUsed\":1000.01}",
+                "{\"weightKgUsed\":1.234}", "{\"repsActual\":-1}", "{\"repsActual\":1001}",
+                "{\"repsActual\":7.5}", "{\"repsActual\":\"abc\"}")) {
+            api.post(user, completeUrl(initial), body).expect(400);
+        }
+        Api.Response loaded = api.get(user, "/api/me/workouts/" + initial.read("$.workoutId")).expect(200);
+        assertThat((String) loaded.read("$.currentSetId")).isEqualTo(initial.read("$.currentSetId"));
+        assertThat((Number) loaded.read("$.executionVersion")).isEqualTo(initial.read("$.executionVersion"));
+        assertThat((Object) loaded.read("$.exercises[0].sets[0].repsActual")).isNull();
+    }
+
+    @Test
+    void resultsRespectOwnershipCurrentSetAndRecoveryGuards() {
+        Api.Response initial = start(user, MONDAY).expect(201);
+        String body = "{\"weightKgUsed\":20,\"repsActual\":5}";
+        api.post(fixtures.createUser(), completeUrl(initial), body).expect(404);
+        api.post(admin, completeUrl(initial), body).expect(403);
+        String laterId = initial.read("$.exercises[0].sets[1].id");
+        String laterUrl = "/api/me/workouts/" + initial.read("$.workoutId") + "/sets/" + laterId + "/complete";
+        api.post(user, laterUrl, body).expectCode(422, "SET_NOT_CURRENT");
+        complete(user, initial).expect(200);
+        api.post(user, laterUrl, body).expectCode(422, "REST_NOT_FINISHED");
+        assertThat(jdbc.queryForObject("select reps_actual from workout_sets where id = ?", Integer.class,
+                UUID.fromString(laterId))).isNull();
+        assertThat(jdbc.queryForObject("select completed_at from workout_sets where id = ?", java.sql.Timestamp.class,
+                UUID.fromString(laterId))).isNull();
+    }
+
+    @Test
+    void concurrentDifferentResultsCannotOverwriteTheWinningCompletion() throws Exception {
+        Api.Response initial = start(user, MONDAY).expect(201);
+        String url = completeUrl(initial);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            CountDownLatch go = new CountDownLatch(1);
+            Future<Api.Response> a = pool.submit(() -> { go.await(); return api.post(user, url, "{\"repsActual\":8}"); });
+            Future<Api.Response> b = pool.submit(() -> { go.await(); return api.post(user, url, "{\"repsActual\":9}"); });
+            go.countDown();
+            Api.Response first = a.get(), second = b.get();
+            assertThat(List.of(first.status(), second.status())).containsExactlyInAnyOrder(200, 409);
+            Api.Response winner = first.status() == 200 ? first : second;
+            Api.Response loaded = api.get(user, "/api/me/workouts/" + initial.read("$.workoutId")).expect(200);
+            assertThat((Integer) loaded.read("$.exercises[0].sets[0].repsActual"))
+                    .isEqualTo(winner.read("$.exercises[0].sets[0].repsActual"));
+            assertThat(((Number) loaded.read("$.executionVersion")).longValue()).isEqualTo(1);
+        }
+    }
+
     private static String reorderBody(List<String> ids, Number version) {
         return "{\"exerciseIds\":[" + ids.stream().map(id -> "\"" + id + "\"")
                 .collect(java.util.stream.Collectors.joining(",")) + "],\"expectedVersion\":" + version + "}";

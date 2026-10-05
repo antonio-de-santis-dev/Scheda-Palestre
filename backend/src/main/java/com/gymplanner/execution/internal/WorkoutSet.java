@@ -10,6 +10,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.math.BigDecimal;
+import java.util.Objects;
 import java.util.UUID;
 
 /** A planned set; {@code completedAt} is the single source of truth of completion (spec 8.14). */
@@ -39,6 +41,11 @@ public class WorkoutSet {
 
     private Instant completedAt;
 
+    @Column(name = "weight_kg_used", precision = 6, scale = 2)
+    private BigDecimal weightKgUsed;
+
+    private Integer repsActual;
+
     protected WorkoutSet() {
     }
 
@@ -55,7 +62,27 @@ public class WorkoutSet {
     }
 
     void complete(Instant now) {
+        complete(now, null, null);
+    }
+
+    void complete(Instant now, BigDecimal weightKgUsed, Integer repsActual) {
         this.completedAt = now;
+        this.weightKgUsed = weightKgUsed;
+        this.repsActual = repsActual;
+    }
+
+    boolean hasResults(BigDecimal weight, Integer repetitions) {
+        boolean sameWeight = weightKgUsed == null ? weight == null
+                : weight != null && weightKgUsed.compareTo(weight) == 0;
+        return sameWeight && Objects.equals(repsActual, repetitions);
+    }
+
+    public BigDecimal getWeightKgUsed() {
+        return weightKgUsed;
+    }
+
+    public Integer getRepsActual() {
+        return repsActual;
     }
 
     public UUID getId() {

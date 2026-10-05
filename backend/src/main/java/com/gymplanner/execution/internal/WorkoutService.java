@@ -127,14 +127,18 @@ class WorkoutService {
 
     /**
      * "Fine serie" (spec 10.8), idempotent: an already completed set returns the current state
-     * without advancing twice. The completion instant comes from the server clock.
+     * without advancing twice. Identical results are retryable; different results cannot
+     * overwrite a completed set. The completion instant comes from the server clock.
      */
     @Transactional
-    public WorkoutState completeSet(UUID userId, UUID workoutId, UUID setId) {
+    public WorkoutState completeSet(UUID userId, UUID workoutId, UUID setId, WorkoutDtos.CompleteSetRequest request) {
         Workout workout = lockOwned(userId, workoutId);
         WorkoutSet set = workout.findSet(setId).orElseThrow(() -> new NotFoundException("Set"));
         Instant now = calendar.now();
         if (set.isCompleted()) {
+            if (request != null && !set.hasResults(request.weightKgUsed(), request.actualRepetitions())) {
+                throw new ConflictException("SET_RESULTS_CHANGED", "Completed set results cannot be overwritten");
+            }
             return WorkoutStateMapper.toState(workout, now);
         }
         requireInProgress(workout);
@@ -152,7 +156,8 @@ class WorkoutService {
                     .with("restPaused", workout.isRestPaused())
                     .with("serverTime", now);
         }
-        set.complete(now);
+        set.complete(now, request == null ? null : request.weightKgUsed(),
+                request == null ? null : request.actualRepetitions());
         workout.executionChanged();
         if (exercise.nextSet().isEmpty()) {
             exercise.markCompleted();

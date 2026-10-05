@@ -37,6 +37,7 @@ const MESSAGES: Record<string, string> = {
   WORKOUT_ALREADY_EXISTS: "L'allenamento di questo giorno è già stato avviato.",
   WORKOUT_ALREADY_IN_PROGRESS: 'Hai già un allenamento in corso: concludilo o interrompilo prima.',
   WORKOUT_NOT_IN_PROGRESS: "L'allenamento non è più in corso.",
+  SET_RESULTS_CHANGED: 'Questa serie è già stata registrata con altri risultati. La schermata è stata aggiornata.',
   SET_NOT_CURRENT: 'Questa serie non è quella corrente. La schermata è stata aggiornata.',
   EXERCISE_NOT_IN_PROGRESS: 'Solo l’esercizio in corso può essere saltato.',
   INVALID_HISTORY_FILTER: 'Controlla l’intervallo di date e il nome inseriti nei filtri.',

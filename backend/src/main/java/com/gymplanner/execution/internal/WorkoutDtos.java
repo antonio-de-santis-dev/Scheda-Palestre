@@ -1,8 +1,12 @@
 package com.gymplanner.execution.internal;
 
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.PositiveOrZero;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -26,6 +30,15 @@ final class WorkoutDtos {
             @NotNull @PositiveOrZero Long expectedExecutionVersion) {
     }
 
+    /** Optional actual results; decimal validation prevents silently truncating fractional repetitions. */
+    record CompleteSetRequest(
+            @DecimalMin("0") @DecimalMax("1000") @Digits(integer = 4, fraction = 2) BigDecimal weightKgUsed,
+            @DecimalMin("0") @DecimalMax("1000") @Digits(integer = 4, fraction = 0) BigDecimal repsActual) {
+        Integer actualRepetitions() {
+            return repsActual == null ? null : repsActual.intValueExact();
+        }
+    }
+
     enum NextAction {
         /** The current set can be completed. */
         COMPLETE_SET,
@@ -35,7 +48,8 @@ final class WorkoutDtos {
         FINISHED
     }
 
-    record SetState(UUID id, int setIndex, int repsPlanned, boolean toFailure, int restSeconds, Instant completedAt) {
+    record SetState(UUID id, int setIndex, int repsPlanned, boolean toFailure, int restSeconds, Instant completedAt,
+            BigDecimal weightKgUsed, Integer repsActual) {
     }
 
     record ExerciseState(UUID id, int position, WorkoutExerciseStatus status, String exerciseName,
