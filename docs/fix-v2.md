@@ -10,9 +10,20 @@ Base richiesta: `fixV2` da `4f1f997`. Ogni passo viene provato dal proprietario 
 | 4 | Recupero persistente: pausa/ripresa, +30s, salto confermato, controllo versione | Integrato in delpy, merge 13d15e7 |
 | 5a | Storico filtrabile con filtri URL | Integrato in delpy, merge c7d55d5 |
 | 5b | Risultati effettivi: peso e ripetizioni per serie | Integrato in delpy, merge 1cff5cb |
-| 5c | Identità storica degli esercizi | Implementato, in verifica su fixV2 |
-| 5d | Volume, statistiche, grafici e record | Da fare dopo la prova dell’identità |
+| 5c | Identità storica degli esercizi | Integrato in delpy, merge de56e3a |
+| 5d | Volume registrato e copertura dei dati | Implementato, in verifica su fixV2 |
+| 5e | Riepiloghi aggregati, grafici dei progressi e record | Da fare dopo la prova del volume |
 | Finale | Verifiche complete e deploy | Da fare |
+
+## Passo 5d: volume dai risultati registrati
+
+L’elenco dello storico, il dettaglio dell’allenamento e ogni esercizio mostrano il volume registrato in `kg × ripetizioni`. Il backend somma `weightKgUsed × repsActual` esclusivamente per serie completate con entrambi i valori presenti. Usa BigDecimal: niente arrotondamenti durante la somma e nessuna stima dalle ripetizioni previste. Una serie MAX usa le ripetizioni effettive. Serie già svolte di esercizi poi saltati o allenamenti interrotti contribuiscono comunque; serie non svolte non contribuiscono e non sono contate come dati mancanti.
+
+`WorkoutSummary`, `WorkoutState` ed `ExerciseState` includono `volume`, con `recordedKgReps`, `completedSets`, `recordedSets`, `missingWeightSets`, `missingRepsSets`. Se nessuna serie è calcolabile, il volume è null, mostrato come Non disponibile. Uno zero registrato è invece calcolabile e distinto dall’assenza di dati. Con dati incompleti il valore resta la somma conosciuta, viene marcato Dati parziali e il dettaglio riporta quanti pesi e quante ripetizioni mancano. Il numero di serie escluse è `completedSets - recordedSets`: una serie priva di entrambi i campi è esclusa una sola volta.
+
+Il client visualizza il riepilogo backend, coerente fra elenco, dettaglio, azioni e riapertura. I filtri e l’URL rimangono attivi. Nessuna nuova migrazione; il volume è derivato dai risultati persistiti. Per esercizi a corpo libero il valore riguarda solo il peso esplicitamente registrato: non viene inventato un peso corporeo. Non è un indicatore di calorie o lavoro meccanico.
+
+Prova locale: completare 32,75 kg × 8 ripetizioni (262), poi una serie con solo peso: lo storico deve mostrare 262 con dati parziali e ripetizioni mancanti. Provare campi vuoti, zero e MAX, oltre a salto dopo una serie svolta e interruzione. Ricaricare il dettaglio e verificare che i valori restino uguali. Dopo la prova si aggiungeranno riepiloghi aggregati, grafici e record.
 
 ## Passo 5c: identità storica degli esercizi
 

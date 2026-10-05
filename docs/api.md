@@ -269,3 +269,7 @@ Il completamento serie `POST /api/me/workouts/{id}/sets/{setId}/complete` accett
 ### Identità storica degli esercizi (fixV2)
 
 `ExerciseState.identity` contiene `{ "source": "CATALOG", "id": "UUID" }` per snapshot nuovi, oppure `source: "LEGACY"` per riferimenti storici limitati. La chiave è la coppia source/id: non usare nome o gruppo per collegare esercizi. L’UUID del catalogo è persistito all’avvio e resta disponibile dopo rinomina/eliminazione della voce originaria. I legacy conservano la vecchia voce della scheda o il proprio UUID di snapshot, senza deduzione del catalogo. La V19 riempie esclusivamente identità legacy mancanti e conserva riferimenti già salvati; risultati e recuperi restano invariati.
+
+### Volume registrato (fixV2)
+
+`WorkoutSummary`, `WorkoutState` ed `ExerciseState` includono `volume: { recordedKgReps, completedSets, recordedSets, missingWeightSets, missingRepsSets }`. Il volume è la somma esatta del peso usato per le ripetizioni effettive delle serie completate con entrambi i campi registrati. Nessuna serie calcolabile: `recordedKgReps: null`; risultati registrati pari a zero: `0`. Mancanze di peso e ripetizioni possono sovrapporsi: serie escluse = completedSets - recordedSets. Serie non svolte escluse da tutti i conteggi. I risultati completati di esercizi saltati o allenamenti interrotti rimangono inclusi. Nessuna stima dai valori previsti, nessuna nuova migrazione.

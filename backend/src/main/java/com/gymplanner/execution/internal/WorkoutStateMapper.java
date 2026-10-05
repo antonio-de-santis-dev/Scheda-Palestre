@@ -24,7 +24,7 @@ final class WorkoutStateMapper {
                         e.getSets().stream()
                                 .map(s -> new SetState(s.getId(), s.getSetIndex(), s.getRepsPlanned(), s.isToFailure(),
                                         s.getRestSeconds(), s.getCompletedAt(), s.getWeightKgUsed(), s.getRepsActual()))
-                                .toList(), e.historicalIdentity()))
+                                .toList(), e.historicalIdentity(), WorkoutVolume.of(e.getSets().stream())))
                 .toList();
 
         UUID currentExerciseId = null;
@@ -45,6 +45,6 @@ final class WorkoutStateMapper {
 
         return new WorkoutState(w.getId(), w.getStatus(), w.getScheduledDate(), w.getPlanNameSnapshot(),
                 w.getSessionTitleSnapshot(), w.getStartedAt(), w.getFinishedAt(), exercises, currentExerciseId,
-                currentSetId, restEndsAt, restSeconds, serverTime, next, w.getExecutionVersion(), w.durationSeconds(), w.isRestPaused(), remaining, w.getRestVersion());
+                currentSetId, restEndsAt, restSeconds, serverTime, next, w.getExecutionVersion(), w.durationSeconds(), w.isRestPaused(), remaining, w.getRestVersion(), WorkoutVolume.of(w));
     }
 }

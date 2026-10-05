@@ -52,6 +52,11 @@ final class WorkoutDtos {
             BigDecimal weightKgUsed, Integer repsActual) {
     }
 
+    /** kg × actual repetitions; null means no completed set has both recorded values. */
+    record VolumeSummary(BigDecimal recordedKgReps, int completedSets, int recordedSets,
+            int missingWeightSets, int missingRepsSets) {
+    }
+
     enum IdentitySource { CATALOG, LEGACY }
 
     /** The source is part of the key: a legacy plan-entry UUID is never a catalog UUID. */
@@ -59,7 +64,7 @@ final class WorkoutDtos {
     }
 
     record ExerciseState(UUID id, int position, WorkoutExerciseStatus status, String exerciseName,
-            String muscleGroupName, int setsPlanned, int setsCompleted, List<SetState> sets, ExerciseIdentity identity) {
+            String muscleGroupName, int setsPlanned, int setsCompleted, List<SetState> sets, ExerciseIdentity identity, VolumeSummary volume) {
     }
 
     /**
@@ -70,12 +75,12 @@ final class WorkoutDtos {
     record WorkoutState(UUID workoutId, WorkoutStatus status, LocalDate scheduledDate, String planName,
             String sessionTitle, Instant startedAt, Instant finishedAt, List<ExerciseState> exercises,
             UUID currentExerciseId, UUID currentSetId, Instant restEndsAt, Integer restSeconds, Instant serverTime,
-            NextAction nextAction, long executionVersion, Long durationSeconds, boolean restPaused, long restRemainingMillis, long restVersion) {
+            NextAction nextAction, long executionVersion, Long durationSeconds, boolean restPaused, long restRemainingMillis, long restVersion, VolumeSummary volume) {
     }
 
     record WorkoutSummary(UUID id, LocalDate scheduledDate, WorkoutStatus status, String planName,
             String sessionTitle, Instant startedAt, Instant finishedAt, int totalExercises, int completedExercises,
-            int skippedExercises, Long durationSeconds) {
+            int skippedExercises, Long durationSeconds, VolumeSummary volume) {
 
         static WorkoutSummary of(Workout w) {
             int completed = 0;
@@ -89,7 +94,7 @@ final class WorkoutDtos {
             }
             return new WorkoutSummary(w.getId(), w.getScheduledDate(), w.getStatus(), w.getPlanNameSnapshot(),
                     w.getSessionTitleSnapshot(), w.getStartedAt(), w.getFinishedAt(), w.getExercises().size(),
-                    completed, skipped, w.durationSeconds());
+                    completed, skipped, w.durationSeconds(), WorkoutVolume.of(w));
         }
     }
 }
