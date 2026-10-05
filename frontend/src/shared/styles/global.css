@@ -1329,3 +1329,8 @@ svg {
     transform: scale(0.97);
   }
 }
+
+.history-records__results { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 1fr); }
+.history-records__results a { overflow-wrap: anywhere; }
+[id^="exercise-"] { scroll-margin-top: 5rem; }
+@media (min-width: 640px) { .history-records__results { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

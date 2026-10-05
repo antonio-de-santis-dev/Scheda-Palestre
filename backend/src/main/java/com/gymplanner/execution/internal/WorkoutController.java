@@ -33,6 +33,7 @@ class WorkoutController {
     private final WorkoutService workouts;
     private final TodayService today;
     private final WorkoutHistoryStatsService historyStats;
+    private final WorkoutRecordsService records;
 
     @GetMapping("/today")
     TodayService.TodayResponse today(@AuthenticationPrincipal AuthenticatedUser user,
@@ -86,6 +87,14 @@ class WorkoutController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) WorkoutStatus status, @RequestParam(required = false) String q) {
         return historyStats.progress(user.id(), new WorkoutHistoryFilter(from, to, status, q));
+    }
+
+    @GetMapping("/workout-records")
+    List<WorkoutRecordsService.ExerciseRecords> records(@AuthenticationPrincipal AuthenticatedUser user,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) WorkoutStatus status, @RequestParam(required = false) String q) {
+        return records.get(user.id(), new WorkoutHistoryFilter(from, to, status, q));
     }
 
     /** Full state of one of the user's workouts (resume after reload, history detail). */
