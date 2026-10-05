@@ -1,6 +1,6 @@
 import { useRef, useState, type CSSProperties } from 'react';
 import { Link, useParams } from 'react-router';
-import { CheckCheck, Hourglass, OctagonX, PartyPopper, SkipForward, TimerReset, Trophy, Volume2, VolumeX } from 'lucide-react';
+import { ArrowDown, ArrowUp, CheckCheck, Hourglass, OctagonX, PartyPopper, SkipForward, TimerReset, Trophy, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '../../shared/components/Button';
 import { Alert, ErrorAlert } from '../../shared/components/Alert';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
@@ -36,6 +36,29 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
   const skip = useWorkoutAction(state.workoutId, (exerciseId: string) => workoutApi.skip(state.workoutId, exerciseId), true);
   const interrupt = useWorkoutAction(state.workoutId, () => workoutApi.interrupt(state.workoutId), true);
 
+  const reorder = useWorkoutAction(state.workoutId,
+    (args: { exerciseIds: string[]; expectedVersion: number }) =>
+      workoutApi.reorder(state.workoutId, args.exerciseIds, args.expectedVersion), true);
+  const busy = complete.isPending || skip.isPending || interrupt.isPending || reorder.isPending;
+  const pending = state.exercises.filter((e) => e.status === 'TODO' || e.status === 'IN_PROGRESS')
+    .sort((a, b) => a.position - b.position);
+  const move = (exerciseId: string, offset: number) => {
+    if (busy) return;
+    const ids = pending.map((e) => e.id);
+    const from = ids.indexOf(exerciseId);
+    const to = from + offset;
+    if (from < 0 || to < 0 || to >= ids.length) return;
+    [ids[from], ids[to]] = [ids[to]!, ids[from]!];
+    complete.reset(); skip.reset(); interrupt.reset(); reorder.reset();
+    setFeedback(null);
+    reorder.mutate({ exerciseIds: ids, expectedVersion: state.executionVersion }, {
+      onSuccess: (after) => {
+        const first = after.exercises.find((e) => e.id === after.currentExerciseId);
+        setAnnouncement(`Ordine salvato. Esercizio corrente: ${first?.exerciseName ?? ''}.`);
+      },
+    });
+  };
+
   const remaining = useRestTimer(state, refetch, () => {
     setAnnouncement('Recupero terminato: puoi completare la prossima serie.');
     restAlert.play();
@@ -58,7 +81,7 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
     void celebrate(main.kind);
   };
 
-  const error = complete.error ?? skip.error ?? interrupt.error;
+  const error = reorder.error ?? complete.error ?? skip.error ?? interrupt.error;
   // Stale screens (e.g. set completed from another tab) are re-synced by the mutation hook.
   const stale = isApiError(error) && STALE_STATE_CODES.includes(error.code);
 
@@ -169,7 +192,7 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
               </span>
               <span className="timer__value">{formatDuration(remaining)}</span>
             </div>
-          ) : announcement ? (
+          ) : announcement.startsWith('Recupero terminato') ? (
             <div className="timer timer--done" role="status">
               <span className="timer__label">
                 <TimerReset size={22} aria-hidden="true" />
@@ -187,8 +210,9 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
             aria-describedby={resting ? 'rest-hint' : undefined}
             icon={resting ? <Hourglass size={26} aria-hidden="true" /> : <CheckCheck size={26} aria-hidden="true" />}
             loading={complete.isPending}
+            disabled={busy}
             onClick={() => {
-              if (resting) {
+              if (resting || busy) {
                 return;
               }
               setAnnouncement('');
@@ -215,10 +239,10 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
 
       {!finished && current ? (
         <div className="workout-actions">
-          <Button variant="secondary" icon={<SkipForward size={20} aria-hidden="true" />} onClick={() => setConfirm('skip')}>
+          <Button variant="secondary" icon={<SkipForward size={20} aria-hidden="true" />} disabled={busy} onClick={() => setConfirm('skip')}>
             Salta esercizio
           </Button>
-          <Button variant="secondary" icon={<OctagonX size={20} aria-hidden="true" />} onClick={() => setConfirm('interrupt')}>
+          <Button variant="secondary" icon={<OctagonX size={20} aria-hidden="true" />} disabled={busy} onClick={() => setConfirm('interrupt')}>
             Interrompi
           </Button>
         </div>
@@ -229,6 +253,9 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
         <h2 id="exercise-list-title" style={{ fontSize: 'var(--text-xl)' }}>
           Esercizi
         </h2>
+        {!finished && pending.length > 1 ? (
+          <p className="small muted">Sposta gli esercizi con Su e Giù. Il primo da svolgere diventa quello corrente; le serie già svolte e il recupero restano salvati.</p>
+        ) : null}
         <ol className="list workout-exercises">
           {state.exercises.map((e) => (
             <li key={e.id} className={`list-item${e.id === state.currentExerciseId ? ' list-item--current' : ''}${e.status === 'COMPLETED' ? ' list-item--done' : ''}`}>
@@ -241,7 +268,19 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
                   {e.sets.map((s) => repsLabel({ reps: s.repsPlanned, toFailure: s.toFailure })).join(' / ')}
                 </div>
               </div>
-              <ExerciseStatusBadge status={e.status} />
+              <div className="workout-exercise-controls">
+                <ExerciseStatusBadge status={e.status} />
+                {!finished && pending.some((item) => item.id === e.id) && pending.length > 1 ? (
+                  <div className="row" role="group" aria-label={`Ordine di ${e.exerciseName}`}>
+                    <Button variant="secondary" size="sm" aria-label={`Sposta su ${e.exerciseName}`}
+                      icon={<ArrowUp size={18} aria-hidden="true" />} disabled={busy || pending[0]?.id === e.id}
+                      onClick={() => move(e.id, -1)}>Su</Button>
+                    <Button variant="secondary" size="sm" aria-label={`Sposta giù ${e.exerciseName}`}
+                      icon={<ArrowDown size={18} aria-hidden="true" />} disabled={busy || pending.at(-1)?.id === e.id}
+                      onClick={() => move(e.id, 1)}>Giù</Button>
+                  </div>
+                ) : null}
+              </div>
             </li>
           ))}
         </ol>

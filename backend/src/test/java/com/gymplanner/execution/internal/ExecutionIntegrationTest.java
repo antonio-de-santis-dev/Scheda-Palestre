@@ -87,6 +87,127 @@ class ExecutionIntegrationTest {
         return api.post(who, "/api/me/workouts/" + workoutId + "/sets/" + setId + "/complete", null);
     }
 
+    private static String reorderBody(List<String> ids, Number version) {
+        return "{\"exerciseIds\":[" + ids.stream().map(id -> "\"" + id + "\"")
+                .collect(java.util.stream.Collectors.joining(",")) + "],\"expectedVersion\":" + version + "}";
+    }
+
+    private Api.Response reorder(AuthenticatedUser who, Api.Response state, List<String> ids) {
+        return api.post(who, "/api/me/workouts/" + state.read("$.workoutId") + "/exercises/reorder",
+                reorderBody(ids, (Number) state.read("$.executionVersion")));
+    }
+
+    @Test
+    void reorderPersistsAndPreservesPartialSetsRestAndSharedPlan() {
+        Api.Response initial = start(user, MONDAY).expect(201);
+        Api.Response partial = complete(user, initial).expect(200);
+        List<String> ids = partial.read("$.exercises[*].id");
+        Api.Response changed = reorder(user, partial, List.of(ids.get(1), ids.getFirst())).expect(200);
+        assertThat((List<String>) changed.read("$.exercises[*].id")).containsExactly(ids.get(1), ids.getFirst());
+        assertThat((List<Integer>) changed.read("$.exercises[*].position")).containsExactly(1, 2);
+        assertThat((List<String>) changed.read("$.exercises[*].status")).containsExactly("IN_PROGRESS", "TODO");
+        assertThat((String) changed.read("$.currentExerciseId")).isEqualTo(ids.get(1));
+        assertThat((Integer) changed.read("$.exercises[1].setsCompleted")).isEqualTo(1);
+        assertThat((String) changed.read("$.exercises[1].sets[0].completedAt"))
+                .isEqualTo(partial.read("$.exercises[0].sets[0].completedAt"));
+        assertThat((String) changed.read("$.restEndsAt")).isEqualTo(partial.read("$.restEndsAt"));
+        complete(user, changed).expectCode(422, "REST_NOT_FINISHED");
+        Api.Response loaded = api.get(user, "/api/me/workouts/" + initial.read("$.workoutId")).expect(200);
+        assertThat((List<String>) loaded.read("$.exercises[*].id")).containsExactly(ids.get(1), ids.getFirst());
+        // Resume the partially executed exercise at its next set, even after a second reorder.
+        changed = reorder(user, loaded, ids).expect(200);
+        assertThat((String) changed.read("$.currentSetId")).isEqualTo(partial.read("$.currentSetId"));
+        assertThat(jdbc.queryForList("select id from plan_exercises where muscle_section_id = ? order by position",
+                UUID.class, plan.sectionIds().getFirst())).containsExactlyElementsOf(plan.planExerciseIds().subList(0, 2));
+    }
+
+    @Test
+    void reorderRetryIsIdempotentAndStaleOrderCannotOverwriteLaterActions() {
+        Api.Response initial = start(user, MONDAY).expect(201);
+        List<String> ids = initial.read("$.exercises[*].id");
+        List<String> reversed = List.of(ids.get(1), ids.getFirst());
+        Api.Response changed = reorder(user, initial, reversed).expect(200);
+        Api.Response retry = reorder(user, initial, reversed).expect(200);
+        assertThat((Number) retry.read("$.executionVersion")).isEqualTo(changed.read("$.executionVersion"));
+        reorder(user, initial, ids).expectCode(409, "WORKOUT_STATE_CHANGED");
+        complete(user, changed).expect(200);
+        reorder(user, initial, reversed).expectCode(409, "WORKOUT_STATE_CHANGED");
+    }
+
+    @Test
+    void reorderedExerciseIsExecutedFirstAndCompletedOnesCannotBeReopened() {
+        Api.Response initial = start(user, MONDAY).expect(201);
+        List<String> ids = initial.read("$.exercises[*].id");
+        Api.Response changed = reorder(user, initial, List.of(ids.get(1), ids.getFirst())).expect(200);
+        changed = complete(user, changed).expect(200);
+        clock.advance(Duration.ofSeconds(60));
+        changed = complete(user, changed).expect(200);
+        assertThat((String) changed.read("$.currentExerciseId")).isEqualTo(ids.getFirst());
+        assertThat((String) changed.read("$.exercises[0].status")).isEqualTo("COMPLETED");
+        reorder(user, changed, ids).expectCode(400, "INVALID_EXERCISE_ORDER");
+        reorder(user, changed, List.of(ids.getFirst())).expect(200);
+        api.post(user, "/api/me/workouts/" + changed.read("$.workoutId") + "/interrupt", null).expect(200);
+        reorder(user, changed, List.of(ids.getFirst())).expectCode(422, "WORKOUT_NOT_IN_PROGRESS");
+    }
+
+    @Test
+    void reorderRejectsDuplicatesMissingForeignExercisesAndOtherUsers() {
+        Api.Response initial = start(user, MONDAY).expect(201);
+        List<String> ids = initial.read("$.exercises[*].id");
+        reorder(user, initial, List.of(ids.getFirst(), ids.getFirst())).expectCode(400, "INVALID_EXERCISE_ORDER");
+        reorder(user, initial, List.of(ids.getFirst())).expectCode(400, "INVALID_EXERCISE_ORDER");
+        reorder(user, initial, List.of(ids.getFirst(), UUID.randomUUID().toString())).expectCode(400, "INVALID_EXERCISE_ORDER");
+        reorder(fixtures.createUser(), initial, ids).expect(404);
+        reorder(admin, initial, ids).expect(403);
+        api.post(user, "/api/me/workouts/" + initial.read("$.workoutId") + "/exercises/reorder",
+                "{\"exerciseIds\":[],\"expectedVersion\":0}").expect(400);
+        api.post(user, "/api/me/workouts/" + initial.read("$.workoutId") + "/exercises/reorder",
+                "{\"exerciseIds\":[null],\"expectedVersion\":0}").expect(400);
+        api.post(user, "/api/me/workouts/" + initial.read("$.workoutId") + "/exercises/reorder",
+                "{\"exerciseIds\":[\"" + ids.getFirst() + "\"]}").expect(400);
+    }
+
+    @Test
+    void simultaneousReordersClaimTheCurrentExerciseOnlyOnce() throws Exception {
+        Api.Response initial = start(user, MONDAY).expect(201);
+        List<String> ids = initial.read("$.exercises[*].id");
+        String url = "/api/me/workouts/" + initial.read("$.workoutId") + "/exercises/reorder";
+        String body = reorderBody(List.of(ids.get(1), ids.getFirst()), (Number) initial.read("$.executionVersion"));
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            CountDownLatch go = new CountDownLatch(1);
+            Callable<Integer> task = () -> { go.await(); return api.post(user, url, body).status(); };
+            Future<Integer> a = pool.submit(task), b = pool.submit(task);
+            go.countDown();
+            assertThat(List.of(a.get(), b.get())).containsOnly(200);
+        }
+        Api.Response loaded = api.get(user, "/api/me/workouts/" + initial.read("$.workoutId")).expect(200);
+        assertThat((Number) loaded.read("$.executionVersion")).isEqualTo(1);
+        assertThat((List<String>) loaded.read("$.exercises[*].status")).containsExactly("IN_PROGRESS", "TODO");
+    }
+
+    @Test
+    void differentConcurrentOrdersCannotOverwriteEachOther() throws Exception {
+        AuthenticatedUser other = fixtures.createUser();
+        BuiltPlan larger = factory.executablePlan(admin, "Riordino concorrente", 1, 3, 2);
+        UUID assignment = assignTo(other, larger);
+        api.put(other, scheduleUrl(assignment), "{\"weekdays\":[1]}").expect(200);
+        Api.Response initial = start(other, MONDAY).expect(201);
+        List<String> ids = initial.read("$.exercises[*].id");
+        String url = "/api/me/workouts/" + initial.read("$.workoutId") + "/exercises/reorder";
+        String bodyA = reorderBody(List.of(ids.get(1), ids.getFirst(), ids.get(2)), 0);
+        String bodyB = reorderBody(List.of(ids.get(2), ids.getFirst(), ids.get(1)), 0);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            CountDownLatch go = new CountDownLatch(1);
+            Future<Integer> a = pool.submit(() -> { go.await(); return api.post(other, url, bodyA).status(); });
+            Future<Integer> b = pool.submit(() -> { go.await(); return api.post(other, url, bodyB).status(); });
+            go.countDown();
+            assertThat(List.of(a.get(), b.get())).containsExactlyInAnyOrder(200, 409);
+        }
+        Api.Response loaded = api.get(other, "/api/me/workouts/" + initial.read("$.workoutId")).expect(200);
+        assertThat((Number) loaded.read("$.executionVersion")).isEqualTo(1);
+        assertThat((List<Integer>) loaded.read("$.exercises[*].position")).containsExactly(1, 2, 3);
+    }
+
     @Test
     void fullWorkoutWithRestTimerUntilCompletion() {
         Api.Response state = start(user, MONDAY).expect(201);

@@ -6,6 +6,7 @@ import com.gymplanner.assignment.api.AssignmentView;
 import com.gymplanner.calendar.api.CalendarQueries;
 import com.gymplanner.calendar.api.DayPlan;
 import com.gymplanner.execution.internal.WorkoutDtos.WorkoutState;
+import com.gymplanner.shared.error.BadRequestException;
 import com.gymplanner.shared.error.BusinessRuleException;
 import com.gymplanner.shared.error.ConflictException;
 import com.gymplanner.shared.error.NotFoundException;
@@ -16,9 +17,13 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -151,12 +156,55 @@ class WorkoutService {
                     .with("serverTime", now);
         }
         set.complete(now);
+        workout.executionChanged();
         if (exercise.nextSet().isEmpty()) {
             exercise.markCompleted();
             advance(workout, now);
         }
         workouts.flush();
         return WorkoutStateMapper.toState(workout, now);
+    }
+
+    /** Changes only this workout's execution order, never the shared plan or saved sets. */
+    @Transactional
+    public WorkoutState reorderExercises(UUID userId, UUID workoutId, WorkoutDtos.ReorderExercisesRequest request) {
+        Workout workout = lockOwned(userId, workoutId);
+        requireInProgress(workout);
+        List<WorkoutExercise> pending = workout.getExercises().stream()
+                .filter(e -> e.getStatus() == WorkoutExerciseStatus.TODO
+                        || e.getStatus() == WorkoutExerciseStatus.IN_PROGRESS)
+                .sorted(Comparator.comparingInt(WorkoutExercise::getPosition)).toList();
+        List<UUID> currentOrder = pending.stream().map(WorkoutExercise::getId).toList();
+        List<UUID> requestedOrder = request.exerciseIds();
+        if (requestedOrder.size() != currentOrder.size()
+                || new HashSet<>(requestedOrder).size() != requestedOrder.size()
+                || !new HashSet<>(requestedOrder).equals(new HashSet<>(currentOrder))) {
+            throw new BadRequestException("INVALID_EXERCISE_ORDER", "Include every unfinished exercise exactly once");
+        }
+        long version = workout.getExecutionVersion();
+        // A network retry of the last applied reorder is safe; later actions must not be overwritten.
+        if (version == request.expectedVersion() + 1 && currentOrder.equals(requestedOrder)) {
+            return WorkoutStateMapper.toState(workout, calendar.now());
+        }
+        if (version != request.expectedVersion()) {
+            throw new ConflictException("WORKOUT_STATE_CHANGED", "Workout changed; reload before reordering");
+        }
+        if (currentOrder.equals(requestedOrder)) {
+            return WorkoutStateMapper.toState(workout, calendar.now());
+        }
+        Map<UUID, WorkoutExercise> byId = pending.stream()
+                .collect(Collectors.toMap(WorkoutExercise::getId, Function.identity()));
+        List<Integer> positions = pending.stream().map(WorkoutExercise::getPosition).toList();
+        // Release the partial unique index before activating a different exercise.
+        workout.currentExercise().ifPresent(WorkoutExercise::markTodo);
+        workouts.flush();
+        for (int i = 0; i < requestedOrder.size(); i++) {
+            byId.get(requestedOrder.get(i)).moveTo(positions.get(i));
+        }
+        byId.get(requestedOrder.getFirst()).markInProgress();
+        workout.executionChanged();
+        workouts.flush();
+        return WorkoutStateMapper.toState(workout, calendar.now());
     }
 
     /** US-20 / O-02: only the exercise in progress can be skipped; skipped ones do not come back. */
@@ -174,6 +222,7 @@ class WorkoutService {
             throw new BusinessRuleException("EXERCISE_NOT_IN_PROGRESS", "Only the exercise in progress can be skipped");
         }
         exercise.markSkipped();
+        workout.executionChanged();
         advance(workout, now);
         workouts.flush();
         return WorkoutStateMapper.toState(workout, now);
@@ -188,6 +237,7 @@ class WorkoutService {
         }
         requireInProgress(workout);
         workout.interrupt(now);
+        workout.executionChanged();
         workouts.flush();
         return WorkoutStateMapper.toState(workout, now);
     }
@@ -199,6 +249,7 @@ class WorkoutService {
         Instant now = calendar.now();
         for (Workout workout : workouts.findByPlanAssignmentIdAndStatus(event.assignmentId(), WorkoutStatus.IN_PROGRESS)) {
             workout.interrupt(now);
+            workout.executionChanged();
             log.info("Workout id={} interrupted because its assignment was closed", workout.getId());
         }
     }

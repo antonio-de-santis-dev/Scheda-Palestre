@@ -35,7 +35,7 @@ public class WorkoutExercise {
     @Column(name = "plan_exercise_id", updatable = false)
     private UUID planExerciseId;
 
-    @Column(nullable = false, updatable = false)
+    @Column(nullable = false)
     private int position;
 
     @Enumerated(EnumType.STRING)
@@ -76,6 +76,14 @@ public class WorkoutExercise {
     /** First set not completed yet: the only one that can be completed next. */
     Optional<WorkoutSet> nextSet() {
         return sets.stream().filter(s -> !s.isCompleted()).findFirst();
+    }
+
+    void moveTo(int position) {
+        this.position = position;
+    }
+
+    void markTodo() {
+        this.status = WorkoutExerciseStatus.TODO;
     }
 
     void markInProgress() {

@@ -20,7 +20,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * A workout and its immutable snapshot (spec 8.12). All state transitions of spec 10.8/10.10
+ * A workout and its snapshot (spec 8.12): names/sets are immutable, execution order can change. All state transitions of spec 10.8/10.10
  * live here so they can be unit tested without a database.
  */
 @Entity
@@ -48,6 +48,10 @@ public class Workout {
     private Instant startedAt;
 
     private Instant finishedAt;
+
+    /** Revision of execution actions, checked while holding the workout row lock. */
+    @Column(nullable = false)
+    private long executionVersion;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -129,6 +133,14 @@ public class Workout {
         return exercises.stream().flatMap(e -> e.getSets().stream())
                 .filter(WorkoutSet::isCompleted)
                 .max(Comparator.comparing(WorkoutSet::getCompletedAt));
+    }
+
+    void executionChanged() {
+        executionVersion++;
+    }
+
+    public long getExecutionVersion() {
+        return executionVersion;
     }
 
     public UUID getId() {

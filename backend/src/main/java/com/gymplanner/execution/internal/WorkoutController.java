@@ -84,6 +84,12 @@ class WorkoutController {
         return workouts.skipExercise(user.id(), id, exerciseId);
     }
 
+    @PostMapping("/workouts/{id}/exercises/reorder")
+    WorkoutState reorder(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id,
+            @Valid @RequestBody WorkoutDtos.ReorderExercisesRequest body) {
+        return workouts.reorderExercises(user.id(), id, body);
+    }
+
     @PostMapping("/workouts/{id}/interrupt")
     WorkoutState interrupt(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id) {
         return workouts.interrupt(user.id(), id);

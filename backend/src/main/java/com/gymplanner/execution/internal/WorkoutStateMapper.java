@@ -6,6 +6,7 @@ import com.gymplanner.execution.internal.WorkoutDtos.SetState;
 import com.gymplanner.execution.internal.WorkoutDtos.WorkoutState;
 import java.time.Instant;
 import java.util.List;
+import java.util.Comparator;
 import java.util.UUID;
 
 /** Builds the execution state; the timer is derived from server instants (spec 10.9). */
@@ -16,6 +17,7 @@ final class WorkoutStateMapper {
 
     static WorkoutState toState(Workout w, Instant serverTime) {
         List<ExerciseState> exercises = w.getExercises().stream()
+                .sorted(Comparator.comparingInt(WorkoutExercise::getPosition))
                 .map(e -> new ExerciseState(e.getId(), e.getPosition(), e.getStatus(), e.getExerciseNameSnapshot(),
                         e.getMuscleGroupNameSnapshot(), e.getSetsPlanned(),
                         (int) e.getSets().stream().filter(WorkoutSet::isCompleted).count(),
@@ -53,6 +55,6 @@ final class WorkoutStateMapper {
 
         return new WorkoutState(w.getId(), w.getStatus(), w.getScheduledDate(), w.getPlanNameSnapshot(),
                 w.getSessionTitleSnapshot(), w.getStartedAt(), w.getFinishedAt(), exercises, currentExerciseId,
-                currentSetId, restEndsAt, restSeconds, serverTime, next);
+                currentSetId, restEndsAt, restSeconds, serverTime, next, w.getExecutionVersion());
     }
 }
