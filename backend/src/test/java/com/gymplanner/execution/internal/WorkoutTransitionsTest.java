@@ -55,11 +55,12 @@ class WorkoutTransitionsTest {
     }
 
     @Test
-    void timerDerivesFromTheLastCompletedSet() {
+    void timerUsesThePersistedRecoveryDeadline() {
         Workout w = workout();
         w.begin();
         WorkoutSet set = w.getExercises().getFirst().getSets().getFirst();
         set.complete(T0);
+        w.startRest(T0, 60);
         var state = WorkoutStateMapper.toState(w, T0.plusSeconds(15));
         assertThat(state.restEndsAt()).isEqualTo(T0.plusSeconds(60));
         assertThat(state.nextAction()).isEqualTo(WorkoutDtos.NextAction.WAIT_FOR_REST);
@@ -74,7 +75,9 @@ class WorkoutTransitionsTest {
         Workout w = workout();
         w.begin();
         w.getExercises().getFirst().getSets().getFirst().complete(T0);
+        w.startRest(T0, 60);
         w.getExercises().getFirst().getSets().get(1).complete(T0.plusSeconds(70));
+        w.startRest(T0.plusSeconds(70), 0);
         var state = WorkoutStateMapper.toState(w, T0.plusSeconds(71));
         assertThat(state.restEndsAt()).isNull();
     }
@@ -84,8 +87,12 @@ class WorkoutTransitionsTest {
         Workout w = workout();
         w.begin();
         w.getExercises().getFirst().getSets().getFirst().complete(T0);
+        w.startRest(T0, 60);
+        w.changeRest(WorkoutDtos.RestAction.PAUSE, T0.plusSeconds(1));
         w.interrupt(T0.plusSeconds(5));
         var state = WorkoutStateMapper.toState(w, T0.plusSeconds(6));
+        assertThat(state.restPaused()).isFalse();
+        assertThat(state.restRemainingMillis()).isZero();
         assertThat(state.restEndsAt()).isNull();
         assertThat(state.currentSetId()).isNull();
         assertThat(state.nextAction()).isEqualTo(WorkoutDtos.NextAction.FINISHED);
@@ -112,6 +119,33 @@ class WorkoutTransitionsTest {
         assertThat(w.durationSeconds()).isNull();
         w.complete(T0.minusSeconds(1));
         assertThat(w.durationSeconds()).isNull();
+    }
+
+    @Test
+    void pausedRecoveryKeepsMillisecondsAcrossTimeAndResumesWithThirtySecondsAdded() {
+        Workout w = workout();
+        w.startRest(T0, 60);
+        w.changeRest(WorkoutDtos.RestAction.PAUSE, T0.plusMillis(10_123));
+        assertThat(w.remainingRestMillis(T0.plusSeconds(3600))).isEqualTo(49_877L);
+        w.changeRest(WorkoutDtos.RestAction.EXTEND, T0.plusSeconds(3600));
+        assertThat(w.isRestPaused()).isTrue();
+        assertThat(w.remainingRestMillis(T0.plusSeconds(7200))).isEqualTo(79_877L);
+        w.changeRest(WorkoutDtos.RestAction.RESUME, T0.plusSeconds(7200));
+        assertThat(w.getRestEndsAt()).isEqualTo(T0.plusSeconds(7200).plusMillis(79_877));
+        assertThat(w.remainingRestMillis(w.getRestEndsAt())).isZero();
+    }
+
+    @Test
+    void skippedRecoveryNeverReappearsFromTheCompletedSetSnapshot() {
+        Workout w = workout();
+        w.begin();
+        w.getExercises().getFirst().getSets().getFirst().complete(T0);
+        w.startRest(T0, 60);
+        w.changeRest(WorkoutDtos.RestAction.SKIP, T0.plusSeconds(5));
+        var state = WorkoutStateMapper.toState(w, T0.plusSeconds(6));
+        assertThat(state.restEndsAt()).isNull();
+        assertThat(state.nextAction()).isEqualTo(WorkoutDtos.NextAction.COMPLETE_SET);
+        assertThat(w.lastCompletedSet()).isPresent();
     }
 
 }

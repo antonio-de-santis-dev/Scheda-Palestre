@@ -5,6 +5,9 @@ import type { PlanSession } from '../../shared/api/planTypes';
 
 export type WorkoutStatus = 'IN_PROGRESS' | 'COMPLETED' | 'INTERRUPTED';
 export type ExerciseStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED';
+export type RestAction = 'PAUSE' | 'RESUME' | 'EXTEND' | 'SKIP';
+export interface RestRequest { action: RestAction; expectedVersion: number; expectedExecutionVersion: number }
+
 export type NextAction = 'COMPLETE_SET' | 'WAIT_FOR_REST' | 'FINISHED';
 
 export interface WorkoutSetState {
@@ -43,6 +46,9 @@ export interface WorkoutState {
   currentSetId: string | null;
   restEndsAt: string | null;
   restSeconds: number | null;
+  restPaused: boolean;
+  restRemainingMillis: number;
+  restVersion: number;
   serverTime: string;
   nextAction: NextAction;
   /** Client clock when the response arrived: used to compute the server/client offset. */
@@ -121,6 +127,8 @@ export const workoutApi = {
     stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/exercises/${exerciseId}/skip`)),
   reorder: async (workoutId: string, exerciseIds: string[], expectedVersion: number) =>
     stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/exercises/reorder`, { exerciseIds, expectedVersion })),
+  changeRest: async (workoutId: string, request: RestRequest) =>
+    stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/rest`, request)),
   interrupt: async (workoutId: string) => stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/interrupt`)),
 };
 
@@ -140,7 +148,7 @@ export function useWorkout(id: string) {
 const retryNetwork = (failureCount: number, error: unknown) => failureCount < 3 && isApiError(error) && error.isNetwork;
 
 /** Errors meaning "the screen is stale": the state is reloaded from the server. */
-export const STALE_STATE_CODES = ['SET_NOT_CURRENT', 'WORKOUT_NOT_IN_PROGRESS', 'EXERCISE_NOT_IN_PROGRESS', 'REST_NOT_FINISHED', 'WORKOUT_STATE_CHANGED', 'INVALID_EXERCISE_ORDER'];
+export const STALE_STATE_CODES = ['REST_STATE_CHANGED', 'REST_NOT_ACTIVE', 'REST_ALREADY_PAUSED', 'REST_NOT_PAUSED', 'SET_NOT_CURRENT', 'WORKOUT_NOT_IN_PROGRESS', 'EXERCISE_NOT_IN_PROGRESS', 'REST_NOT_FINISHED', 'WORKOUT_STATE_CHANGED', 'INVALID_EXERCISE_ORDER'];
 
 export function useWorkoutAction<TArgs>(workoutId: string, fn: (args: TArgs) => Promise<WorkoutState>, idempotent: boolean) {
   const queryClient = useQueryClient();

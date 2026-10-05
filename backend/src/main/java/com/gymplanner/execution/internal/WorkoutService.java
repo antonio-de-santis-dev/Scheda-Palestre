@@ -146,13 +146,10 @@ class WorkoutService {
         }
         // Fase F (supersedes O-06): the next set cannot start while the rest is running. A repeated
         // request for an already completed set was answered above (idempotency is preserved).
-        Optional<Instant> restEndsAt = workout.lastCompletedSet()
-                .filter(last -> last.getRestSeconds() > 0)
-                .map(last -> last.getCompletedAt().plusSeconds(last.getRestSeconds()))
-                .filter(now::isBefore);
-        if (restEndsAt.isPresent()) {
+        if (workout.remainingRestMillis(now) > 0) {
             throw new BusinessRuleException("REST_NOT_FINISHED", "The rest period is not over yet")
-                    .with("restEndsAt", restEndsAt.get())
+                    .with("restEndsAt", workout.getRestEndsAt())
+                    .with("restPaused", workout.isRestPaused())
                     .with("serverTime", now);
         }
         set.complete(now);
@@ -161,6 +158,23 @@ class WorkoutService {
             exercise.markCompleted();
             advance(workout, now);
         }
+        if (workout.isInProgress()) workout.startRest(now, set.getRestSeconds());
+        workouts.flush();
+        return WorkoutStateMapper.toState(workout, now);
+    }
+
+    /** Recovery changes share the set-completion lock and reject duplicate/stale revisions. */
+    @Transactional
+    public WorkoutState changeRest(UUID userId, UUID workoutId, WorkoutDtos.RestRequest request) {
+        Workout workout = lockOwned(userId, workoutId);
+        requireInProgress(workout);
+        if (request.expectedVersion() != workout.getRestVersion()
+                || request.expectedExecutionVersion() != workout.getExecutionVersion()) {
+            throw new ConflictException("REST_STATE_CHANGED", "Workout or rest changed; reload before retrying");
+        }
+        Instant now = calendar.now();
+        workout.changeRest(request.action(), now);
+        workout.executionChanged();
         workouts.flush();
         return WorkoutStateMapper.toState(workout, now);
     }

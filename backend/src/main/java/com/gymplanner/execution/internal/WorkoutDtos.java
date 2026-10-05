@@ -20,10 +20,16 @@ final class WorkoutDtos {
             @NotNull @PositiveOrZero Long expectedVersion) {
     }
 
+    enum RestAction { PAUSE, RESUME, EXTEND, SKIP }
+
+    record RestRequest(@NotNull RestAction action, @NotNull @PositiveOrZero Long expectedVersion,
+            @NotNull @PositiveOrZero Long expectedExecutionVersion) {
+    }
+
     enum NextAction {
         /** The current set can be completed. */
         COMPLETE_SET,
-        /** Rest is running; completing the next set is still allowed (O-06: informative timer). */
+        /** Rest is running or paused; the next set is blocked until it ends or is skipped. */
         WAIT_FOR_REST,
         /** The workout is completed or interrupted. */
         FINISHED
@@ -38,13 +44,13 @@ final class WorkoutDtos {
 
     /**
      * Complete execution state returned by every execution endpoint (spec 13.6): the client
-     * never has to guess what to do next. {@code restEndsAt} = completion instant of the last
-     * set + its rest; the client computes the remaining time against {@code serverTime}.
+     * never has to guess what to do next. Running recovery uses the persisted {@code restEndsAt};
+     * paused recovery uses the stored remaining milliseconds.
      */
     record WorkoutState(UUID workoutId, WorkoutStatus status, LocalDate scheduledDate, String planName,
             String sessionTitle, Instant startedAt, Instant finishedAt, List<ExerciseState> exercises,
             UUID currentExerciseId, UUID currentSetId, Instant restEndsAt, Integer restSeconds, Instant serverTime,
-            NextAction nextAction, long executionVersion, Long durationSeconds) {
+            NextAction nextAction, long executionVersion, Long durationSeconds, boolean restPaused, long restRemainingMillis, long restVersion) {
     }
 
     record WorkoutSummary(UUID id, LocalDate scheduledDate, WorkoutStatus status, String planName,
