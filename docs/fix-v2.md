@@ -7,11 +7,24 @@ Base richiesta: `fixV2` da `4f1f997`. Ogni passo viene provato dal proprietario 
 | 1 | Riordinare gli esercizi durante l’allenamento | Verificato e pubblicato su delpy |
 | 2 | Esercizi completati in fondo alla lista | Verificato e pubblicato su delpy |
 | 3 | Durata allenamento da timestamp backend, nello storico | Integrato in delpy, merge 2d3e34d |
-| 4 | Recupero persistente: pausa/ripresa, +30s, salto confermato, controllo versione | Implementato, in verifica su fixV2 |
-| 5 | Storico filtrabile con filtri URL, risultati peso/ripetizioni, statistiche e record | Da fare |
+| 4 | Recupero persistente: pausa/ripresa, +30s, salto confermato, controllo versione | Integrato in delpy, merge 13d15e7 |
+| 5a | Storico filtrabile con filtri URL | Implementato, in verifica su fixV2 |
+| 5b | Risultati peso/ripetizioni, identità storica, statistiche, grafici e record | Da fare dopo la prova dei filtri |
 | Finale | Verifiche complete e deploy | Da fare |
 
+## Passo 5a: filtri dello storico conservati nell’URL
+
+L’elenco dello storico accetta `from`, `to`, `status` e `q`, oltre a `page` e `size`. Le date si riferiscono alla data dell’allenamento (`scheduledDate`) e sono inclusive; è possibile impostare anche un solo estremo. Esiti: `COMPLETED`, `INTERRUPTED`, `IN_PROGRESS`, oppure tutti. La ricerca è una sottostringa senza distinzione di maiuscole sui nomi storici della scheda o della sessione; non consulta schede rinominate o eliminate. `%`, `_` e backslash sono cercati letteralmente.
+
+La query applica sempre l’utente autenticato insieme ai criteri e calcola la paginazione sui risultati filtrati. L’ordinamento resta dal più recente, con UUID come spareggio deterministico. Intervalli invertiti e nomi oltre 100 caratteri vengono rifiutati, così come date/esiti non validi. Non occorre una migrazione del database.
+
+Il modulo Applica filtri aggiorna l’URL e torna alla prima pagina; Azzera filtri li rimuove. Paginazione, refresh, link al dettaglio, ritorno allo storico e navigazione Indietro mantengono i criteri. I filtri non validi presenti nell’URL sono segnalati prima di interrogare il backend. Le ricerche senza risultati hanno un messaggio dedicato. I risultati della ricerca precedente non vengono presentati come se appartenessero ai nuovi filtri durante il caricamento.
+
+Prova locale: combinare date, esito e nome; passare alla pagina successiva, aprire un dettaglio e tornare allo storico; ricaricare; cambiare i criteri e verificare il ritorno alla prima pagina; azzerare e controllare il ripristino dell’elenco. Statistiche e grafici vengono aggiunti nei passi successivi dopo questa prova.
+
 ## Passo 4: recupero avanzato persistente
+
+Integrato in delpy tramite PR #7 (merge 13d15e7), su richiesta del proprietario.
 
 Il timer usa `rest_ends_at`, `rest_remaining_millis`, `rest_duration_seconds` e `rest_version` già presenti dalla V12 originale. Pausa e ripresa conservano i millisecondi residui; +30 secondi funziona sia durante il conto alla rovescia sia in pausa. Il salto richiede conferma e termina soltanto il recupero, conservando esercizi e serie. Completare l’allenamento o interromperlo chiude anche il recupero. Riordinare o saltare un esercizio conserva il recupero ancora attivo.
 

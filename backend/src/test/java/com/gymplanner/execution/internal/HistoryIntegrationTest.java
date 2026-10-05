@@ -11,11 +11,13 @@ import com.gymplanner.support.PlanFactory.BuiltPlan;
 import com.gymplanner.support.TestFixtures;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @IntegrationTest
 @SuppressWarnings({"unchecked", "cast"})
@@ -31,6 +33,9 @@ class HistoryIntegrationTest {
     PlanFactory factory;
     @Autowired
     MutableClock clock;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     AuthenticatedUser admin;
     AuthenticatedUser user;
@@ -99,6 +104,9 @@ class HistoryIntegrationTest {
         assertThat((String) detail.read("$.sessionTitle")).isEqualTo("Giorno 1");
         assertThat((List<Object>) detail.read("$.exercises")).hasSize(2);
         assertThat((String) api.get(user, "/api/me/workouts").read("$.content[0].planName")).isEqualTo("Storico");
+        assertThat((Integer) api.get(user, "/api/me/workouts?q=storICO").expect(200).read("$.totalElements")).isEqualTo(1);
+        assertThat((Integer) api.get(user, "/api/me/workouts?q=Rinominata").expect(200).read("$.totalElements")).isZero();
+        assertThat((Integer) api.get(user, "/api/me/workouts", Map.of("q", "Giorno 1")).expect(200).read("$.totalElements")).isEqualTo(1);
     }
 
     @Test
@@ -109,6 +117,55 @@ class HistoryIntegrationTest {
         api.get(other, "/api/me/workouts/" + id).expectCode(404, "NOT_FOUND");
         api.get(other, "/api/me/workouts/" + UUID.randomUUID()).expectCode(404, "NOT_FOUND");
         api.get(admin, "/api/me/workouts").expectCode(403, "FORBIDDEN");
+        assertThat((Integer) api.get(other, "/api/me/workouts?from=2026-10-05&to=2026-10-05&status=IN_PROGRESS&q=Storico").expect(200).read("$.totalElements")).isZero();
+    }
+
+    private Api.Response start(LocalDate date) {
+        clock.setDate(date);
+        return api.post(user, "/api/me/workouts", "{\"date\":\"" + date + "\"}").expect(201);
+    }
+
+    @Test
+    void historyCombinesInclusiveCalendarDatesStatusNameAndPagination() {
+        Api.Response monday = start(MONDAY);
+        String mondayId = monday.read("$.workoutId");
+        monday = api.post(user, "/api/me/workouts/" + mondayId + "/sets/" + monday.read("$.currentSetId") + "/complete", null).expect(200);
+        api.post(user, "/api/me/workouts/" + mondayId + "/exercises/" + monday.read("$.currentExerciseId") + "/skip", null).expect(200);
+        String tuesdayId = start(MONDAY.plusDays(1)).read("$.workoutId");
+        api.post(user, "/api/me/workouts/" + tuesdayId + "/interrupt", null).expect(200);
+        String wednesdayId = start(MONDAY.plusDays(2)).read("$.workoutId");
+        Api.Response range = api.get(user, "/api/me/workouts?from=2026-10-05&to=2026-10-06&size=1").expect(200);
+        assertThat((Integer) range.read("$.totalElements")).isEqualTo(2);
+        assertThat((Integer) range.read("$.totalPages")).isEqualTo(2);
+        assertThat((List<String>) range.read("$.content[*].id")).containsExactly(tuesdayId);
+        assertThat((List<String>) api.get(user, "/api/me/workouts?from=2026-10-05&to=2026-10-06&size=1&page=1").expect(200).read("$.content[*].id")).containsExactly(mondayId);
+        assertThat((List<String>) api.get(user, "/api/me/workouts?from=2026-10-05&to=2026-10-05&status=COMPLETED&q=stoRICO").expect(200).read("$.content[*].id")).containsExactly(mondayId);
+        assertThat((List<String>) api.get(user, "/api/me/workouts?to=2026-10-05").expect(200).read("$.content[*].id")).containsExactly(mondayId);
+        assertThat((List<String>) api.get(user, "/api/me/workouts?from=2026-10-07&status=IN_PROGRESS").expect(200).read("$.content[*].id")).containsExactly(wednesdayId);
+        assertThat((List<String>) api.get(user, "/api/me/workouts?status=INTERRUPTED").expect(200).read("$.content[*].id")).containsExactly(tuesdayId);
+        assertThat((Integer) api.get(user, "/api/me/workouts?from=2026-10-07&status=COMPLETED").expect(200).read("$.totalElements")).isZero();
+    }
+
+    @Test
+    void nameSearchTreatsWildcardsAndBackslashAsLiteralText() {
+        String id = start(MONDAY).read("$.workoutId");
+        jdbc.update("update workouts set plan_name_snapshot = ? where id = ?", "Carico 100%_\\ pronto", UUID.fromString(id));
+        api.post(user, "/api/me/workouts/" + id + "/interrupt", null).expect(200);
+        start(MONDAY.plusDays(1));
+        for (String q : List.of("100%_\\", "%", "_", "\\", "  CARICO  ")) {
+            assertThat((List<String>) api.get(user, "/api/me/workouts", Map.of("q", q)).expect(200).read("$.content[*].id")).containsExactly(id);
+        }
+        assertThat((Integer) api.get(user, "/api/me/workouts?q=100X").expect(200).read("$.totalElements")).isZero();
+        assertThat((Integer) api.get(user, "/api/me/workouts", Map.of("q", "  ")).expect(200).read("$.totalElements")).isEqualTo(2);
+    }
+
+    @Test
+    void invalidHistoryFiltersAreRejected() {
+        api.get(user, "/api/me/workouts?from=2026-10-06&to=2026-10-05").expectCode(400, "INVALID_HISTORY_FILTER");
+        api.get(user, "/api/me/workouts?q=" + "x".repeat(101)).expectCode(400, "INVALID_HISTORY_FILTER");
+        api.get(user, "/api/me/workouts?from=not-a-date").expect(400);
+        api.get(user, "/api/me/workouts?from=2026-02-30").expect(400);
+        api.get(user, "/api/me/workouts?status=FAILED").expect(400);
     }
 
     @Test

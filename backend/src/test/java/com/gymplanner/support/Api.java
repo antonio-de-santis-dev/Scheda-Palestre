@@ -5,6 +5,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import com.gymplanner.shared.security.AuthenticatedUser;
 import com.jayway.jsonpath.JsonPath;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import org.assertj.core.api.Assertions;
 import org.springframework.boot.test.context.TestComponent;
 import org.springframework.http.MediaType;
@@ -45,6 +46,13 @@ public class Api {
 
     public Response get(AuthenticatedUser user, String url) {
         return perform(user, MockMvcRequestBuilders.get(url));
+    }
+
+    /** Supplies literal query values without pre-encoding text in the URI template. */
+    public Response get(AuthenticatedUser user, String url, Map<String, String> query) {
+        var request = MockMvcRequestBuilders.get(url);
+        query.forEach((name, value) -> request.queryParam(name, value));
+        return perform(user, request);
     }
 
     public Response post(AuthenticatedUser user, String url, String json) {

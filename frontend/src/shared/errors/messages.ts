@@ -39,6 +39,7 @@ const MESSAGES: Record<string, string> = {
   WORKOUT_NOT_IN_PROGRESS: "L'allenamento non è più in corso.",
   SET_NOT_CURRENT: 'Questa serie non è quella corrente. La schermata è stata aggiornata.',
   EXERCISE_NOT_IN_PROGRESS: 'Solo l’esercizio in corso può essere saltato.',
+  INVALID_HISTORY_FILTER: 'Controlla l’intervallo di date e il nome inseriti nei filtri.',
   RANGE_TOO_LARGE: "L'intervallo richiesto è troppo ampio (massimo 62 giorni).",
   EXERCISE_GROUP_MISMATCH: 'L’esercizio scelto non appartiene al gruppo muscolare di questa sezione.',
   SCHEDULE_DAY_CONFLICT: 'Alcuni giorni sono già usati da un’altra tua scheda attiva.',
