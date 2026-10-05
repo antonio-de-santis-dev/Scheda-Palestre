@@ -91,7 +91,11 @@ public class Workout {
     }
 
     WorkoutExercise addExercise(UUID planExerciseId, String exerciseName, String muscleGroupName) {
-        WorkoutExercise exercise = new WorkoutExercise(this, planExerciseId, exercises.size() + 1, exerciseName,
+        return addExercise(planExerciseId, null, exerciseName, muscleGroupName);
+    }
+
+    WorkoutExercise addExercise(UUID planExerciseId, UUID catalogExerciseId, String exerciseName, String muscleGroupName) {
+        WorkoutExercise exercise = new WorkoutExercise(this, planExerciseId, catalogExerciseId, exercises.size() + 1, exerciseName,
                 muscleGroupName);
         exercises.add(exercise);
         return exercise;

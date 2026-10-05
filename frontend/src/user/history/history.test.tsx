@@ -34,6 +34,22 @@ describe('history', () => {
     expect(within(trazioni).getByText('MAX')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Panca' })).getAllByText('✓ Completata')).toHaveLength(2);
   });
+  it('marks legacy identities without guessing a catalog link from matching names', async () => {
+    const state = workoutState();
+    state.exercises[0]!.identity = { source: 'LEGACY', id: 'old-plan-entry' };
+    state.exercises[1]!.exerciseName = 'Panca';
+    server.use(
+      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
+      http.get('*/api/me/workouts/:id', () => HttpResponse.json(state)),
+    );
+    renderApp('/app/history/w-1');
+    const regions = await screen.findAllByRole('region', { name: 'Panca' });
+    expect(within(regions[0]!).getByText(/Identità storica limitata/)).toBeInTheDocument();
+    expect(within(regions[1]!).queryByText(/Identità storica limitata/)).not.toBeInTheDocument();
+    expect(within(regions[0]!).queryByRole('link')).not.toBeInTheDocument();
+    expect(within(regions[1]!).queryByRole('link')).not.toBeInTheDocument();
+  });
+
   it.each([
     { status: 'INTERRUPTED' as const, seconds: 3661, label: 'Durata: 1 h 1 min 1 s' },
     { status: 'COMPLETED' as const, seconds: 90061, label: 'Durata: 25 h 1 min 1 s' },

@@ -132,6 +132,9 @@ export function HistoryDetailPage() {
                   </div>
                   <ExerciseStatusBadge status={e.status} />
                 </div>
+                {e.identity?.source === 'LEGACY' ? (
+                  <p className="small muted">Identità storica limitata: questo esercizio sarà confrontabile solo con le registrazioni che conservano la stessa identità, senza associazioni basate sul nome.</p>
+                ) : null}
                 <div className="table-scroll">
                   <table className="sets-table">
                     <caption className="visually-hidden">Serie di {e.exerciseName}</caption>

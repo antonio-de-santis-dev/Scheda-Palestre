@@ -21,7 +21,10 @@ export interface WorkoutSetState extends SetResults {
   completedAt: string | null;
 }
 
+export interface ExerciseIdentity { source: 'CATALOG' | 'LEGACY'; id: string }
+
 export interface WorkoutExerciseState {
+  identity: ExerciseIdentity;
   id: string;
   position: number;
   status: ExerciseStatus;
