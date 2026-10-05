@@ -37,24 +37,14 @@ final class WorkoutStateMapper {
             }
         }
 
-        Instant restEndsAt = null;
-        Integer restSeconds = null;
-        if (w.isInProgress()) {
-            var last = w.lastCompletedSet();
-            if (last.isPresent() && last.get().getRestSeconds() > 0) {
-                Instant end = last.get().getCompletedAt().plusSeconds(last.get().getRestSeconds());
-                if (end.isAfter(serverTime)) {
-                    restEndsAt = end;
-                    restSeconds = last.get().getRestSeconds();
-                }
-            }
-        }
-
+        long remaining = w.remainingRestMillis(serverTime);
+        Instant restEndsAt = remaining > 0 && !w.isRestPaused() ? w.getRestEndsAt() : null;
+        Integer restSeconds = remaining > 0 ? w.getRestDurationSeconds() : null;
         NextAction next = !w.isInProgress() ? NextAction.FINISHED
-                : restEndsAt != null ? NextAction.WAIT_FOR_REST : NextAction.COMPLETE_SET;
+                : remaining > 0 ? NextAction.WAIT_FOR_REST : NextAction.COMPLETE_SET;
 
         return new WorkoutState(w.getId(), w.getStatus(), w.getScheduledDate(), w.getPlanNameSnapshot(),
                 w.getSessionTitleSnapshot(), w.getStartedAt(), w.getFinishedAt(), exercises, currentExerciseId,
-                currentSetId, restEndsAt, restSeconds, serverTime, next, w.getExecutionVersion(), w.durationSeconds());
+                currentSetId, restEndsAt, restSeconds, serverTime, next, w.getExecutionVersion(), w.durationSeconds(), w.isRestPaused(), remaining, w.getRestVersion());
     }
 }

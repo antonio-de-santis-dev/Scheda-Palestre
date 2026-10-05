@@ -208,6 +208,99 @@ class ExecutionIntegrationTest {
         assertThat((List<Integer>) loaded.read("$.exercises[*].position")).containsExactly(1, 2, 3);
     }
 
+    private Api.Response rest(Api.Response state, String action) {
+        return api.post(user, "/api/me/workouts/" + state.read("$.workoutId") + "/rest", restBody(state, action));
+    }
+
+    private String restBody(Api.Response state, String action) {
+        return "{\"action\":\"%s\",\"expectedVersion\":%s,\"expectedExecutionVersion\":%s}"
+                .formatted(action, state.read("$.restVersion"), state.read("$.executionVersion"));
+    }
+
+    @Test
+    void restPauseExtendResumeSkipPersistsAcrossReadsAndKeepsPartialSetsAndReorder() {
+        Api.Response state = complete(user, start(user, MONDAY).expect(201)).expect(200);
+        clock.advance(Duration.ofMillis(10_123));
+        state = rest(state, "PAUSE").expect(200);
+        assertThat((Boolean) state.read("$.restPaused")).isTrue();
+        assertThat(((Number) state.read("$.restRemainingMillis")).longValue()).isEqualTo(49_877L);
+        assertThat((Object) state.read("$.restEndsAt")).isNull();
+        clock.advance(Duration.ofHours(1));
+        String url = "/api/me/workouts/" + state.read("$.workoutId");
+        state = api.get(user, url).expect(200);
+        assertThat(((Number) state.read("$.restRemainingMillis")).longValue()).isEqualTo(49_877L);
+        assertThat((String) state.read("$.nextAction")).isEqualTo("WAIT_FOR_REST");
+        complete(user, state).expectCode(422, "REST_NOT_FINISHED");
+        List<String> ids = state.read("$.exercises[*].id");
+        state = reorder(user, state, List.of(ids.get(1), ids.getFirst())).expect(200);
+        assertThat((Boolean) state.read("$.restPaused")).isTrue();
+        assertThat(((Number) state.read("$.restRemainingMillis")).longValue()).isEqualTo(49_877L);
+        state = rest(state, "EXTEND").expect(200);
+        assertThat(((Number) state.read("$.restRemainingMillis")).longValue()).isEqualTo(79_877L);
+        assertThat((Boolean) state.read("$.restPaused")).isTrue();
+        Instant resumedAt = clock.instant();
+        state = rest(state, "RESUME").expect(200);
+        assertThat(Instant.parse(state.read("$.restEndsAt"))).isEqualTo(resumedAt.plusMillis(79_877));
+        state = rest(state, "EXTEND").expect(200);
+        assertThat(Instant.parse(state.read("$.restEndsAt"))).isEqualTo(resumedAt.plusMillis(109_877));
+        complete(user, state).expectCode(422, "REST_NOT_FINISHED");
+        state = rest(state, "SKIP").expect(200);
+        state = api.get(user, url).expect(200);
+        assertThat((String) state.read("$.nextAction")).isEqualTo("COMPLETE_SET");
+        assertThat(((Number) state.read("$.restRemainingMillis")).longValue()).isZero();
+        assertThat((Integer) state.read("$.exercises[1].setsCompleted")).isEqualTo(1);
+        state = complete(user, state).expect(200);
+        assertThat(((Number) state.read("$.restRemainingMillis")).longValue()).isEqualTo(60_000L);
+        assertThat((Boolean) state.read("$.restPaused")).isFalse();
+    }
+
+    @Test
+    void duplicateAndConcurrentRestRequestsCannotExtendTwiceOrAffectALaterState() throws Exception {
+        Api.Response initial = complete(user, start(user, MONDAY).expect(201)).expect(200);
+        String url = "/api/me/workouts/" + initial.read("$.workoutId") + "/rest";
+        String body = restBody(initial, "EXTEND");
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            CountDownLatch go = new CountDownLatch(1);
+            Future<Integer> a = pool.submit(() -> { go.await(); return api.post(user, url, body).status(); });
+            Future<Integer> b = pool.submit(() -> { go.await(); return api.post(user, url, body).status(); });
+            go.countDown();
+            assertThat(List.of(a.get(), b.get())).containsExactlyInAnyOrder(200, 409);
+        }
+        api.post(user, url, body).expectCode(409, "REST_STATE_CHANGED");
+        Api.Response state = api.get(user, "/api/me/workouts/" + initial.read("$.workoutId")).expect(200);
+        assertThat(((Number) state.read("$.restRemainingMillis")).longValue()).isEqualTo(90_000L);
+        List<String> ids = state.read("$.exercises[*].id");
+        Api.Response changed = reorder(user, state, List.of(ids.get(1), ids.getFirst())).expect(200);
+        rest(state, "PAUSE").expectCode(409, "REST_STATE_CHANGED");
+        changed = rest(changed, "SKIP").expect(200);
+        changed = complete(user, changed).expect(200);
+        rest(state, "SKIP").expectCode(409, "REST_STATE_CHANGED");
+        assertThat(((Number) changed.read("$.restRemainingMillis")).longValue()).isEqualTo(60_000L);
+    }
+
+    @Test
+    void expiredInvalidForeignAndFinishedRecoveryActionsAreRejected() {
+        Api.Response state = start(user, MONDAY).expect(201);
+        rest(state, "PAUSE").expectCode(422, "REST_NOT_ACTIVE");
+        state = complete(user, state).expect(200);
+        String url = "/api/me/workouts/" + state.read("$.workoutId") + "/rest";
+        rest(state, "RESUME").expectCode(422, "REST_NOT_PAUSED");
+        api.post(fixtures.createUser(), url, restBody(state, "PAUSE")).expectCode(404, "NOT_FOUND");
+        api.post(admin, url, restBody(state, "PAUSE")).expectCode(403, "FORBIDDEN");
+        api.post(user, url, "{\"action\":\"PAUSE\"}").expectCode(400, "VALIDATION_ERROR");
+        api.post(user, url, "{\"action\":\"PAUSE\",\"expectedVersion\":-1,\"expectedExecutionVersion\":0}").expectCode(400, "VALIDATION_ERROR");
+        api.post(user, url, "{\"action\":\"UNKNOWN\",\"expectedVersion\":0,\"expectedExecutionVersion\":0}").expect(400);
+        state = rest(state, "PAUSE").expect(200);
+        rest(state, "PAUSE").expectCode(422, "REST_ALREADY_PAUSED");
+        state = rest(state, "RESUME").expect(200);
+        clock.advance(Duration.ofSeconds(60));
+        rest(state, "EXTEND").expectCode(422, "REST_NOT_ACTIVE");
+        state = api.post(user, "/api/me/workouts/" + state.read("$.workoutId") + "/interrupt", null).expect(200);
+        assertThat(((Number) state.read("$.restRemainingMillis")).longValue()).isZero();
+        assertThat((Boolean) state.read("$.restPaused")).isFalse();
+        rest(state, "PAUSE").expectCode(422, "WORKOUT_NOT_IN_PROGRESS");
+    }
+
     @Test
     void fullWorkoutWithRestTimerUntilCompletion() {
         Api.Response state = start(user, MONDAY).expect(201);

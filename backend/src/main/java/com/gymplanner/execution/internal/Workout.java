@@ -1,5 +1,6 @@
 package com.gymplanner.execution.internal;
 
+import com.gymplanner.shared.error.BusinessRuleException;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -49,6 +50,12 @@ public class Workout {
     private Instant startedAt;
 
     private Instant finishedAt;
+
+    private Instant restEndsAt;
+    private Long restRemainingMillis;
+    private Integer restDurationSeconds;
+    @Column(nullable = false)
+    private long restVersion;
 
     /** Revision of execution actions, checked while holding the workout row lock. */
     @Column(nullable = false)
@@ -122,12 +129,70 @@ public class Workout {
     void complete(Instant now) {
         this.status = WorkoutStatus.COMPLETED;
         this.finishedAt = now;
+        clearRest();
     }
 
     void interrupt(Instant now) {
         this.status = WorkoutStatus.INTERRUPTED;
         this.finishedAt = now;
+        clearRest();
     }
+
+    private void clearRest() {
+        restEndsAt = null;
+        restRemainingMillis = null;
+        restDurationSeconds = null;
+        restVersion++;
+    }
+
+    void startRest(Instant now, int seconds) {
+        clearRest();
+        if (isInProgress() && seconds > 0) {
+            restDurationSeconds = seconds;
+            restEndsAt = now.plusSeconds(seconds);
+        }
+    }
+
+    long remainingRestMillis(Instant now) {
+        if (!isInProgress()) return 0;
+        return restRemainingMillis != null ? restRemainingMillis
+                : restEndsAt == null ? 0 : Math.max(0, Duration.between(now, restEndsAt).toMillis());
+    }
+
+    boolean isRestPaused() {
+        return isInProgress() && restRemainingMillis != null;
+    }
+
+    void changeRest(WorkoutDtos.RestAction action, Instant now) {
+        long remaining = remainingRestMillis(now);
+        if (remaining <= 0) throw new BusinessRuleException("REST_NOT_ACTIVE", "There is no active rest");
+        switch (action) {
+            case PAUSE -> {
+                if (isRestPaused()) throw new BusinessRuleException("REST_ALREADY_PAUSED", "Rest is already paused");
+                restRemainingMillis = remaining;
+                restEndsAt = null;
+            }
+            case RESUME -> {
+                if (!isRestPaused()) throw new BusinessRuleException("REST_NOT_PAUSED", "Rest is not paused");
+                restEndsAt = now.plusMillis(remaining);
+                restRemainingMillis = null;
+            }
+            case EXTEND -> {
+                restDurationSeconds = Math.addExact(restDurationSeconds, 30);
+                if (isRestPaused()) restRemainingMillis = remaining + 30_000;
+                else restEndsAt = restEndsAt.plusSeconds(30);
+            }
+            case SKIP -> {
+                clearRest();
+                return;
+            }
+        }
+        restVersion++;
+    }
+
+    Instant getRestEndsAt() { return restEndsAt; }
+    Integer getRestDurationSeconds() { return restDurationSeconds; }
+    long getRestVersion() { return restVersion; }
 
     /** Most recently completed set, used to derive the rest timer. */
     Optional<WorkoutSet> lastCompletedSet() {

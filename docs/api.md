@@ -253,3 +253,7 @@ le altre sessioni aperte dell'utente.
 ### Durata definitiva dell’allenamento (fixV2)
 
 `WorkoutState` e `WorkoutSummary` includono `durationSeconds` (`long` nullable). Il backend calcola i secondi interi tra i timestamp persistiti `startedAt` e `finishedAt` per gli allenamenti conclusi o interrotti, includendo i recuperi. Il campo è `null` per gli allenamenti ancora in corso o privi di timestamp validi. La lettura e i retry di azioni già applicate non modificano il valore finale. Anche lo storico precedente è coperto senza migrazioni o backfill aggiuntivi.
+
+### Recupero avanzato persistente (fixV2)
+
+`POST /api/me/workouts/{id}/rest` accetta `action` (`PAUSE`, `RESUME`, `EXTEND` = +30 secondi, `SKIP`), `expectedVersion` e `expectedExecutionVersion`, entrambi interi non negativi obbligatori. La risposta è `WorkoutState`, che include `restPaused`, `restRemainingMillis` e `restVersion`. Il timer in pausa blocca la serie successiva quanto un timer in esecuzione. Le revisioni vengono controllate sotto lock sul workout: duplicati o richieste basate su recupero/allenamento precedenti ricevono 409 `REST_STATE_CHANGED`; un recupero già terminato riceve 422 `REST_NOT_ACTIVE`. Le richieste non possono riaprire il recupero dopo la scadenza. Il salto ha conferma nella UI e non elimina risultati delle serie.

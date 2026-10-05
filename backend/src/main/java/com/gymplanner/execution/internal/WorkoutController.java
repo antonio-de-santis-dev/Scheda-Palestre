@@ -90,6 +90,12 @@ class WorkoutController {
         return workouts.reorderExercises(user.id(), id, body);
     }
 
+    @PostMapping("/workouts/{id}/rest")
+    WorkoutState changeRest(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id,
+            @Valid @RequestBody WorkoutDtos.RestRequest body) {
+        return workouts.changeRest(user.id(), id, body);
+    }
+
     @PostMapping("/workouts/{id}/interrupt")
     WorkoutState interrupt(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id) {
         return workouts.interrupt(user.id(), id);

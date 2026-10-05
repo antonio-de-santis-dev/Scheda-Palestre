@@ -6,10 +6,28 @@ Base richiesta: `fixV2` da `4f1f997`. Ogni passo viene provato dal proprietario 
 |---|---|---|
 | 1 | Riordinare gli esercizi durante l’allenamento | Verificato e pubblicato su delpy |
 | 2 | Esercizi completati in fondo alla lista | Verificato e pubblicato su delpy |
-| 3 | Durata allenamento da timestamp backend, nello storico | Implementato, in verifica |
-| 4 | Recupero persistente: pausa/ripresa, +30s, salto confermato, controllo versione | Da fare |
+| 3 | Durata allenamento da timestamp backend, nello storico | Integrato in delpy, merge 2d3e34d |
+| 4 | Recupero persistente: pausa/ripresa, +30s, salto confermato, controllo versione | Implementato, in verifica su fixV2 |
 | 5 | Storico filtrabile con filtri URL, risultati peso/ripetizioni, statistiche e record | Da fare |
 | Finale | Verifiche complete e deploy | Da fare |
+
+## Passo 4: recupero avanzato persistente
+
+Il timer usa `rest_ends_at`, `rest_remaining_millis`, `rest_duration_seconds` e `rest_version` già presenti dalla V12 originale. Pausa e ripresa conservano i millisecondi residui; +30 secondi funziona sia durante il conto alla rovescia sia in pausa. Il salto richiede conferma e termina soltanto il recupero, conservando esercizi e serie. Completare l’allenamento o interromperlo chiude anche il recupero. Riordinare o saltare un esercizio conserva il recupero ancora attivo.
+
+`POST /api/me/workouts/{id}/rest` riceve:
+
+```json
+{"action":"PAUSE","expectedVersion":1,"expectedExecutionVersion":1}
+```
+
+Azioni: `PAUSE`, `RESUME`, `EXTEND` (sempre +30 secondi), `SKIP`. Il lock del workout serializza i comandi con il completamento serie e il riordino. Una modifica aumenta entrambe le revisioni; duplicati e richieste obsolete ricevono 409 `REST_STATE_CHANGED`, senza applicare due volte l’azione. Il frontend rilegge lo stato aggiornato. Anche la conferma del salto conserva le revisioni del timer selezionato, così non può saltare un recupero successivo. Le risorse altrui restano 404; gli ADMIN non accedono agli endpoint USER; CSRF resta richiesto.
+
+`WorkoutState` include `restPaused`, `restRemainingMillis` e `restVersion`; `WAIT_FOR_REST` vale anche in pausa. La serie successiva rimane bloccata finché il recupero termina o viene saltato. A zero, +30 non può riaprire un recupero già finito. In pausa non ci sono tick né avvisi di scadenza.
+
+La nuova V18 riallinea dal più recente set completato i timer legacy di fixV2 ancora a revisione 0. Non modifica le migrazioni applicate né timer V2 già controllati o in pausa. I risultati delle serie restano invariati.
+
+Verifiche: ciclo pausa/estensione/refresh/ripresa/salto e mantenimento serie/riordino; richieste concorrenti e duplicate; rifiuto di revisioni precedenti, timer scaduti, input invalidi e accessi altrui; migrazione di un timer legacy preservando un timer V2 in pausa; frontend con conferma, blocco azioni e risincronizzazione. Per la prova locale completare una serie, mettere in pausa, ricaricare, aggiungere 30 secondi, riprendere, annullare poi confermare il salto. La migrazione si applica automaticamente all’avvio senza eliminare il database.
 
 ## Passo 3: durata definitiva dell’allenamento
 
@@ -19,7 +37,7 @@ La durata definitiva è `null` mentre l’allenamento è in corso oppure se i ti
 
 La durata compare nel riepilogo finale, nell’elenco dello storico e nel dettaglio. Vale anche per allenamenti storici precedenti che conservano i timestamp. Ripetere una richiesta di completamento già applicata o di interruzione non prolunga l’allenamento.
 
-Prova locale: concludere o interrompere un allenamento, verificare la durata nel riepilogo finale e nello storico, poi ricaricare e riaprire il dettaglio: il valore deve restare uguale. Durante un allenamento ancora aperto non viene mostrata una durata definitiva. Questo passo rimane su fixV2 fino alla prova del proprietario.
+Prova locale: concludere o interrompere un allenamento, verificare la durata nel riepilogo finale e nello storico, poi ricaricare e riaprire il dettaglio: il valore deve restare uguale. Durante un allenamento ancora aperto non viene mostrata una durata definitiva. Il proprietario ha richiesto il rilascio della durata tramite delpy, completato con il merge 2d3e34d (PR #6).
 
 ## Passo 1: ordine durante l’esecuzione
 

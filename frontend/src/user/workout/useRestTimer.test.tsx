@@ -68,4 +68,26 @@ describe('rest timer lifecycle', () => {
     expect(vi.getTimerCount()).toBe(0);
     expect(finished).not.toHaveBeenCalled();
   });
+  it('keeps paused milliseconds fixed and resumes against server time without a false finished alert', () => {
+    vi.useFakeTimers();
+    const start = Date.now();
+    const finished = vi.fn();
+    const input = { restEndsAt: null as string | null, restPaused: true, restRemainingMillis: 40_123,
+      serverTime: new Date(start + 10_000).toISOString(), receivedAt: start };
+    const { result, rerender } = renderHook(({ value }) => useRestTimer(value, vi.fn(), finished),
+      { initialProps: { value: input } });
+    expect(result.current).toBe(41);
+    act(() => vi.advanceTimersByTime(3_600_000));
+    expect(result.current).toBe(41);
+    expect(finished).not.toHaveBeenCalled();
+    const now = Date.now();
+    rerender({ value: { ...input, restPaused: false, restEndsAt: new Date(now + 10_000 + 40_123).toISOString(),
+      serverTime: new Date(now + 10_000).toISOString(), receivedAt: now } });
+    act(() => vi.advanceTimersByTime(1000));
+    expect(result.current).toBe(40);
+    act(() => vi.advanceTimersByTime(40_000));
+    expect(result.current).toBe(0);
+    expect(finished).toHaveBeenCalledOnce();
+  });
+
 });

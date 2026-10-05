@@ -1,6 +1,6 @@
 import { useRef, useState, type CSSProperties } from 'react';
 import { Link, useParams } from 'react-router';
-import { CheckCheck, Hourglass, OctagonX, PartyPopper, SkipForward, TimerReset, Trophy, Volume2, VolumeX } from 'lucide-react';
+import { CheckCheck, Hourglass, Pause, Play, Plus, OctagonX, PartyPopper, SkipForward, TimerReset, Trophy, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '../../shared/components/Button';
 import { Alert, ErrorAlert } from '../../shared/components/Alert';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
@@ -8,7 +8,7 @@ import { QueryState } from '../../shared/components/States';
 import { isApiError } from '../../shared/errors/ApiError';
 import { formatDuration, formatRest } from '../../shared/utils/format';
 import { repsLabel } from '../../shared/api/planTypes';
-import { STALE_STATE_CODES, useWorkout, useWorkoutAction, workoutApi, type WorkoutState } from './api';
+import { STALE_STATE_CODES, useWorkout, useWorkoutAction, workoutApi, type RestAction, type RestRequest, type WorkoutState } from './api';
 import { useRestTimer } from './useRestTimer';
 import { WorkoutStatusBadge } from './ExerciseStatusBadge';
 import { celebrate, transitions, type Feedback } from './feedback';
@@ -29,6 +29,7 @@ export function WorkoutPage() {
 
 function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => void }) {
   const [confirm, setConfirm] = useState<'skip' | 'interrupt' | null>(null);
+  const [restConfirm, setRestConfirm] = useState<RestRequest | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   // Transitions already celebrated: refetches, retries and StrictMode never repeat them.
@@ -41,12 +42,26 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
   const reorder = useWorkoutAction(state.workoutId,
     (args: { exerciseIds: string[]; expectedVersion: number }) =>
       workoutApi.reorder(state.workoutId, args.exerciseIds, args.expectedVersion), true);
+  const recovery = useWorkoutAction(state.workoutId,
+    (request: RestRequest) => workoutApi.changeRest(state.workoutId, request), true);
+  const recoveryRequest = (action: RestAction): RestRequest => ({ action,
+    expectedVersion: state.restVersion, expectedExecutionVersion: state.executionVersion });
+  const changeRecovery = (request: RestRequest) => {
+    if (busy) return;
+    complete.reset(); skip.reset(); interrupt.reset(); reorder.reset(); recovery.reset();
+    setAnnouncement('');
+    recovery.mutate(request, {
+      onSuccess: () => setAnnouncement(request.action === 'SKIP' ? 'Recupero saltato: puoi completare la prossima serie.'
+        : request.action === 'PAUSE' ? 'Recupero in pausa.' : request.action === 'RESUME' ? 'Recupero ripreso.' : 'Aggiunti 30 secondi al recupero.'),
+      onSettled: () => setRestConfirm(null),
+    });
+  };
   const [dragging, setDragging] = useState(false);
-  const saving = complete.isPending || skip.isPending || interrupt.isPending || reorder.isPending;
+  const saving = complete.isPending || skip.isPending || interrupt.isPending || reorder.isPending || recovery.isPending;
   const busy = saving || dragging;
   const saveOrder = (ids: string[]) => {
     if (saving) return;
-    complete.reset(); skip.reset(); interrupt.reset(); reorder.reset();
+    complete.reset(); skip.reset(); interrupt.reset(); reorder.reset(); recovery.reset();
     setFeedback(null);
     reorder.mutate({ exerciseIds: ids, expectedVersion: state.executionVersion }, {
       onSuccess: (after) => {
@@ -78,7 +93,7 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
     void celebrate(main.kind);
   };
 
-  const error = reorder.error ?? complete.error ?? skip.error ?? interrupt.error;
+  const error = recovery.error ?? reorder.error ?? complete.error ?? skip.error ?? interrupt.error;
   // Stale screens (e.g. set completed from another tab) are re-synced by the mutation hook.
   const stale = isApiError(error) && STALE_STATE_CODES.includes(error.code);
 
@@ -182,10 +197,10 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
           </div>
 
           {remaining > 0 ? (
-            <div className="timer timer--ring" style={{ '--rest-progress': `${Math.min(100, remaining / Math.max(1, state.restSeconds ?? currentSet.restSeconds) * 100)}%` } as CSSProperties} role="timer" aria-live="off" aria-label={`Recupero: ${formatDuration(remaining)} rimanenti`}>
+            <div className="timer timer--ring" style={{ '--rest-progress': `${Math.min(100, remaining / Math.max(1, state.restSeconds ?? currentSet.restSeconds) * 100)}%` } as CSSProperties} role="timer" aria-live="off" aria-label={`Recupero${state.restPaused ? ' in pausa' : ''}: ${formatDuration(remaining)} rimanenti`}>
               <span className="timer__label">
                 <Hourglass size={22} aria-hidden="true" />
-                Recupero
+                {state.restPaused ? 'Recupero in pausa' : 'Recupero'}
               </span>
               <span className="timer__value">{formatDuration(remaining)}</span>
             </div>
@@ -195,6 +210,20 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
                 <TimerReset size={22} aria-hidden="true" />
                 Recupero terminato
               </span>
+            </div>
+          ) : null}
+
+          {remaining > 0 ? (
+            <div className="rest-controls" role="group" aria-label="Controlli recupero">
+              <Button variant="secondary" size="sm" disabled={busy}
+                icon={state.restPaused ? <Play size={18} aria-hidden="true" /> : <Pause size={18} aria-hidden="true" />}
+                onClick={() => changeRecovery(recoveryRequest(state.restPaused ? 'RESUME' : 'PAUSE'))}>
+                {state.restPaused ? 'Riprendi recupero' : 'Pausa recupero'}
+              </Button>
+              <Button variant="secondary" size="sm" icon={<Plus size={18} aria-hidden="true" />}
+                disabled={busy} onClick={() => changeRecovery(recoveryRequest('EXTEND'))}>30 secondi</Button>
+              <Button variant="secondary" size="sm" icon={<SkipForward size={18} aria-hidden="true" />}
+                disabled={busy} onClick={() => setRestConfirm(recoveryRequest('SKIP'))}>Salta recupero</Button>
             </div>
           ) : null}
 
@@ -214,13 +243,13 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
               }
               setAnnouncement('');
               setFeedback(null);
-              skip.reset();
+              skip.reset(); recovery.reset(); reorder.reset(); interrupt.reset();
               const before = state;
               complete.mutate(currentSet.id, { onSuccess: (after) => onActionSuccess(before, after) });
             }}
           >
             Fine serie
-            {resting ? <span className="btn__sub" aria-hidden="true">tra {formatDuration(remaining)}</span> : null}
+            {resting ? <span className="btn__sub" aria-hidden="true">{state.restPaused ? 'recupero in pausa' : `tra ${formatDuration(remaining)}`}</span> : null}
           </Button>
           {resting ? (
             <p id="rest-hint" className="small muted center" style={{ margin: 'var(--space-2) 0 0' }}>
@@ -256,6 +285,12 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
 
       </div>
 
+      <ConfirmDialog open={restConfirm !== null} title="Saltare il recupero?" confirmLabel="Salta recupero"
+        tone="primary" loading={recovery.isPending} onCancel={() => setRestConfirm(null)}
+        onConfirm={() => { if (restConfirm) changeRecovery(restConfirm); }}>
+        <p>Il recupero terminerà subito e potrai completare la prossima serie. Le serie già svolte restano salvate.</p>
+      </ConfirmDialog>
+
       <ConfirmDialog
         open={confirm === 'skip'}
         title={`Saltare “${current?.exerciseName ?? ''}”?`}
@@ -264,7 +299,8 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
         loading={skip.isPending}
         onCancel={() => setConfirm(null)}
         onConfirm={() => {
-          if (current) {
+          if (current && !busy) {
+            recovery.reset(); reorder.reset(); complete.reset(); interrupt.reset();
             const before = state;
             skip.mutate(current.id, {
               onSuccess: (after) => onActionSuccess(before, after),
@@ -281,7 +317,11 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
         confirmLabel="Interrompi"
         loading={interrupt.isPending}
         onCancel={() => setConfirm(null)}
-        onConfirm={() => interrupt.mutate(undefined, { onSettled: () => setConfirm(null) })}
+        onConfirm={() => {
+          if (busy) return;
+          recovery.reset(); reorder.reset(); complete.reset(); skip.reset();
+          interrupt.mutate(undefined, { onSettled: () => setConfirm(null) });
+        }}
       >
         <p>L'allenamento verrà chiuso con le serie svolte finora e non potrà essere ripreso.</p>
       </ConfirmDialog>

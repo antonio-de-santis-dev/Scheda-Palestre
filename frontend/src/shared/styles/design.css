@@ -1074,3 +1074,6 @@ body:has(.navigation-drawer[open]) {
   .workout-exercises .list-item { gap: var(--space-2); }
   .workout-exercise-controls { margin-left: auto; }
 }
+
+.rest-controls { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0; }
+.rest-controls .btn { flex: 1 1 auto; min-height: 44px; }
