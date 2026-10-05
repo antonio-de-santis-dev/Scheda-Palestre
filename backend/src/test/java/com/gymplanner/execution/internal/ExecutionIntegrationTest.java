@@ -106,8 +106,8 @@ class ExecutionIntegrationTest {
         Api.Response reopened = api.get(user, "/api/me/workouts/" + initial.read("$.workoutId")).expect(200);
         assertThat((Integer) reopened.read("$.exercises[0].sets[0].repsActual")).isEqualTo(8);
         assertThat(((Number) reopened.read("$.exercises[0].sets[0].weightKgUsed")).doubleValue()).isEqualTo(32.75);
-        assertThat(jdbc.queryForList("select reps from plan_sets where plan_exercise_id = ?", Integer.class,
-                plan.planExerciseIds().getFirst())).containsOnly(10);
+        assertThat(jdbc.queryForObject("select reps from plan_exercises where id = ?", Integer.class,
+                plan.planExerciseIds().getFirst())).isEqualTo(10);
     }
 
     @Test
