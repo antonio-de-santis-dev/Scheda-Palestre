@@ -29,13 +29,15 @@ export function CompleteSetForm({ busy, loading, resting, paused, remaining, onC
       if (invalid.weight || invalid.reps) return;
       onComplete({ weightKgUsed: kg === '' ? null : Number(kg), repsActual: repetitions === '' ? null : Number(repetitions) });
     }}>
-      <div className="form-grid form-grid--2">
-        <TextField label="Peso usato (kg)" inputMode="decimal" value={weight} disabled={busy}
-          error={errors.weight} onChange={(event) => setWeight(event.target.value)} />
-        <TextField label="Ripetizioni effettive" inputMode="numeric" value={reps} disabled={busy}
-          error={errors.reps} onChange={(event) => setReps(event.target.value)} />
-      </div>
-      <p className="small muted" style={{ margin: 0 }}>Facoltativi: i campi vuoti restano non registrati nello storico.</p>
+      {!resting ? <>
+        <div className="form-grid form-grid--2">
+          <TextField label="Peso usato (kg)" inputMode="decimal" value={weight} disabled={busy}
+            error={errors.weight} onChange={(event) => setWeight(event.target.value)} />
+          <TextField label="Ripetizioni effettive" inputMode="numeric" value={reps} disabled={busy}
+            error={errors.reps} onChange={(event) => setReps(event.target.value)} />
+        </div>
+        <p className="small muted" style={{ margin: 0 }}>Facoltativi: i campi vuoti restano non registrati nello storico.</p>
+      </> : null}
       <Button type="submit" size="lg" block className={resting ? 'btn--waiting' : undefined}
         aria-disabled={resting || undefined} aria-describedby={resting ? 'rest-hint' : undefined}
         icon={resting ? <Hourglass size={26} aria-hidden="true" /> : <CheckCheck size={26} aria-hidden="true" />}

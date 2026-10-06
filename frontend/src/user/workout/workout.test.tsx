@@ -81,6 +81,8 @@ describe('workout screen', () => {
     const timer = await screen.findByRole('timer');
     expect(calledUrl).toBe('/api/me/workouts/w-1/sets/s-1/complete');
     expect(timer).toHaveTextContent(/1:00|0:59/);
+    expect(screen.queryByLabelText('Peso usato (kg)')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Ripetizioni effettive')).not.toBeInTheDocument();
     expect(screen.getByText('2/2')).toBeInTheDocument();
     // During the rest the button stays focusable but is not activatable, and says why.
     const finish = screen.getByRole('button', { name: 'Fine serie' });
@@ -146,12 +148,16 @@ describe('workout screen', () => {
     renderApp('/app/workout/w-1');
     const finish = await screen.findByRole('button', { name: 'Fine serie' });
     expect(finish).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.queryByLabelText('Peso usato (kg)')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Ripetizioni effettive')).not.toBeInTheDocument();
     // The countdown is not a live region.
     expect(screen.getByRole('timer')).toHaveAttribute('aria-live', 'off');
     await act(async () => {
       vi.advanceTimersByTime(6_000);
     });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Fine serie' })).not.toHaveAttribute('aria-disabled'));
+    expect(screen.getByLabelText('Peso usato (kg)')).toHaveValue('');
+    expect(screen.getByLabelText('Ripetizioni effettive')).toHaveValue('');
     expect(screen.getAllByText('Recupero terminato: puoi completare la prossima serie.')).toHaveLength(1);
   });
 

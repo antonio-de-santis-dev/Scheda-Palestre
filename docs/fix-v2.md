@@ -14,8 +14,14 @@ Base richiesta: `fixV2` da `4f1f997`. Ogni passo viene provato dal proprietario 
 | 5d | Volume registrato e copertura dei dati | Integrato in delpy, merge d19abef |
 | 5e | Riepiloghi aggregati sui filtri dello storico | Integrato in delpy, merge b57de4f |
 | 5f | Grafici dei progressi mensili | Integrato in delpy, merge 159c11c |
-| 5g | Record di peso e ripetizioni per esercizio | Implementato, in verifica su fixV2 |
+| 5g | Record di peso e ripetizioni per esercizio | Integrato in delpy, merge eadc582 |
 | Finale | Verifiche complete e deploy | Da fare |
+
+## Fix del 6 ottobre: campi dei risultati dopo il recupero
+
+Su fixV2, in attesa della prova manuale: peso usato e ripetizioni effettive compaiono solo quando non è in corso un recupero. La prima serie li mostra subito. Durante recupero attivo o in pausa, anche dopo refresh, i campi e la nota facoltativa sono nascosti. Scadenza o salto confermato li rendono disponibili per la serie corrente. I dati restano facoltativi e il salvataggio avviene con Fine serie.
+
+Prova: completare una serie, controllare l’assenza dei campi durante il timer, mettere in pausa e ricaricare, poi riprendere e attendere la scadenza. Ripetere con +30 secondi e salto confermato. Al termine i campi devono ricomparire, vuoti per la nuova serie.
 
 ## Passo 5g: record per esercizio
 
@@ -23,7 +29,7 @@ Base richiesta: `fixV2` da `4f1f997`. Ogni passo viene provato dal proprietario 
 
 Ogni record conserva il risultato completo della sua serie, timestamp, nome storico e collegamento allo snapshot nell’allenamento originale. Il titolo dell’esercizio usa il più recente snapshot con serie completate nei filtri; rinomina o eliminazione del catalogo non altera le serie originali. Omonimi e origini diverse restano separati; i legacy mostrano i limiti dell’identità. Il frontend conserva filtri e scelta del grafico nei link, distingue caricamento/errori/assenza di serie e mostra la copertura separata di peso e ripetizioni. Nessuna migrazione.
 
-Prova: registrare per lo stesso esercizio 80 kg × 5 e 50 kg × 12; verificare due record diversi e aprire le rispettive serie. Provare dati parziali, zero, omonimi e filtri; ricaricare e confrontare i record con il dettaglio. Il rilascio dei record attende questa prova su fixV2.
+Prova: registrare per lo stesso esercizio 80 kg × 5 e 50 kg × 12; verificare due record diversi e aprire le rispettive serie. Provare dati parziali, zero, omonimi e filtri; ricaricare e confrontare i record con il dettaglio. I record sono stati integrati in delpy tramite PR #14 (eadc582).
 
 ## Passo 5f: grafici dei progressi mensili
 
@@ -67,7 +73,7 @@ Prova locale: aprire un vecchio storico e verificare l’avviso di identità lim
 
 ## Passo 5b: risultati effettivi per serie
 
-Prima di Fine serie si possono registrare peso usato (kg) e ripetizioni effettive, anche per serie MAX. Entrambi sono facoltativi: un campo vuoto resta `null`, mentre zero è registrato come valore esplicito. Non viene copiato il numero previsto dalla scheda. Peso 0–1000 kg, massimo due decimali; ripetizioni intere 0–1000. Il frontend accetta anche la virgola decimale. Ogni nuova serie apre campi vuoti; il recupero continua a bloccare il completamento ma permette di preparare i risultati.
+Prima di Fine serie si possono registrare peso usato (kg) e ripetizioni effettive, anche per serie MAX. Entrambi sono facoltativi: un campo vuoto resta `null`, mentre zero è registrato come valore esplicito. Non viene copiato il numero previsto dalla scheda. Peso 0–1000 kg, massimo due decimali; ripetizioni intere 0–1000. Il frontend accetta anche la virgola decimale. Ogni nuova serie apre campi vuoti; durante il recupero i campi e la nota sui risultati facoltativi sono nascosti. Compaiono al termine del timer o dopo il salto confermato del recupero; pausa, estensione e refresh mantengono i campi nascosti finché il recupero è attivo.
 
 `POST /api/me/workouts/{id}/sets/{setId}/complete` accetta un corpo facoltativo:
 
