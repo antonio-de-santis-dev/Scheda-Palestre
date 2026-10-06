@@ -38,6 +38,12 @@ class AdminUserService {
     private final AdminBootstrapProperties bootstrap;
     private final ApplicationEventPublisher events;
     private final Clock clock;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    /** A dedicated namespace serialises changes to the set of active administrators. */
+    private void lockAdminLifecycle() {
+        jdbc.queryForObject("select pg_advisory_xact_lock(?)", Object.class, 0x4750_4144_4D49_4E4CL);
+    }
 
     /** The ADMIN created at start-up from the configuration cannot be deleted (ADR 0010). */
     boolean isProtected(User user) {
@@ -53,6 +59,7 @@ class AdminUserService {
      */
     @Transactional
     public void delete(UUID id, UUID currentAdminId) {
+        lockAdminLifecycle();
         User user = get(id);
         if (user.isDeleted()) {
             return;
@@ -123,6 +130,7 @@ class AdminUserService {
     /** Deactivation invalidates open sessions (session version) and keeps at least one ADMIN. */
     @Transactional
     public User deactivate(UUID id, UUID currentAdminId) {
+        lockAdminLifecycle();
         User user = get(id);
         if (user.getId().equals(currentAdminId)) {
             throw new BusinessRuleException("CANNOT_DEACTIVATE_SELF", "An ADMIN cannot deactivate their own account");

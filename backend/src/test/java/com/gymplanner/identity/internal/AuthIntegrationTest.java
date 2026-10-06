@@ -96,6 +96,14 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void oversizedUtf8PasswordReturnsCredentialsErrorInsteadOfServerError() throws Exception {
+        var user = fixtures.createUser();
+        assertThat(login(user.username(), "é".repeat(40)).getResponse().getStatus()).isEqualTo(401);
+        assertThat(login("unknown_user", "a".repeat(73)).getResponse().getStatus()).isEqualTo(401);
+        assertThat(login(user.username(), TestFixtures.PASSWORD).getResponse().getStatus()).isEqualTo(200);
+    }
+
+    @Test
     void inactiveAccountCannotLogin() throws Exception {
         AuthenticatedUser user = fixtures.createUser();
         User entity = users.findById(user.id()).orElseThrow();

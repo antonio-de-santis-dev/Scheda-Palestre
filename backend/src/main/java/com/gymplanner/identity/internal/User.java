@@ -59,6 +59,11 @@ public class User {
     @Column(nullable = false)
     private int sessionVersion;
 
+    /** Prevent stale profile/admin writes from restoring a revoked session or old password. */
+    @jakarta.persistence.Version
+    @Column(nullable = false)
+    private long version;
+
     /** Logical deletion (ADR 0010): the row stays, personal data are anonymized. */
     private Instant deletedAt;
 

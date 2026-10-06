@@ -36,7 +36,7 @@ function RecordResult({ record, metric, search }: { record: SetRecord | null; me
 export function HistoryRecords({ filters }: { filters: HistoryFilters }) {
   const [params] = useSearchParams();
   const query = useQuery({ queryKey: ['me', 'history', 'records', filters],
-    queryFn: () => http.get<ExerciseRecords[]>('/api/me/workout-records', { ...filters }) });
+    queryFn: ({ signal }) => http.get<ExerciseRecords[]>('/api/me/workout-records', { ...filters }, signal) });
   return <section className="card" aria-labelledby="history-records-title">
     <h2 id="history-records-title" style={{ fontSize: 'var(--text-xl)', margin: 0 }}>Record nei filtri selezionati</h2>
     <p className="small muted">Massimi indipendenti delle serie completate, anche nelle altre pagine. A parità di valore viene mostrata la prima serie registrata. Senza filtri comprendono tutto lo storico.</p>

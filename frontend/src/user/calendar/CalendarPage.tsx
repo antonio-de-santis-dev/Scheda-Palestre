@@ -73,10 +73,8 @@ export function CalendarPage() {
 }
 
 function CalendarDetail({ day, date, today }: { day: CalendarDay | undefined; date: string; today: string }) {
-  const plan = useMyPlan(day?.assignmentId ?? '');
-  // Calendar responses identify sessions by title; duplicated titles are ambiguous.
-  const matchingSessions = plan.data?.sessions.filter((s) => s.title === day?.sessionTitle);
-  const session = matchingSessions?.length === 1 ? matchingSessions[0] : undefined;
+  const plan = useMyPlan(day?.type === 'TRAINING' && !day.workout ? day.assignmentId ?? '' : '');
+  const session = plan.data?.sessions.find((s) => s.id === day?.sessionId);
   return <section className="card calendar-detail" aria-labelledby="calendar-detail-title">
     <div className="row row--between"><h2 id="calendar-detail-title">{formatLongDate(date)}</h2>
       {day?.workout ? <WorkoutStatusBadge status={day.workout.status} /> : date === today ? <StatusBadge tone="warning">Oggi</StatusBadge> : null}

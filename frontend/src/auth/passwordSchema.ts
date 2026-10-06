@@ -1,10 +1,11 @@
 import { z } from 'zod';
 
-/** Same policy as the backend (PasswordPolicy): 8-128 chars, at least a letter and a digit. */
+/** Same policy as the backend (PasswordPolicy): 8-128 chars, max 72 UTF-8 bytes, at least a letter and a digit. */
 export const newPasswordSchema = z
   .string()
   .min(8, 'Almeno 8 caratteri')
   .max(128, 'Al massimo 128 caratteri')
+  .refine((v) => new TextEncoder().encode(v).length <= 72, 'Password troppo lunga: al massimo 72 byte UTF-8')
   .refine((v) => /\p{L}/u.test(v), 'Deve contenere almeno una lettera')
   .refine((v) => /\p{Nd}/u.test(v), 'Deve contenere almeno una cifra');
 

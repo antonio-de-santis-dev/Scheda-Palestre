@@ -73,11 +73,12 @@ class TodayService {
         NONE
     }
 
-    record CalendarDay(LocalDate date, DayType type, String sessionTitle, UUID assignmentId, String planName,
+    record CalendarDay(LocalDate date, DayType type, String sessionTitle, UUID sessionId, UUID assignmentId, String planName,
             WorkoutSummary workout) {
     }
 
     private final WorkoutRepository workouts;
+    private final WorkoutSummaryLoader summaries;
     private final AssignmentQueries assignments;
     private final CalendarQueries calendarQueries;
     private final WorkoutPlanQueries plans;
@@ -94,7 +95,7 @@ class TodayService {
         Optional<Workout> inProgress = workouts.findFirstByUserIdAndStatus(userId, WorkoutStatus.IN_PROGRESS);
         // O-04: a workout left open on another day is shown and needs an explicit choice.
         WorkoutSummary pending = inProgress.filter(w -> !w.getScheduledDate().equals(date))
-                .map(WorkoutSummary::of).orElse(null);
+                .map(w -> summaries.load(List.of(w)).get(w.getId())).orElse(null);
 
         List<AssignmentView> active = assignments.listActiveForUser(userId);
         if (active.isEmpty()) {
@@ -119,7 +120,9 @@ class TodayService {
 
         // The plan of the day: the one that owns a workout on that date, else the one that trains.
         Map<UUID, Workout> workoutByAssignment = new HashMap<>();
-        for (Workout w : workouts.findByUserIdAndScheduledDateBetweenOrderByStartedAtAsc(userId, date, date)) {
+        List<Workout> dated = workouts.findByUserIdAndScheduledDateBetweenOrderByStartedAtAsc(userId, date, date);
+        Map<UUID, WorkoutSummary> summaryById = summaries.load(dated);
+        for (Workout w : dated) {
             workoutByAssignment.put(w.getPlanAssignmentId(), w);
         }
         AssignmentView chosen = active.stream().filter(a -> workoutByAssignment.containsKey(a.id())).findFirst()
@@ -156,7 +159,7 @@ class TodayService {
         boolean canStart = status == TodayStatus.TRAINING_DAY && workoutOfDay == null && inProgress.isEmpty()
                 && dateAllowed;
         return new TodayResponse(date, status, chosen.id(), structure.name(), List.copyOf(days.get(chosen.id())),
-                session, workoutOfDay == null ? null : WorkoutSummary.of(workoutOfDay), pending, next, canStart,
+                session, workoutOfDay == null ? null : summaryById.get(workoutOfDay.getId()), pending, next, canStart,
                 active.size(), withoutDays, ended);
     }
 
@@ -186,12 +189,13 @@ class TodayService {
         }
         List<AssignmentView> active = assignments.listActiveForUser(userId);
         Map<UUID, PlanSummary> names = plans.findPlans(active.stream().map(AssignmentView::planId).toList());
-        Map<UUID, List<DayPlan>> ranges = new HashMap<>();
-        active.forEach(a -> ranges.put(a.id(), calendarQueries.range(a, from, to)));
+        Map<UUID, List<DayPlan>> ranges = calendarQueries.ranges(active, from, to);
 
         List<CalendarDay> result = new ArrayList<>();
         Map<LocalDate, List<Workout>> byDate = new HashMap<>();
-        for (Workout w : workouts.findByUserIdAndScheduledDateBetweenOrderByStartedAtAsc(userId, from, to)) {
+        List<Workout> dated = workouts.findByUserIdAndScheduledDateBetweenOrderByStartedAtAsc(userId, from, to);
+        Map<UUID, WorkoutSummary> summaryById = summaries.load(dated);
+        for (Workout w : dated) {
             byDate.computeIfAbsent(w.getScheduledDate(), k -> new ArrayList<>()).add(w);
         }
         int i = 0;
@@ -215,8 +219,9 @@ class TodayService {
             Workout w = ofDay.stream().filter(x -> x.getPlanAssignmentId().equals(trainingId)).findFirst()
                     .orElse(ofDay.isEmpty() ? null : ofDay.getLast());
             result.add(new CalendarDay(d, type, trainingDay == null ? null : trainingDay.sessionTitle(),
+                    trainingDay == null ? null : trainingDay.sessionId(),
                     trainingId, training == null ? null : name(names, training),
-                    w == null ? null : WorkoutSummary.of(w)));
+                    w == null ? null : summaryById.get(w.getId())));
         }
         return result;
     }
@@ -229,8 +234,9 @@ class TodayService {
     /** Earliest planned training among all active plans in the look-ahead window. */
     private NextTraining nextTraining(List<AssignmentView> active, Map<UUID, PlanSummary> names, LocalDate from) {
         NextTraining best = null;
+        var ranges = calendarQueries.ranges(active, from, from.plusDays(LOOKAHEAD_DAYS - 1));
         for (AssignmentView a : active) {
-            Optional<DayPlan> first = calendarQueries.range(a, from, from.plusDays(LOOKAHEAD_DAYS - 1)).stream()
+            Optional<DayPlan> first = ranges.get(a.id()).stream()
                     .filter(DayPlan::isTraining)
                     .min(Comparator.comparing(DayPlan::date));
             if (first.isPresent() && (best == null || first.get().date().isBefore(best.date()))) {

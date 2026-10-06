@@ -25,3 +25,18 @@ describe('CSRF bootstrap', () => {
     await expect(http.post('/api/test-write', {})).rejects.toMatchObject({ status: 0, code: 'NETWORK_ERROR' });
   });
 });
+
+describe('request boundaries', () => {
+  it('rejects external destinations before transmitting a request or CSRF token', async () => {
+    await expect(http.get('https://other.example/api/test')).rejects.toThrow('application origin');
+  });
+
+  it('does not send a cancelled query', async () => {
+    let reads = 0;
+    server.use(mswHttp.get('*/api/test-read', () => { reads++; return HttpResponse.json({}); }));
+    const controller = new AbortController();
+    controller.abort();
+    await expect(http.get('/api/test-read', undefined, controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    expect(reads).toBe(0);
+  });
+});

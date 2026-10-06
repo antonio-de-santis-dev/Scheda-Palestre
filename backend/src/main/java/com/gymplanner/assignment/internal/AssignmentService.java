@@ -24,7 +24,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -71,7 +70,7 @@ class AssignmentService implements AssignmentQueries {
         if (request.activate()) {
             plans.requireExecutable(plan.id());
         }
-        Set<UUID> userIds = new LinkedHashSet<>(request.userIds());
+        Set<UUID> userIds = new java.util.TreeSet<>(request.userIds());
         Map<UUID, UserSummary> found = users.findAll(userIds);
         for (UUID userId : userIds) {
             UserSummary user = found.get(userId);

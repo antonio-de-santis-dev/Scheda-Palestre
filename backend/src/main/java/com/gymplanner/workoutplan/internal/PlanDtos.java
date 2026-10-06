@@ -52,7 +52,7 @@ final class PlanDtos {
             @Min(0) @Max(100) int reps,
             boolean toFailure,
             @Min(0) @Max(600) int restSeconds,
-            @Valid @Size(max = 20) List<SetRequest> customSets) {
+            @Valid @Size(max = 20) List<@NotNull SetRequest> customSets) {
     }
 
     record PlanListItem(UUID id, String name, String description, Integer durationWeeks, int sessionCount,

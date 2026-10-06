@@ -285,6 +285,26 @@ class CalendarService implements CalendarQueries {
 
     @Override
     @Transactional(readOnly = true)
+    public Map<UUID, List<DayPlan>> ranges(Collection<AssignmentView> active, LocalDate from, LocalDate to) {
+        if (active.isEmpty()) return Map.of();
+        Map<UUID, Set<Integer>> days = new java.util.HashMap<>();
+        active.forEach(a -> days.put(a.id(), new TreeSet<>()));
+        schedules.findByPlanAssignmentIdIn(days.keySet())
+                .forEach(s -> days.get(s.getPlanAssignmentId()).add(s.getWeekday()));
+        var sessions = plans.sessionsInOrder(active.stream().map(AssignmentView::planId).distinct().toList());
+        Map<UUID, List<DayPlan>> result = new java.util.HashMap<>();
+        for (var assignment : active) {
+            List<DayPlan> range = new ArrayList<>();
+            for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
+                range.add(plan(assignment, days.get(assignment.id()), sessions.getOrDefault(assignment.planId(), List.of()), date));
+            }
+            result.put(assignment.id(), List.copyOf(range));
+        }
+        return Map.copyOf(result);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Set<Integer> weekdays(UUID assignmentId) {
         return schedules.findByPlanAssignmentIdOrderByWeekday(assignmentId).stream()
                 .map(WeeklySchedule::getWeekday)

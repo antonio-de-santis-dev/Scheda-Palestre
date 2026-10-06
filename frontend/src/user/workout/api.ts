@@ -121,6 +121,8 @@ export interface CalendarDay {
   date: string;
   type: 'TRAINING' | 'REST' | 'NONE';
   sessionTitle: string | null;
+  /** Stable session identity; titles may be duplicated or renamed. */
+  sessionId: string | null;
   /** Plan that trains on that day (null on rest days). */
   assignmentId: string | null;
   planName: string | null;
@@ -137,10 +139,10 @@ export const workoutKeys = {
 };
 
 export const workoutApi = {
-  today: (date: string) => http.get<Today>('/api/me/today', { date }),
-  calendar: (from: string, to: string) => http.get<CalendarDay[]>('/api/me/calendar', { from, to }),
+  today: (date: string, signal?: AbortSignal) => http.get<Today>('/api/me/today', { date }, signal),
+  calendar: (from: string, to: string, signal?: AbortSignal) => http.get<CalendarDay[]>('/api/me/calendar', { from, to }, signal),
   start: async (date: string) => stamp(await http.post<RawState>('/api/me/workouts', { date })),
-  get: async (id: string) => stamp(await http.get<RawState>(`/api/me/workouts/${id}`)),
+  get: async (id: string, signal?: AbortSignal) => stamp(await http.get<RawState>(`/api/me/workouts/${id}`, undefined, signal)),
   completeSet: async (workoutId: string, setId: string, results: SetResults) =>
     stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/sets/${setId}/complete`, results)),
   recordResults: async (workoutId: string, setId: string, request: RecordSetResultsRequest) =>
@@ -155,15 +157,15 @@ export const workoutApi = {
 };
 
 export function useToday(date: string) {
-  return useQuery({ queryKey: workoutKeys.today(date), queryFn: () => workoutApi.today(date) });
+  return useQuery({ queryKey: workoutKeys.today(date), queryFn: ({ signal }) => workoutApi.today(date, signal) });
 }
 
 export function useCalendar(from: string, to: string) {
-  return useQuery({ queryKey: workoutKeys.calendar(from, to), queryFn: () => workoutApi.calendar(from, to) });
+  return useQuery({ queryKey: workoutKeys.calendar(from, to), queryFn: ({ signal }) => workoutApi.calendar(from, to, signal) });
 }
 
 export function useWorkout(id: string) {
-  return useQuery({ queryKey: workoutKeys.workout(id), queryFn: () => workoutApi.get(id), staleTime: 0 });
+  return useQuery({ queryKey: workoutKeys.workout(id), queryFn: ({ signal }) => workoutApi.get(id, signal), staleTime: 0 });
 }
 
 /** Retries only transport failures: used for idempotent actions (Fine serie, skip, interrupt). */

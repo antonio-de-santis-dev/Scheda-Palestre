@@ -204,3 +204,20 @@ describe('calendar page', () => {
     }
   });
 });
+
+describe('calendar session identity', () => {
+  it('shows the selected session even when another session has the same title', async () => {
+    const date = new Date();
+    const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const base = planStructure();
+    server.use(
+      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
+      http.get('*/api/me/calendar', () => HttpResponse.json([
+        { date: iso, type: 'TRAINING', sessionTitle: 'Duplicato', sessionId: 's-1', assignmentId: 'as-1', planName: 'P', workout: null },
+      ])),
+      http.get('*/api/me/assignments/as-1/plan', () => HttpResponse.json({ ...base, sessions: base.sessions.map((s) => ({ ...s, title: 'Duplicato' })) })),
+    );
+    renderApp('/app/calendar');
+    expect(await screen.findByText('Panca piana')).toBeInTheDocument();
+  });
+});
