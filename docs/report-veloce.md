@@ -49,7 +49,10 @@ Il job di pulizia temporanea discusso in precedenza non è stato introdotto. All
 - Backend: suite Maven con Java 21 e PostgreSQL Testcontainers in GitHub Actions; nuove prove su login simultanei, scritture obsolete, input password eccessivo, serie `null`, identità calendario e assenza di caricamento delle entità WorkoutExercise/WorkoutSet nei riepiloghi.
 - Container frontend: `scripts/check-frontend-container.py` contro l’immagine Nginx reale, non contro Vite.
 - Suite preesistente copre ruoli/CSRF/privacy, migrazioni, assegnazioni, catalogo, esecuzione, timer, riordino, risultati, volumi, filtri, statistiche e record.
-- Risultati finali e collegamento CI verranno registrati al termine dei controlli. Localmente non sono disponibili Java 21 e Docker: per backend e container l’evidenza è la CI.
+- **Esito finale sul codice `b604b35441dafdf6c08ac536224f73c581e1f5da`: 267 test backend e 152 test frontend superati**, lint e build superati; Compose e container frontend superati. CI: https://github.com/antonio-de-santis-dev/Scheda-Palestre/actions/runs/37468587564
+- La verifica del container ha osservato Nginx 1.30.5 e il bundle JavaScript principale di **373.961 byte non compressi / 115.231 byte gzip**, circa 69% di byte in meno per quel file. Non è una misura del tempo di risposta del backend né del caricamento completo su telefono.
+- Localmente non sono disponibili Java 21 e Docker: per backend e container l’evidenza è la CI. Le regressioni frontend mirate sono state eseguite anche localmente.
+- Una prova nuova ha evidenziato la necessità di attendere l’avvio effettivo del container; il controllo ora tollera i reset di connessione soltanto durante quella attesa. Un test preesistente di navigazione ora attende il commit del DOM prima di controllare il link attivo.
 
 ## Prova manuale
 
