@@ -122,7 +122,18 @@ class WorkoutOrderMigrationTest {
             assertThat(jdbc.queryForMap("select * from workouts where id = ?", legacyWorkout)).isEqualTo(beforeRecovery);
             assertThat(jdbc.queryForMap("select * from workout_sets where id = ?", set)).isEqualTo(beforeSet);
             assertThat(jdbc.queryForList("select version, checksum from flyway_schema_history where version::integer <= 16 order by installed_rank")).isEqualTo(history);
-
+            // V20 restores only unambiguous recovery references and preserves all saved results/timers.
+            UUID tiedSet = UUID.randomUUID();
+            jdbc.update("""
+                insert into workout_sets (id, workout_exercise_id, set_index, reps_planned, to_failure, rest_seconds, completed_at)
+                select ?, workout_exercise_id, 2, reps_planned, to_failure, rest_seconds, completed_at
+                from workout_sets where id = ?
+                """, tiedSet, legacySet);
+            assertThat(Flyway.configure().dataSource(ds).target("20").load().migrate().migrationsExecuted).isEqualTo(1);
+            assertThat(jdbc.queryForObject("select rest_set_id from workouts where id = ?", UUID.class, workout)).isEqualTo(set);
+            assertThat(jdbc.queryForObject("select rest_set_id from workouts where id = ?", UUID.class, legacyWorkout)).isNull();
+            assertThat(jdbc.queryForMap("select * from workouts where id = ?", workout)).containsAllEntriesOf(beforeWorkout);
+            assertThat(jdbc.queryForMap("select * from workout_sets where id = ?", set)).isEqualTo(beforeSet);
 
         }
     }

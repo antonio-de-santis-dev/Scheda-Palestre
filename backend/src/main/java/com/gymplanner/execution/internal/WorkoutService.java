@@ -164,6 +164,7 @@ class WorkoutService {
             advance(workout, now);
         }
         if (workout.isInProgress()) workout.startRest(now, set.getRestSeconds());
+        workout.attachRestSet(set);
         workouts.flush();
         return WorkoutStateMapper.toState(workout, now);
     }
@@ -224,6 +225,30 @@ class WorkoutService {
         workout.executionChanged();
         workouts.flush();
         return WorkoutStateMapper.toState(workout, calendar.now());
+    }
+
+    /** Save only the exact completed series attached to this recovery; never advance or restart its timer. */
+    @Transactional
+    public WorkoutState recordSetResults(UUID userId, UUID workoutId, UUID setId, WorkoutDtos.RecordSetResultsRequest request) {
+        Workout workout = lockOwned(userId, workoutId);
+        WorkoutSet set = workout.findSet(setId).orElseThrow(() -> new NotFoundException("Set"));
+        Instant now = calendar.now();
+        var results = request.results();
+        // Identical retries do not write anything, even if the recovery ended during network retry.
+        if (set.isCompleted() && set.hasResults(results.weightKgUsed(), results.actualRepetitions())) {
+            return WorkoutStateMapper.toState(workout, now);
+        }
+        if (workout.getExecutionVersion() != request.expectedExecutionVersion()
+                || workout.getRestVersion() != request.expectedRestVersion()) {
+            throw new ConflictException("SET_RESULTS_CHANGED", "Recovery results were changed or the screen is stale");
+        }
+        if (workout.resultEntrySet(now).filter(candidate -> candidate.getId().equals(setId)).isEmpty()) {
+            throw new ConflictException("SET_RESULTS_WINDOW_CLOSED", "Results can only be entered for the completed recovery series");
+        }
+        set.recordResults(results.weightKgUsed(), results.actualRepetitions());
+        workout.executionChanged();
+        workouts.flush();
+        return WorkoutStateMapper.toState(workout, now);
     }
 
     /** US-20 / O-02: only the exercise in progress can be skipped; skipped ones do not come back. */

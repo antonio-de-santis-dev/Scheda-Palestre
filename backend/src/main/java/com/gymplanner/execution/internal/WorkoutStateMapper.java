@@ -45,6 +45,6 @@ final class WorkoutStateMapper {
 
         return new WorkoutState(w.getId(), w.getStatus(), w.getScheduledDate(), w.getPlanNameSnapshot(),
                 w.getSessionTitleSnapshot(), w.getStartedAt(), w.getFinishedAt(), exercises, currentExerciseId,
-                currentSetId, restEndsAt, restSeconds, serverTime, next, w.getExecutionVersion(), w.durationSeconds(), w.isRestPaused(), remaining, w.getRestVersion(), WorkoutVolume.of(w));
+                currentSetId, restEndsAt, restSeconds, serverTime, next, w.getExecutionVersion(), w.durationSeconds(), w.isRestPaused(), remaining, w.getRestVersion(), WorkoutVolume.of(w), w.resultEntrySet(serverTime).map(WorkoutSet::getId).orElse(null), w.finalResultEndsAt(serverTime));
     }
 }

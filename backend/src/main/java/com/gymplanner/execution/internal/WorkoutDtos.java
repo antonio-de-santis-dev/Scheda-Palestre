@@ -1,5 +1,6 @@
 package com.gymplanner.execution.internal;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.DecimalMax;
@@ -39,6 +40,10 @@ final class WorkoutDtos {
         }
     }
 
+    record RecordSetResultsRequest(@NotNull @Valid CompleteSetRequest results,
+            @NotNull @PositiveOrZero Long expectedExecutionVersion, @NotNull @PositiveOrZero Long expectedRestVersion) {
+    }
+
     enum NextAction {
         /** The current set can be completed. */
         COMPLETE_SET,
@@ -75,7 +80,7 @@ final class WorkoutDtos {
     record WorkoutState(UUID workoutId, WorkoutStatus status, LocalDate scheduledDate, String planName,
             String sessionTitle, Instant startedAt, Instant finishedAt, List<ExerciseState> exercises,
             UUID currentExerciseId, UUID currentSetId, Instant restEndsAt, Integer restSeconds, Instant serverTime,
-            NextAction nextAction, long executionVersion, Long durationSeconds, boolean restPaused, long restRemainingMillis, long restVersion, VolumeSummary volume) {
+            NextAction nextAction, long executionVersion, Long durationSeconds, boolean restPaused, long restRemainingMillis, long restVersion, VolumeSummary volume, UUID resultEntrySetId, Instant finalResultEndsAt) {
     }
 
     record WorkoutSummary(UUID id, LocalDate scheduledDate, WorkoutStatus status, String planName,

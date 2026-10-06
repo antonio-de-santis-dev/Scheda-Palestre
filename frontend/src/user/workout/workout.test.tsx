@@ -8,7 +8,7 @@ import { workoutState } from '../../test/workoutFixtures';
 import { remainingRestMs } from './useRestTimer';
 
 const confetti = vi.hoisted(() => vi.fn(() => Promise.resolve()));
-vi.mock('canvas-confetti', () => ({ default: confetti }));
+vi.mock('canvas-confetti', () => ({ default: Object.assign(confetti, { create: () => confetti }) }));
 
 beforeEach(() => {
   confetti.mockClear();
@@ -156,8 +156,8 @@ describe('workout screen', () => {
       vi.advanceTimersByTime(6_000);
     });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Fine serie' })).not.toHaveAttribute('aria-disabled'));
-    expect(screen.getByLabelText('Peso usato (kg)')).toHaveValue('');
-    expect(screen.getByLabelText('Ripetizioni effettive')).toHaveValue('');
+    expect(screen.queryByLabelText('Peso usato (kg)')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Ripetizioni effettive')).not.toBeInTheDocument();
     expect(screen.getAllByText('Recupero terminato: puoi completare la prossima serie.')).toHaveLength(1);
   });
 

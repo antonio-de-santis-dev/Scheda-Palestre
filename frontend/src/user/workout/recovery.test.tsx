@@ -9,7 +9,7 @@ import type { RestRequest } from './api';
 
 function activeRest() {
   const now = new Date();
-  const state = workoutState({ currentSetId: 's-2', restVersion: 1, executionVersion: 1,
+  const state = workoutState({ resultEntrySetId: 's-1', currentSetId: 's-2', restVersion: 1, executionVersion: 1,
     restEndsAt: new Date(now.getTime() + 60_000).toISOString(), serverTime: now.toISOString(),
     restSeconds: 60, restRemainingMillis: 60_000, nextAction: 'WAIT_FOR_REST' });
   state.exercises[0]!.setsCompleted = 1;
@@ -42,8 +42,8 @@ describe('persistent recovery controls', () => {
     await user.click(await screen.findByRole('button', { name: 'Pausa recupero' }));
     expect(await screen.findByRole('button', { name: 'Riprendi recupero' })).toBeInTheDocument();
     expect(screen.getByRole('timer')).toHaveTextContent('0:41');
-    expect(screen.queryByLabelText('Peso usato (kg)')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Ripetizioni effettive')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Peso usato (kg)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Ripetizioni effettive')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Fine serie' })).toHaveAttribute('aria-disabled', 'true');
     await user.click(screen.getByRole('button', { name: '30 secondi' }));
     await waitFor(() => expect(screen.getByRole('timer')).toHaveTextContent('1:11'));
@@ -51,13 +51,13 @@ describe('persistent recovery controls', () => {
     view = renderApp('/app/workout/w-1');
     await screen.findByRole('button', { name: 'Riprendi recupero' });
     expect(screen.getByRole('timer')).toHaveTextContent('1:11');
-    expect(screen.queryByLabelText('Peso usato (kg)')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Ripetizioni effettive')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Peso usato (kg)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Ripetizioni effettive')).toBeInTheDocument();
     expect(screen.getByRole('list')).toHaveTextContent('1/2 serie');
     await user.click(screen.getByRole('button', { name: 'Riprendi recupero' }));
     await screen.findByRole('button', { name: 'Pausa recupero' });
-    expect(screen.queryByLabelText('Peso usato (kg)')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Ripetizioni effettive')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Peso usato (kg)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Ripetizioni effettive')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Salta recupero' }));
     const dialog = screen.getByRole('dialog', { name: 'Saltare il recupero?' });
     expect(requests).toHaveLength(3);
@@ -66,8 +66,8 @@ describe('persistent recovery controls', () => {
     await user.click(screen.getByRole('button', { name: 'Salta recupero' }));
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Salta recupero' }));
     await waitFor(() => expect(screen.queryByRole('timer')).not.toBeInTheDocument());
-    expect(screen.getByLabelText('Peso usato (kg)')).toHaveValue('');
-    expect(screen.getByLabelText('Ripetizioni effettive')).toHaveValue('');
+    expect(screen.queryByLabelText('Peso usato (kg)')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Ripetizioni effettive')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Fine serie' })).not.toHaveAttribute('aria-disabled');
     expect(requests).toEqual([
       { action: 'PAUSE', expectedVersion: 1, expectedExecutionVersion: 1 },

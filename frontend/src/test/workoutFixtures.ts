@@ -8,6 +8,8 @@ type Raw = Omit<WorkoutState, 'receivedAt'>;
 export function workoutState(overrides: Partial<Raw> = {}): Raw {
   return {
     workoutId: 'w-1',
+    resultEntrySetId: null,
+    finalResultEndsAt: null,
     executionVersion: 0,
     status: 'IN_PROGRESS',
     scheduledDate: '2026-10-05',

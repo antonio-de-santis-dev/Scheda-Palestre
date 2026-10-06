@@ -51,6 +51,7 @@ public class Workout {
 
     private Instant finishedAt;
 
+    private UUID restSetId;
     private Instant restEndsAt;
     private Long restRemainingMillis;
     private Integer restDurationSeconds;
@@ -143,6 +144,7 @@ public class Workout {
     }
 
     private void clearRest() {
+        restSetId = null;
         restEndsAt = null;
         restRemainingMillis = null;
         restDurationSeconds = null;
@@ -197,6 +199,26 @@ public class Workout {
     Instant getRestEndsAt() { return restEndsAt; }
     Integer getRestDurationSeconds() { return restDurationSeconds; }
     long getRestVersion() { return restVersion; }
+
+    void attachRestSet(WorkoutSet set) {
+        restSetId = set.getId();
+    }
+
+    /** A final recovery is derived from persisted completion time, without extending workout duration. */
+    Optional<WorkoutSet> resultEntrySet(Instant now) {
+        if (restSetId == null) return Optional.empty();
+        return findSet(restSetId).filter(WorkoutSet::isCompleted).filter(set ->
+                remainingRestMillis(now) > 0 || finalResultEndsAt(set).filter(end -> end.isAfter(now)).isPresent());
+    }
+
+    private Optional<Instant> finalResultEndsAt(WorkoutSet set) {
+        return status == WorkoutStatus.COMPLETED && set.getCompletedAt().equals(finishedAt) && set.getRestSeconds() > 0
+                ? Optional.of(set.getCompletedAt().plusSeconds(set.getRestSeconds())) : Optional.empty();
+    }
+
+    Instant finalResultEndsAt(Instant now) {
+        return resultEntrySet(now).flatMap(this::finalResultEndsAt).orElse(null);
+    }
 
     /** Most recently completed set, used to derive the rest timer. */
     Optional<WorkoutSet> lastCompletedSet() {
