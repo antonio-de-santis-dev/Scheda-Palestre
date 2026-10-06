@@ -27,7 +27,7 @@ L’analisi non è una certificazione di assenza di vulnerabilità e non include
 | Client HTTP | URL esterni accettati; errori durante lettura risposta non uniformati | Richieste limitate alla stessa origine prima del bootstrap CSRF; errori di trasporto durante la lettura tradotti in ApiError |
 | Download pagina fallito | Fallback React Router standard con dettagli tecnici | Pagina di recupero con ricarica e Home; nessun dettaglio dell’eccezione mostrato |
 | Dipendenze frontend | `source-map-js` 1.2.1 segnalato con gravità alta | Aggiornamento mirato a 1.2.2; avviso relativo a elaborazione source map negli strumenti di sviluppo/build, non prova di attacco al backend |
-| Immagine frontend | Nginx della vecchia linea 1.27 | Immagine ufficiale `nginx:stable-alpine`; nuova build verificata in CI. Il tag è mobile, non un digest immutabile |
+| Immagine frontend | Nginx della vecchia linea 1.27 | Immagine ufficiale `nginx:1.30.5-alpine`, versione osservata nella build della linea stable; nuova build verificata in CI. Il tag non è un digest immutabile |
 | Asset pubblici | JS/CSS non compressi da questa configurazione | Gzip per asset statici, senza comprimere JSON autenticato; meno byte trasferiti |
 | Cache Nginx | HTML e icone senza politica esplicita; JS mancanti potevano ricevere HTML | HTML/manifest/icone rivalidati, bundle con hash immutabili; file statici mancanti restituiscono 404 |
 | Header Nginx | `add_header` nella location asset impediva l’eredità degli header di sicurezza | Snippet comune incluso anche nella location asset; nosniff/CSP/frame protection conservati |

@@ -20,7 +20,7 @@ for attempt in range(30):
         status, headers, html = fetch("/")
         if status == 200:
             break
-    except URLError:
+    except (URLError, ConnectionError, TimeoutError):
         pass
     time.sleep(1)
 else:
@@ -37,7 +37,7 @@ for path in ["/", "/app/history", "/manifest.webmanifest", "/apple-touch-icon.pn
 asset = re.search(rb'src="(/assets/[^" ]+\.js)"', html).group(1).decode()
 status, headers, plain = fetch(asset)
 assert status == 200
-assert "immutable" in headers.get("Cache-Control", "")
+assert "immutable" in ", ".join(headers.get_all("Cache-Control", []))
 assert headers.get("X-Content-Type-Options") == "nosniff"
 assert headers.get("Content-Security-Policy")
 status, headers, compressed = fetch(asset, "gzip")

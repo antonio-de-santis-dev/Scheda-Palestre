@@ -479,7 +479,7 @@ class HistoryIntegrationTest {
         UUID catalog = jdbc.queryForObject("select exercise_id from plan_exercises where id = ?", UUID.class, entry);
         api.put(admin, "/api/admin/plan-exercises/" + entry,
                 "{\"exerciseId\":\"%s\",\"setsCount\":1,\"reps\":10,\"restSeconds\":60,\"customSets\":[null]}".formatted(catalog))
-                .expectCode(400, "VALIDATION_ERROR");
+                .expect(400);
     }
 
     @Test

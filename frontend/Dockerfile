@@ -8,7 +8,7 @@ COPY . .
 RUN npm run build
 
 # --- Runtime: nginx serves the SPA and proxies /api to the backend (same origin) ---
-FROM nginx:stable-alpine
+FROM nginx:1.30.5-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY nginx-security-headers.conf /etc/nginx/snippets/gym-security-headers.conf
 COPY --from=build /app/dist /usr/share/nginx/html
