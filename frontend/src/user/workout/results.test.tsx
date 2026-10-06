@@ -1,113 +1,117 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { normalUser, renderApp } from '../../test/render';
 import { problem, server } from '../../test/server';
 import { workoutState } from '../../test/workoutFixtures';
+import type { RecordSetResultsRequest } from './api';
 
 vi.mock('canvas-confetti', () => ({ default: vi.fn(() => Promise.resolve()) }));
-
-describe('actual set results', () => {
-  it('records comma decimals and actual repetitions, then clears the fields for the next set', async () => {
-    let body: unknown;
-    let setId: unknown;
-    server.use(
-      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
-      http.get('*/api/me/workouts/:id', () => HttpResponse.json(workoutState())),
-      http.post('*/api/me/workouts/:id/sets/:setId/complete', async ({ request, params }) => {
-        body = await request.json(); setId = params.setId;
-        return HttpResponse.json(workoutState({ currentSetId: 's-2' }));
-      }),
-    );
-    renderApp('/app/workout/w-1');
-    const user = userEvent.setup();
+afterEach(() => vi.useRealTimers());
+function recovery(seconds = 60) {
+  const now = new Date();
+  const state = workoutState({ currentSetId: 's-2', resultEntrySetId: 's-1',
+    executionVersion: 1, restVersion: 1, nextAction: 'WAIT_FOR_REST',
+    serverTime: now.toISOString(), restEndsAt: new Date(now.getTime() + seconds * 1000).toISOString(), restSeconds: seconds });
+  state.exercises[0]!.setsCompleted = 1;
+  state.exercises[0]!.sets[0]!.completedAt = now.toISOString();
+  return state;
+}
+function setup(state = recovery()) {
+  server.use(http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
+    http.get('*/api/me/workouts/:id', () => HttpResponse.json(state)));
+  return state;
+}
+describe('actual set results during recovery', () => {
+  it('hides inputs during execution and opens them for the series just completed', async () => {
+    setup(workoutState()); const after = recovery(); let completeBody: unknown; let target: unknown; let body: unknown;
+    server.use(http.post('*/api/me/workouts/:id/sets/:setId/complete', async ({ request }) => {
+      completeBody = await request.json(); return HttpResponse.json(after);
+    }), http.post('*/api/me/workouts/:id/sets/:setId/results', async ({ request, params }) => {
+      target = params.setId; body = await request.json(); return HttpResponse.json(after);
+    }));
+    renderApp('/app/workout/w-1'); const user = userEvent.setup();
+    await screen.findByRole('button', { name: 'Fine serie' });
+    expect(screen.queryByLabelText('Peso usato (kg)')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Ripetizioni effettive')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Fine serie' }));
     await user.type(await screen.findByLabelText('Peso usato (kg)'), '32,75');
     await user.type(screen.getByLabelText('Ripetizioni effettive'), '8');
-    await user.click(screen.getByRole('button', { name: 'Fine serie' }));
-    await waitFor(() => expect(body).toEqual({ weightKgUsed: 32.75, repsActual: 8 }));
-    expect(setId).toBe('s-1');
-    await waitFor(() => expect(screen.getByLabelText('Peso usato (kg)')).toHaveValue(''));
-    expect(screen.getByLabelText('Ripetizioni effettive')).toHaveValue('');
+    expect(screen.getByRole('form')).toHaveTextContent('Serie appena svolta: Panca · 1');
+    await user.click(screen.getByRole('button', { name: 'Salva risultati' }));
+    await waitFor(() => expect(target).toBe('s-1'));
+    expect(completeBody).toEqual({ weightKgUsed: null, repsActual: null });
+    expect(body).toEqual({ results: { weightKgUsed: 32.75, repsActual: 8 }, expectedExecutionVersion: 1, expectedRestVersion: 1 });
   });
 
   it.each([
     { weight: '', reps: '', expected: { weightKgUsed: null, repsActual: null } },
     { weight: '0', reps: '0', expected: { weightKgUsed: 0, repsActual: 0 } },
     { weight: '', reps: '7', expected: { weightKgUsed: null, repsActual: 7 } },
-  ])('preserves missing values and explicit zero ($weight/$reps)', async ({ weight, reps, expected }) => {
-    let body: unknown;
-    server.use(
-      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
-      http.get('*/api/me/workouts/:id', () => HttpResponse.json(workoutState({ currentExerciseId: 'e-2', currentSetId: 's-3' }))),
-      http.post('*/api/me/workouts/:id/sets/:setId/complete', async ({ request }) => {
-        body = await request.json(); return HttpResponse.json(workoutState());
-      }),
-    );
-    renderApp('/app/workout/w-1');
-    const user = userEvent.setup();
+  ])('preserves missing and zero results ($weight/$reps)', async ({ weight, reps, expected }) => {
+    const state = setup(); let body: RecordSetResultsRequest | undefined;
+    server.use(http.post('*/api/me/workouts/:id/sets/:setId/results', async ({ request }) => {
+      body = await request.json() as RecordSetResultsRequest; return HttpResponse.json(state);
+    }));
+    renderApp('/app/workout/w-1'); const user = userEvent.setup();
     await screen.findByLabelText('Peso usato (kg)');
     if (weight) await user.type(screen.getByLabelText('Peso usato (kg)'), weight);
     if (reps) await user.type(screen.getByLabelText('Ripetizioni effettive'), reps);
-    await user.click(screen.getByRole('button', { name: 'Fine serie' }));
-    await waitFor(() => expect(body).toEqual(expected));
+    await user.click(screen.getByRole('button', { name: 'Salva risultati' }));
+    await waitFor(() => expect(body?.results).toEqual(expected));
   });
 
-  it('rejects invalid results before sending a completion', async () => {
-    let calls = 0;
-    server.use(
-      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
-      http.get('*/api/me/workouts/:id', () => HttpResponse.json(workoutState())),
-      http.post('*/api/me/workouts/:id/sets/:setId/complete', () => { calls++; return HttpResponse.json(workoutState()); }),
-    );
-    renderApp('/app/workout/w-1');
-    const user = userEvent.setup();
+  it('rejects invalid input and hides the fields when recovery naturally expires', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true }); setup(recovery(5)); let calls = 0;
+    server.use(http.post('*/api/me/workouts/:id/sets/:setId/results', () => { calls++; return HttpResponse.json(recovery()); }));
+    renderApp('/app/workout/w-1'); const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const weight = await screen.findByLabelText('Peso usato (kg)');
-    const reps = screen.getByLabelText('Ripetizioni effettive');
-    for (const [kg, count] of [['-1', '7.5'], ['1.234', '-1'], ['1001', '1001']]) {
-      await user.clear(weight); await user.type(weight, kg!);
-      await user.clear(reps); await user.type(reps, count!);
-      await user.click(screen.getByRole('button', { name: 'Fine serie' }));
-      expect(weight).toHaveAttribute('aria-invalid', 'true');
-      expect(reps).toHaveAttribute('aria-invalid', 'true');
-    }
-    expect(calls).toBe(0);
+    await user.type(weight, '1.234'); await user.type(screen.getByLabelText('Ripetizioni effettive'), '7.5');
+    await user.click(screen.getByRole('button', { name: 'Salva risultati' }));
+    expect(weight).toHaveAttribute('aria-invalid', 'true'); expect(calls).toBe(0);
+    await act(async () => { vi.advanceTimersByTime(6000); });
+    await waitFor(() => expect(screen.queryByLabelText('Peso usato (kg)')).not.toBeInTheDocument());
+    expect(screen.queryByLabelText('Ripetizioni effettive')).not.toBeInTheDocument();
   });
 
-  it('retries the same captured results after a transport failure', async () => {
-    const bodies: unknown[] = [];
-    server.use(
-      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
-      http.get('*/api/me/workouts/:id', () => HttpResponse.json(workoutState())),
-      http.post('*/api/me/workouts/:id/sets/:setId/complete', async ({ request }) => {
-        bodies.push(await request.json());
-        return bodies.length === 1 ? HttpResponse.error() : HttpResponse.json(workoutState({ currentSetId: 's-2' }));
-      }),
-    );
-    renderApp('/app/workout/w-1');
-    const user = userEvent.setup();
-    await user.type(await screen.findByLabelText('Peso usato (kg)'), '40');
-    await user.type(screen.getByLabelText('Ripetizioni effettive'), '9');
-    await user.click(screen.getByRole('button', { name: 'Fine serie' }));
-    expect(screen.getByLabelText('Peso usato (kg)')).toBeDisabled();
+  it('restores saved values after refresh and keeps a retry bound to the previous series', async () => {
+    const state = recovery(); state.exercises[0]!.sets[0]!.weightKgUsed = 40; state.exercises[0]!.sets[0]!.repsActual = 9;
+    setup(state); const bodies: unknown[] = [];
+    server.use(http.post('*/api/me/workouts/:id/sets/:setId/results', async ({ request, params }) => {
+      bodies.push({ id: params.setId, body: await request.json() });
+      return bodies.length === 1 ? HttpResponse.error() : HttpResponse.json(state);
+    }));
+    const view = renderApp('/app/workout/w-1'); const user = userEvent.setup();
+    expect(await screen.findByLabelText('Peso usato (kg)')).toHaveValue('40');
+    expect(screen.getByLabelText('Ripetizioni effettive')).toHaveValue('9');
+    await user.click(screen.getByRole('button', { name: 'Salva risultati' }));
     await waitFor(() => expect(bodies).toHaveLength(2), { timeout: 2500 });
-    expect(bodies).toEqual([{ weightKgUsed: 40, repsActual: 9 }, { weightKgUsed: 40, repsActual: 9 }]);
+    expect(bodies[0]).toEqual(bodies[1]); expect(bodies[0]).toMatchObject({ id: 's-1' });
+    view.unmount(); renderApp('/app/workout/w-1');
+    expect(await screen.findByLabelText('Peso usato (kg)')).toHaveValue('40');
   });
 
-  it('resynchronizes a conflicting completed set without attempting to overwrite it again', async () => {
-    let calls = 0, fetches = 0;
-    server.use(
-      http.get('*/api/auth/me', () => HttpResponse.json(normalUser)),
-      http.get('*/api/me/workouts/:id', () => HttpResponse.json(workoutState({ currentSetId: ++fetches === 1 ? 's-1' : 's-2' }))),
-      http.post('*/api/me/workouts/:id/sets/:setId/complete', () => { calls++; return problem(409, 'SET_RESULTS_CHANGED'); }),
-    );
-    renderApp('/app/workout/w-1');
-    const user = userEvent.setup();
+  it('resyncs rejected stale results and never submits them for the next series', async () => {
+    const state = setup(); let calls = 0;
+    server.use(http.post('*/api/me/workouts/:id/sets/:setId/results', () => {
+      calls++; state.resultEntrySetId = null; state.restEndsAt = null; state.nextAction = 'COMPLETE_SET';
+      return problem(409, 'SET_RESULTS_WINDOW_CLOSED');
+    }));
+    renderApp('/app/workout/w-1'); const user = userEvent.setup();
     await user.type(await screen.findByLabelText('Ripetizioni effettive'), '8');
-    await user.click(screen.getByRole('button', { name: 'Fine serie' }));
-    await waitFor(() => expect(screen.getByLabelText('Ripetizioni effettive')).toHaveValue(''));
-    expect(fetches).toBeGreaterThan(1);
+    await user.click(screen.getByRole('button', { name: 'Salva risultati' }));
+    await waitFor(() => expect(screen.queryByLabelText('Ripetizioni effettive')).not.toBeInTheDocument());
     expect(calls).toBe(1);
+  });
+
+  it('allows results for the final completed series during the final recovery', async () => {
+    const state = recovery(); state.status = 'COMPLETED'; state.currentExerciseId = null; state.currentSetId = null;
+    state.finalResultEndsAt = new Date(Date.now() + 60000).toISOString(); state.restEndsAt = null;
+    setup(state); renderApp('/app/workout/w-1');
+    expect(await screen.findByRole('timer', { name: 'Recupero finale' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Peso usato (kg)')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Fine serie' })).not.toBeInTheDocument();
   });
 
   it('shows saved results, explicit zero, missing values and unperformed sets separately in history', async () => {

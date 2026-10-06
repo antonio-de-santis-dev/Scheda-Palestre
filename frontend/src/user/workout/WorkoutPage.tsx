@@ -8,13 +8,14 @@ import { QueryState } from '../../shared/components/States';
 import { isApiError } from '../../shared/errors/ApiError';
 import { formatDuration, formatRest } from '../../shared/utils/format';
 import { repsLabel } from '../../shared/api/planTypes';
-import { STALE_STATE_CODES, useWorkout, useWorkoutAction, workoutApi, type SetResults, type RestAction, type RestRequest, type WorkoutState } from './api';
+import { STALE_STATE_CODES, useWorkout, useWorkoutAction, workoutApi, type RecordSetResultsRequest, type RestAction, type RestRequest, type WorkoutState } from './api';
 import { useRestTimer } from './useRestTimer';
 import { WorkoutStatusBadge } from './ExerciseStatusBadge';
 import { celebrate, transitions, type Feedback } from './feedback';
 import { useRestAlert } from './useRestAlert';
 import { WorkoutDuration } from './WorkoutDuration';
 import { WorkoutExerciseList } from './WorkoutExerciseList';
+import { RecoveryResultsForm } from './RecoveryResultsForm';
 import { CompleteSetForm } from './CompleteSetForm';
 
 /** Workout execution (US-17, US-18, US-20, US-23): usable one-handed from 360 px. */
@@ -36,7 +37,9 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
   // Transitions already celebrated: refetches, retries and StrictMode never repeat them.
   const celebrated = useRef(new Set<string>());
   const restAlert = useRestAlert();
-  const complete = useWorkoutAction(state.workoutId, (args: { setId: string; results: SetResults }) => workoutApi.completeSet(state.workoutId, args.setId, args.results), true);
+  const complete = useWorkoutAction(state.workoutId, (setId: string) => workoutApi.completeSet(state.workoutId, setId, { weightKgUsed: null, repsActual: null }), true);
+  const results = useWorkoutAction(state.workoutId,
+    (args: { setId: string; request: RecordSetResultsRequest }) => workoutApi.recordResults(state.workoutId, args.setId, args.request), true);
   const skip = useWorkoutAction(state.workoutId, (exerciseId: string) => workoutApi.skip(state.workoutId, exerciseId), true);
   const interrupt = useWorkoutAction(state.workoutId, () => workoutApi.interrupt(state.workoutId), true);
 
@@ -58,7 +61,7 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
     });
   };
   const [dragging, setDragging] = useState(false);
-  const saving = complete.isPending || skip.isPending || interrupt.isPending || reorder.isPending || recovery.isPending;
+  const saving = results.isPending || complete.isPending || skip.isPending || interrupt.isPending || reorder.isPending || recovery.isPending;
   const busy = saving || dragging;
   const saveOrder = (ids: string[]) => {
     if (saving) return;
@@ -72,8 +75,9 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
     });
   };
 
-  const remaining = useRestTimer(state, refetch, () => {
-    setAnnouncement('Recupero terminato: puoi completare la prossima serie.');
+  const timerState = state.finalResultEndsAt ? { ...state, restEndsAt: state.finalResultEndsAt, restPaused: false } : state;
+  const remaining = useRestTimer(timerState, refetch, () => {
+    setAnnouncement(state.status === 'COMPLETED' ? 'Recupero finale terminato.' : 'Recupero terminato: puoi completare la prossima serie.');
     restAlert.play();
     if ('vibrate' in navigator) {
       navigator.vibrate?.(300);
@@ -94,7 +98,7 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
     void celebrate(main.kind);
   };
 
-  const error = recovery.error ?? reorder.error ?? complete.error ?? skip.error ?? interrupt.error;
+  const error = results.error ?? recovery.error ?? reorder.error ?? complete.error ?? skip.error ?? interrupt.error;
   // Stale screens (e.g. set completed from another tab) are re-synced by the mutation hook.
   const stale = isApiError(error) && STALE_STATE_CODES.includes(error.code);
 
@@ -105,6 +109,17 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
   const totalSets = state.exercises.reduce((n, e) => n + e.setsPlanned, 0);
   const completedSets = state.exercises.reduce((n, e) => n + e.setsCompleted, 0);
   const progress = totalSets ? Math.round(completedSets / totalSets * 100) : 0;
+
+  const resultExercise = state.exercises.find((e) => e.sets.some((s) => s.id === state.resultEntrySetId));
+  const resultSet = resultExercise?.sets.find((s) => s.id === state.resultEntrySetId);
+  const recoveryResults = resting && resultExercise && resultSet ? <RecoveryResultsForm
+    key={`${resultSet.id}:${resultSet.weightKgUsed}:${resultSet.repsActual}`} set={resultSet}
+    exerciseName={resultExercise.exerciseName} busy={busy} loading={results.isPending}
+    onSave={(values) => {
+      results.mutate({ setId: resultSet.id, request: { results: values,
+        expectedExecutionVersion: state.executionVersion, expectedRestVersion: state.restVersion } },
+        { onSuccess: () => setAnnouncement('Risultati della serie salvati.') });
+    }} /> : null;
 
   return (
     <div className="workout">
@@ -168,7 +183,15 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
       <div className="workout-layout">
         <div className="workout-primary">
       {finished ? (
-        <FinishedCard state={state} />
+        <>
+          {resting && state.finalResultEndsAt ? <div className="stack">
+            <div className="timer" role="timer" aria-label="Recupero finale" aria-live="off">
+              <span className="timer__label">Recupero finale</span><span className="timer__value">{formatDuration(remaining)}</span>
+            </div>
+            {recoveryResults}
+          </div> : null}
+          <FinishedCard state={state} />
+        </>
       ) : current && currentSet ? (
         <section className="workout-current" aria-labelledby="current-exercise">
           <div className="workout-current__section">{current.muscleGroupName}</div>
@@ -228,14 +251,15 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
             </div>
           ) : null}
 
+          {recoveryResults}
           <CompleteSetForm key={currentSet.id} busy={busy} loading={complete.isPending}
             resting={resting} paused={state.restPaused} remaining={remaining}
-            onComplete={(results) => {
+            onComplete={() => {
               setAnnouncement('');
               setFeedback(null);
               skip.reset(); recovery.reset(); reorder.reset(); interrupt.reset();
               const before = state;
-              complete.mutate({ setId: currentSet.id, results }, { onSuccess: (after) => onActionSuccess(before, after) });
+              complete.mutate(currentSet.id, { onSuccess: (after) => onActionSuccess(before, after) });
             }} />
         </section>
       ) : (

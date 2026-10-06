@@ -14,8 +14,20 @@ Base richiesta: `fixV2` da `4f1f997`. Ogni passo viene provato dal proprietario 
 | 5d | Volume registrato e copertura dei dati | Integrato in delpy, merge d19abef |
 | 5e | Riepiloghi aggregati sui filtri dello storico | Integrato in delpy, merge b57de4f |
 | 5f | Grafici dei progressi mensili | Integrato in delpy, merge 159c11c |
-| 5g | Record di peso e ripetizioni per esercizio | Implementato, in verifica su fixV2 |
+| 5g | Record di peso e ripetizioni per esercizio | Integrato in delpy, merge eadc582 |
 | Finale | Verifiche complete e deploy | Da fare |
+
+## Fix del 6 ottobre: risultati solo durante il recupero e coriandoli su telefono
+
+Correzione dell’interpretazione iniziale, sviluppata su fixV2 in attesa della prova manuale. Durante l’esecuzione di una serie non ci sono input. Fine serie completa la serie senza risultati e avvia il recupero; i campi si riferiscono esplicitamente alla serie appena svolta, anche quando l’esercizio corrente è già cambiato. Salva risultati registra peso e ripetizioni senza far avanzare la sessione né riavviare il timer. I campi sono disponibili solo nel recupero, anche in pausa, e spariscono alla scadenza o dopo il salto. I dati salvati sono ripristinati dopo refresh; quelli non salvati rimangono mancanti. Nessun input nelle serie con recupero configurato a zero.
+
+Anche l’ultima serie offre il recupero finale per registrare i risultati: la scadenza deriva dal timestamp backend della serie e dal recupero previsto, sopravvive al refresh e non prolunga la durata definitiva dell’allenamento. Un’interruzione non apre il recupero finale.
+
+`POST /api/me/workouts/{id}/sets/{setId}/results` riceve `{results: {weightKgUsed, repsActual}, expectedExecutionVersion, expectedRestVersion}`. Il lock del workout, il riferimento alla serie del recupero e le revisioni impediscono scritture sulla serie successiva o da schermate obsolete. Durante la finestra i risultati possono essere corretti; dopo rimangono immutabili. Retry identici sono letture senza effetti anche se il timer è scaduto; payload differenti e riferimenti obsoleti sono rifiutati. Ownership, ruoli e validazione dei valori rimangono attivi. V20 aggiunge `rest_set_id` e ripristina le vecchie finestre solo se la serie è identificabile senza ambiguità; tutte le migrazioni precedenti restano invariate.
+
+I coriandoli usano un canvas dedicato sopra il contenuto, dimensionato sul visualViewport del telefono (fallback innerWidth/innerHeight), con aggiornamento dopo resize/scroll del viewport e pulizia al termine. Nessun worker per il rendering; la preferenza di movimento ridotto rimane rispettata e il messaggio testuale resta sempre visibile.
+
+Prova: eseguire una serie senza input, premere Fine serie, compilare e salvare durante il timer, verificare i risultati dopo refresh e nello storico; ripetere con pausa, estensione, salto, cambio esercizio e ultima serie. Su telefono controllare i coriandoli a fine esercizio e allenamento anche con la pagina scorsa.
 
 ## Passo 5g: record per esercizio
 
@@ -23,7 +35,7 @@ Base richiesta: `fixV2` da `4f1f997`. Ogni passo viene provato dal proprietario 
 
 Ogni record conserva il risultato completo della sua serie, timestamp, nome storico e collegamento allo snapshot nell’allenamento originale. Il titolo dell’esercizio usa il più recente snapshot con serie completate nei filtri; rinomina o eliminazione del catalogo non altera le serie originali. Omonimi e origini diverse restano separati; i legacy mostrano i limiti dell’identità. Il frontend conserva filtri e scelta del grafico nei link, distingue caricamento/errori/assenza di serie e mostra la copertura separata di peso e ripetizioni. Nessuna migrazione.
 
-Prova: registrare per lo stesso esercizio 80 kg × 5 e 50 kg × 12; verificare due record diversi e aprire le rispettive serie. Provare dati parziali, zero, omonimi e filtri; ricaricare e confrontare i record con il dettaglio. Il rilascio dei record attende questa prova su fixV2.
+Prova: registrare per lo stesso esercizio 80 kg × 5 e 50 kg × 12; verificare due record diversi e aprire le rispettive serie. Provare dati parziali, zero, omonimi e filtri; ricaricare e confrontare i record con il dettaglio. I record sono stati integrati in delpy tramite PR #14 (eadc582).
 
 ## Passo 5f: grafici dei progressi mensili
 
@@ -67,7 +79,7 @@ Prova locale: aprire un vecchio storico e verificare l’avviso di identità lim
 
 ## Passo 5b: risultati effettivi per serie
 
-Prima di Fine serie si possono registrare peso usato (kg) e ripetizioni effettive, anche per serie MAX. Entrambi sono facoltativi: un campo vuoto resta `null`, mentre zero è registrato come valore esplicito. Non viene copiato il numero previsto dalla scheda. Peso 0–1000 kg, massimo due decimali; ripetizioni intere 0–1000. Il frontend accetta anche la virgola decimale. Ogni nuova serie apre campi vuoti; il recupero continua a bloccare il completamento ma permette di preparare i risultati.
+Durante il recupero successivo a Fine serie si possono registrare peso usato (kg) e ripetizioni effettive della serie appena svolta, anche per serie MAX. Entrambi sono facoltativi: un campo vuoto resta `null`, mentre zero è registrato come valore esplicito. Non viene copiato il numero previsto dalla scheda. Peso 0–1000 kg, massimo due decimali; ripetizioni intere 0–1000. Il frontend accetta anche la virgola decimale. Ogni nuova serie apre campi vuoti; i campi compaiono solo durante il recupero, anche in pausa. Scadenza o salto li nascondono; i risultati salvati restano nello storico.
 
 `POST /api/me/workouts/{id}/sets/{setId}/complete` accetta un corpo facoltativo:
 

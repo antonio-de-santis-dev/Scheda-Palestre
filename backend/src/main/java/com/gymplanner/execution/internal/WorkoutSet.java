@@ -71,6 +71,11 @@ public class WorkoutSet {
         this.repsActual = repsActual;
     }
 
+    void recordResults(BigDecimal weight, Integer repetitions) {
+        this.weightKgUsed = weight;
+        this.repsActual = repetitions;
+    }
+
     boolean hasResults(BigDecimal weight, Integer repetitions) {
         boolean sameWeight = weightKgUsed == null ? weight == null
                 : weight != null && weightKgUsed.compareTo(weight) == 0;
