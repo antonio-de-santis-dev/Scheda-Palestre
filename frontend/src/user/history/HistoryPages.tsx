@@ -23,7 +23,7 @@ import { ExerciseStatusBadge, WorkoutStatusBadge } from '../workout/ExerciseStat
 function useHistory(page: number, filters: HistoryFilters, enabled: boolean) {
   return useQuery({
     queryKey: ['me', 'history', page, filters],
-    queryFn: () => http.get<Page<WorkoutSummary>>('/api/me/workouts', { page, size: 20, ...filters }),
+    queryFn: ({ signal }) => http.get<Page<WorkoutSummary>>('/api/me/workouts', { page, size: 20, ...filters }, signal),
     enabled,
   });
 }

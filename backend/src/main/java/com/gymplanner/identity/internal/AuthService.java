@@ -38,7 +38,11 @@ class AuthService {
 
     @Transactional(noRollbackFor = UnauthorizedException.class)
     public User authenticate(String username, String rawPassword) {
-        Optional<User> found = users.findByUsernameIgnoreCase(username.trim());
+        if (!PasswordPolicy.fitsEncoder(rawPassword)) {
+            passwordEncoder.matches("invalid-password", dummyHash);
+            throw invalidCredentials();
+        }
+        Optional<User> found = users.lockByUsername(username.trim());
         if (found.isEmpty()) {
             passwordEncoder.matches(rawPassword, dummyHash);
             throw invalidCredentials();
@@ -69,7 +73,7 @@ class AuthService {
     @Transactional
     public User changePassword(UUID userId, String currentPassword, String newPassword) {
         User user = users.findById(userId).orElseThrow(() -> new NotFoundException("User"));
-        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+        if (!PasswordPolicy.fitsEncoder(currentPassword) || !passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
             throw BadRequestException.field("currentPassword", "Current password is not correct");
         }
         PasswordPolicy.validate("newPassword", newPassword);

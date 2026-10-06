@@ -7,6 +7,7 @@ import { AppLayout } from '../layouts/AppLayout';
 import { LoadingState } from '../../shared/components/States';
 import { NotFoundPage } from './AccessDeniedPage';
 import { ADMIN_NAV, USER_NAV } from './navigation';
+import { RouteErrorPage } from './RouteErrorPage';
 
 /**
  * Route-level code splitting: each page is downloaded only when first opened, so a USER on a
@@ -84,4 +85,4 @@ export const routes: RouteObject[] = [
     ],
   },
   { path: '*', element: <NotFoundPage /> },
-];
+].map((route) => ({ ...route, errorElement: <RouteErrorPage /> }));

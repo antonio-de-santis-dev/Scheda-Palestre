@@ -20,7 +20,7 @@ export interface HistoryStatsData {
 export function HistoryStats({ filters }: { filters: HistoryFilters }) {
   const query = useQuery({
     queryKey: ['me', 'history', 'stats', filters],
-    queryFn: () => http.get<HistoryStatsData>('/api/me/workout-stats', { ...filters }),
+    queryFn: ({ signal }) => http.get<HistoryStatsData>('/api/me/workout-stats', { ...filters }, signal),
   });
   const stats = query.data;
   return (

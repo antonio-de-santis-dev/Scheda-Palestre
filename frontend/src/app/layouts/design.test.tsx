@@ -19,7 +19,7 @@ describe('mockup navigation and preferences', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/admin/users'));
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(within(screen.getByRole('navigation', { name: 'Navigazione rapida amministrazione' })).getByRole('link', { name: 'Utenti' })).toHaveAttribute('aria-current', 'page');
+    await waitFor(() => expect(within(screen.getByRole('navigation', { name: 'Navigazione rapida amministrazione' })).getByRole('link', { name: 'Utenti' })).toHaveAttribute('aria-current', 'page'));
   });
 
   it('persists a manual theme and restores the system preference from the profile', async () => {

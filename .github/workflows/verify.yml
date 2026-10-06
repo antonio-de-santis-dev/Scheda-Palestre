@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [delpy]
   push:
-    branches: [desaig, fixV2, 'fix/**']
+    branches: [desaig, fixV2, veloce, 'fix/**']
   workflow_dispatch:
 
 permissions:
@@ -60,3 +60,15 @@ jobs:
         run: docker compose --profile app config --quiet
       - name: Validate production Compose
         run: docker compose -f compose.production.yaml config --quiet
+
+      - name: Build production frontend image
+        run: docker build -t gym-frontend-ci frontend
+      - name: Verify production Nginx responses and compression
+        run: |
+          docker run -d --name gym-frontend-ci --add-host gym-planner-backend:127.0.0.1 -p 127.0.0.1:18080:80 gym-frontend-ci
+          python3 scripts/check-frontend-container.py
+      - name: Container diagnostics and cleanup
+        if: always()
+        run: |
+          docker logs gym-frontend-ci || true
+          docker rm -f gym-frontend-ci || true

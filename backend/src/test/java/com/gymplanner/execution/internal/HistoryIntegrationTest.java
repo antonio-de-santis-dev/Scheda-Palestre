@@ -36,6 +36,7 @@ class HistoryIntegrationTest {
 
     @Autowired
     JdbcTemplate jdbc;
+    @Autowired jakarta.persistence.EntityManagerFactory emf;
 
     AuthenticatedUser admin;
     AuthenticatedUser user;
@@ -470,6 +471,39 @@ class HistoryIntegrationTest {
         api.get(user, "/api/me/workout-records?from=wrong").expect(400);
         api.get(user, "/api/me/workout-records?status=wrong").expect(400);
         api.get(user, "/api/me/workout-records", Map.of("q", "x".repeat(101))).expectCode(400, "INVALID_HISTORY_FILTER");
+    }
+
+    @Test
+    void nullCustomSetIsRejectedBeforeApplyingAnyPlanEdit() {
+        UUID entry = plan.planExerciseIds().getFirst();
+        UUID catalog = jdbc.queryForObject("select exercise_id from plan_exercises where id = ?", UUID.class, entry);
+        api.put(admin, "/api/admin/plan-exercises/" + entry,
+                "{\"exerciseId\":\"%s\",\"setsCount\":1,\"reps\":10,\"restSeconds\":60,\"customSets\":[null]}".formatted(catalog))
+                .expectCode(400, "VALIDATION_ERROR");
+    }
+
+    @Test
+    void historyAndCalendarDoNotHydrateExerciseOrSetGraphs() {
+        var state = startAt(MONDAY);
+        interrupt(state);
+        var statistics = emf.unwrap(org.hibernate.SessionFactory.class).getStatistics();
+        statistics.setStatisticsEnabled(true);
+        try {
+            statistics.clear();
+            api.get(user, "/api/me/workouts").expect(200);
+            api.get(user, "/api/me/calendar?from=2026-10-05&to=2026-10-05").expect(200);
+            assertThat(statistics.getEntityStatistics(WorkoutExercise.class.getName()).getLoadCount()).isZero();
+            assertThat(statistics.getEntityStatistics(WorkoutSet.class.getName()).getLoadCount()).isZero();
+        } finally { statistics.setStatisticsEnabled(false); }
+    }
+
+    @Test
+    void calendarCarriesStableSessionIdentityEvenForDuplicateTitles() {
+        api.put(admin, "/api/admin/sessions/" + plan.sessionIds().get(1), "{\"title\":\"Giorno 1\"}").expect(200);
+        var days = api.get(user, "/api/me/calendar?from=2026-10-05&to=2026-10-06").expect(200);
+        assertThat((List<String>) days.read("$[*].sessionTitle")).containsExactly("Giorno 1", "Giorno 1");
+        assertThat((List<String>) days.read("$[*].sessionId"))
+                .containsExactly(plan.sessionIds().get(0).toString(), plan.sessionIds().get(1).toString());
     }
 
     @Test

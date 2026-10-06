@@ -46,6 +46,7 @@ class WorkoutService {
     private static final long START_TOLERANCE_DAYS = 1;
 
     private final WorkoutRepository workouts;
+    private final WorkoutSummaryLoader summaries;
     private final AssignmentQueries assignments;
     private final CalendarQueries calendarQueries;
     private final WorkoutPlanQueries plans;
@@ -115,7 +116,9 @@ class WorkoutService {
     @Transactional(readOnly = true)
     public org.springframework.data.domain.Page<WorkoutDtos.WorkoutSummary> history(UUID userId,
             org.springframework.data.domain.Pageable pageable, WorkoutHistoryFilter filter) {
-        return workouts.findAll(filter.ownedBy(userId), pageable).map(WorkoutDtos.WorkoutSummary::of);
+        var page = workouts.findAll(filter.ownedBy(userId), pageable);
+        var summaryById = summaries.load(page.getContent());
+        return page.map(workout -> summaryById.get(workout.getId()));
     }
 
     @Transactional(readOnly = true)

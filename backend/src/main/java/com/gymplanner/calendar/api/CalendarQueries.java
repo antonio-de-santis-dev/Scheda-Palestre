@@ -9,6 +9,10 @@ import java.util.UUID;
 /** Rotation queries for the execution module. */
 public interface CalendarQueries {
 
+    /** Bulk rotation lookup: two queries independent of the number of active plans. */
+    java.util.Map<UUID, List<DayPlan>> ranges(java.util.Collection<AssignmentView> assignments,
+            LocalDate from, LocalDate to);
+
     Set<Integer> weekdays(UUID assignmentId);
 
     DayPlan dayPlan(AssignmentView assignment, LocalDate date);

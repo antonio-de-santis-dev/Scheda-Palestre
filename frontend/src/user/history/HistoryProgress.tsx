@@ -72,7 +72,7 @@ export function HistoryProgress({ filters }: { filters: HistoryFilters }) {
   const requested = params.get('chart');
   const metric: Metric = requested === 'duration' || requested === 'workouts' ? requested : 'volume';
   const query = useQuery({ queryKey: ['me', 'history', 'progress', filters],
-    queryFn: () => http.get<MonthlyProgress[]>('/api/me/workout-progress', { ...filters }) });
+    queryFn: ({ signal }) => http.get<MonthlyProgress[]>('/api/me/workout-progress', { ...filters }, signal) });
   return <section className="card history-progress" aria-labelledby="history-progress-title">
     <h2 id="history-progress-title" style={{ fontSize: 'var(--text-xl)', margin: 0 }}>Progressi mensili</h2>
     <p className="small muted">Tutti i risultati dei filtri, indipendentemente dalla pagina. Sono mostrati solo i mesi con allenamenti.</p>
