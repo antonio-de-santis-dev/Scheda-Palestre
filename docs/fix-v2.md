@@ -17,9 +17,17 @@ Base richiesta: `fixV2` da `4f1f997`. Ogni passo viene provato dal proprietario 
 | 5g | Record di peso e ripetizioni per esercizio | Integrato in delpy, merge eadc582 |
 | Finale | Verifiche complete e deploy | Da fare |
 
+## Icona del collegamento alla Home
+
+Su fixV2 in attesa della prova: manubrio SVG Lucide fornito dal proprietario, con tracciati invariati, manubrio scuro #111827 su fondo opaco arancione #f97316, mantenendo le dimensioni approvate. Il file vettoriale e la variante maskable restano in public/icons come sorgenti; le versioni PNG sono renderizzate dagli SVG. Apple touch icon 180×180 alla root, icone Android 192×192 e 512×512, varianti maskable separate con il logo nella zona centrale sicura, favicon SVG e PNG 32×32. Metadati comuni nell’HTML e manifest con nome GymPlanner, avvio alla root e modalità standalone; nessun service worker o cache offline. Nginx serve il manifest come application/manifest+json e restituisce 404 per icone mancanti, senza fallback HTML.
+
+Dopo il deploy: aprire il sito HTTPS da Safari e scegliere Condividi → Aggiungi alla schermata Home; su Android usare il comando del browser Aggiungi alla schermata Home/Installa. Per verificare il nuovo artwork ricreare il collegamento se quello esistente conserva la vecchia icona. Verificare avvio, autenticazione, nome e icona da iPhone e Android. La pubblicazione attende l’approvazione di questa modifica su fixV2.
+
+Riferimenti: Apple Safari Web Content Guide (Configuring Web Applications); MDN Manifest icons; web.dev Adaptive icon support in PWAs with maskable icons.
+
 ## Fix del 6 ottobre: risultati solo durante il recupero e coriandoli su telefono
 
-Correzione dell’interpretazione iniziale, sviluppata su fixV2 in attesa della prova manuale. Durante l’esecuzione di una serie non ci sono input. Fine serie completa la serie senza risultati e avvia il recupero; i campi si riferiscono esplicitamente alla serie appena svolta, anche quando l’esercizio corrente è già cambiato. Salva risultati registra peso e ripetizioni senza far avanzare la sessione né riavviare il timer. I campi sono disponibili solo nel recupero, anche in pausa, e spariscono alla scadenza o dopo il salto. I dati salvati sono ripristinati dopo refresh; quelli non salvati rimangono mancanti. Nessun input nelle serie con recupero configurato a zero.
+Correzione dell’interpretazione iniziale, approvata dal proprietario e integrata in delpy tramite PR #15 (913921e). Durante l’esecuzione di una serie non ci sono input. Fine serie completa la serie senza risultati e avvia il recupero; i campi si riferiscono esplicitamente alla serie appena svolta, anche quando l’esercizio corrente è già cambiato. Salva risultati registra peso e ripetizioni senza far avanzare la sessione né riavviare il timer. I campi sono disponibili solo nel recupero, anche in pausa, e spariscono alla scadenza o dopo il salto. I dati salvati sono ripristinati dopo refresh; quelli non salvati rimangono mancanti. Nessun input nelle serie con recupero configurato a zero.
 
 Anche l’ultima serie offre il recupero finale per registrare i risultati: la scadenza deriva dal timestamp backend della serie e dal recupero previsto, sopravvive al refresh e non prolunga la durata definitiva dell’allenamento. Un’interruzione non apre il recupero finale.
 
