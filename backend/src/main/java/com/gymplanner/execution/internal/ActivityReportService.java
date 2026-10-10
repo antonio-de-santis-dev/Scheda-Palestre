@@ -25,8 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * ADMIN activity report (ADR 0010). Only data actually recorded by the app: assignments, days,
- * workouts by outcome, exercises and sets. No physical results (loads, body weight) are invented:
- * the app does not record them. Interpretations (rates) are left to the client and labelled.
+ * workouts by outcome, exercises and sets. Recorded loads and repetitions belong to the USER history
+ * (volume, records); nothing is estimated here. Interpretations (rates) are left to the client and labelled.
  */
 @Service
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)

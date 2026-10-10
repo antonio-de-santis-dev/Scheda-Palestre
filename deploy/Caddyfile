@@ -1,4 +1,6 @@
 {$GYM_DOMAIN} {
     encode zstd gzip
+    # HTTPS only from the first visit on (Caddy already redirects HTTP to HTTPS).
+    header Strict-Transport-Security "max-age=31536000"
     reverse_proxy frontend:80
 }

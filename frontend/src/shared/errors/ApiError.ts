@@ -67,6 +67,8 @@ function defaultCode(status: number): string {
       return 'CONFLICT';
     case 422:
       return 'UNPROCESSABLE';
+    case 429:
+      return 'RATE_LIMITED';
     default:
       return status >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_ERROR';
   }

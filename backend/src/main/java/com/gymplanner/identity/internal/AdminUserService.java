@@ -113,6 +113,10 @@ class AdminUserService {
         User user = get(id);
         requireNotDeleted(user);
         UserRequest r = request.normalized();
+        if (isProtected(user) && !user.getUsername().equalsIgnoreCase(r.username())) {
+            // The protection is bound to the configured username (ADR 0010): renaming would remove it.
+            throw new BusinessRuleException("PROTECTED_ACCOUNT", "The username of the initial ADMIN account cannot be changed");
+        }
         ensureUnique(r.username(), r.email(), id);
         user.updateDetails(r.firstName(), r.lastName(), r.username(), r.email(), r.phone());
         users.saveAndFlush(user);

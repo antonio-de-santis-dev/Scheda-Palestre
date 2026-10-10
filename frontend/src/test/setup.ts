@@ -27,3 +27,12 @@ if (!HTMLDialogElement.prototype.showModal) {
     this.dispatchEvent(new Event('close'));
   };
 }
+
+// jsdom only logs "Not implemented" for scrolling and media playback: silent no-ops keep the
+// test output readable without hiding real warnings.
+window.scrollTo = () => undefined;
+Object.assign(HTMLMediaElement.prototype, {
+  pause: () => undefined,
+  load: () => undefined,
+  play: () => Promise.resolve(),
+});

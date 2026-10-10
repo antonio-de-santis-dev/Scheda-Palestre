@@ -47,4 +47,31 @@ assert len(compressed) < len(plain)
 for path in ["/assets/missing.js", "/icons/missing.png"]:
     assert fetch(path)[0] == 404, path
 assert "application/manifest+json" in fetch("/manifest.webmanifest")[1].get("Content-Type", "")
-print(f"Nginx OK: SPA, cache, security headers, missing assets, manifest; JS {len(plain)} -> {len(compressed)} bytes via gzip")
+# The production CSP has no 'unsafe-inline' for scripts: index.html must not contain inline scripts.
+assert re.search(rb"<script>(?!</script>)", html) is None, "inline script blocked by the CSP"
+status, headers, body = fetch("/theme-init.js")
+assert status == 200 and b"gymplanner-theme" in body
+assert "camera=()" in fetch("/")[1].get("Permissions-Policy", "")
+
+# Login rate limit: answered by Nginx before the backend, as Problem Details.
+def login():
+    request = Request(BASE + "/api/auth/login", data=b"{}", method="POST",
+                      headers={"Content-Type": "application/json"})
+    try:
+        with urlopen(request, timeout=5) as response:
+            return response.status, response.headers, response.read()
+    except HTTPError as error:
+        return error.code, error.headers, error.read()
+
+limited = None
+for _ in range(60):
+    result = login()
+    if result[0] == 429:
+        limited = result
+        break
+assert limited, "login rate limit not applied"
+assert b'"code":"RATE_LIMITED"' in limited[2]
+assert limited[1].get("Retry-After") == "60"
+assert "problem+json" in limited[1].get("Content-Type", "")
+assert limited[1].get("X-Content-Type-Options") == "nosniff"
+print(f"Nginx OK: SPA, cache, security headers, missing assets, manifest, login rate limit; JS {len(plain)} -> {len(compressed)} bytes via gzip")

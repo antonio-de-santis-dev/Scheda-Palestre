@@ -59,16 +59,16 @@ class RecoveryResultsIntegrationTest {
         Api.Response saved = save(user, setId, body).expect(200);
         assertThat((String) saved.read("$.currentSetId")).isEqualTo(next);
         assertThat((String) saved.read("$.restEndsAt")).isEqualTo(end);
-        assertThat((Object) saved.read("$.restVersion")).isEqualTo(state.read("$.restVersion"));
+        assertThat(saved.<Object>read("$.restVersion")).isEqualTo(state.read("$.restVersion"));
         assertThat((String) saved.read("$.exercises[0].sets[0].completedAt")).isEqualTo(state.read("$.exercises[0].sets[0].completedAt"));
         assertThat(((Number) saved.read("$.volume.recordedKgReps")).doubleValue()).isEqualTo(262);
-        assertThat((Object) save(user, setId, body).expect(200).read("$.executionVersion")).isEqualTo(saved.read("$.executionVersion"));
+        assertThat(save(user, setId, body).expect(200).<Object>read("$.executionVersion")).isEqualTo(saved.read("$.executionVersion"));
         save(user, setId, payload(state, "{\"weightKgUsed\":50}")).expectCode(409, "SET_RESULTS_CHANGED");
         save(user, next, payload(saved, "{\"weightKgUsed\":50}")).expectCode(409, "SET_RESULTS_WINDOW_CLOSED");
         Api.Response refreshed = api.get(user, "/api/me/workouts/" + id).expect(200);
         assertThat(((Number) refreshed.read("$.exercises[0].sets[0].weightKgUsed")).doubleValue()).isEqualTo(32.75);
         clock.advance(Duration.ofSeconds(51));
-        assertThat((Object) api.get(user, "/api/me/workouts/" + id).expect(200).read("$.resultEntrySetId")).isNull();
+        assertThat(api.get(user, "/api/me/workouts/" + id).expect(200).<Object>read("$.resultEntrySetId")).isNull();
         save(user, setId, payload(saved, "{\"weightKgUsed\":70}")).expectCode(409, "SET_RESULTS_WINDOW_CLOSED");
         save(user, setId, body).expect(200); // transport retry after expiry is a read-only success
     }
@@ -84,7 +84,7 @@ class RecoveryResultsIntegrationTest {
         request = "{\"action\":\"SKIP\",\"expectedVersion\":%s,\"expectedExecutionVersion\":%s}"
                 .formatted(state.read("$.restVersion"), state.read("$.executionVersion"));
         state = api.post(user, "/api/me/workouts/" + id + "/rest", request).expect(200);
-        assertThat((Object) state.read("$.resultEntrySetId")).isNull();
+        assertThat(state.<Object>read("$.resultEntrySetId")).isNull();
         save(user, setId, payload(state, "{\"weightKgUsed\":1}")).expectCode(409, "SET_RESULTS_WINDOW_CLOSED");
     }
     @Test
@@ -93,16 +93,16 @@ class RecoveryResultsIntegrationTest {
         clock.advance(Duration.ofSeconds(61)); state = complete(finalSet);
         assertThat((String) state.read("$.status")).isEqualTo("COMPLETED");
         assertThat((String) state.read("$.resultEntrySetId")).isEqualTo(finalSet);
-        assertThat((Object) state.read("$.finalResultEndsAt")).isNotNull();
+        assertThat(state.<Object>read("$.finalResultEndsAt")).isNotNull();
         String finished = state.read("$.finishedAt"); Object duration = state.read("$.durationSeconds");
         clock.advance(Duration.ofSeconds(10));
         state = save(user, finalSet, payload(state, "{\"repsActual\":12}")).expect(200);
-        assertThat((Object) state.read("$.durationSeconds")).isEqualTo(duration);
+        assertThat(state.<Object>read("$.durationSeconds")).isEqualTo(duration);
         assertThat((String) state.read("$.finishedAt")).isEqualTo(finished);
         Api.Response refreshed = api.get(user, "/api/me/workouts/" + id).expect(200);
         assertThat((String) refreshed.read("$.resultEntrySetId")).isEqualTo(finalSet);
         assertThat((Integer) refreshed.read("$.exercises[0].sets[1].repsActual")).isEqualTo(12);
-        assertThat((Object) refreshed.read("$.exercises[0].sets[1].weightKgUsed")).isNull();
+        assertThat(refreshed.<Object>read("$.exercises[0].sets[1].weightKgUsed")).isNull();
         clock.advance(Duration.ofSeconds(51));
         save(user, finalSet, payload(state, "{\"repsActual\":15}")).expectCode(409, "SET_RESULTS_WINDOW_CLOSED");
     }

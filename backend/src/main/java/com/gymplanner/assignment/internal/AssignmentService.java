@@ -96,21 +96,18 @@ class AssignmentService implements AssignmentQueries {
     @Transactional
     public AssignmentResponse activate(UUID assignmentId, boolean copySchedule) {
         PlanAssignment assignment = load(assignmentId);
-        switch (assignment.status()) {
-            case ACTIVE -> {
-                return toResponses(List.of(assignment)).getFirst();
-            }
+        Map<UUID, CopyResult> copies = switch (assignment.status()) {
+            case ACTIVE -> Map.of();
             case CLOSED -> throw new BusinessRuleException("ASSIGNMENT_CLOSED",
                     "A closed assignment cannot be activated again: create a new one");
             case PENDING -> {
                 plans.requireExecutable(assignment.getWorkoutPlanId());
                 CopyResult copy = activateInternal(assignment, copySchedule);
                 assignments.flush();
-                return toResponses(List.of(assignment), Map.of(assignment.getId(), copy)).getFirst();
+                yield Map.of(assignment.getId(), copy);
             }
-        }
-        assignments.flush();
-        return toResponses(List.of(assignment)).getFirst();
+        };
+        return toResponses(List.of(assignment), copies).getFirst();
     }
 
     @Transactional

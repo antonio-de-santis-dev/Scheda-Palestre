@@ -104,10 +104,10 @@ class WorkoutTransitionsTest {
         assertThat(WorkoutStateMapper.toState(w, T0.plusSeconds(60)).durationSeconds()).isNull();
         w.complete(T0.plusMillis(3_723_456));
         assertThat(WorkoutStateMapper.toState(w, T0.plusSeconds(90_000)).durationSeconds()).isEqualTo(3723L);
-        assertThat(WorkoutDtos.WorkoutSummary.of(w).durationSeconds()).isEqualTo(3723L);
+        assertThat(w.durationSeconds()).isEqualTo(3723L);
         Workout interrupted = workout();
         interrupted.interrupt(T0.plusSeconds(90_061));
-        assertThat(WorkoutDtos.WorkoutSummary.of(interrupted).durationSeconds()).isEqualTo(90061L);
+        assertThat(interrupted.durationSeconds()).isEqualTo(90061L);
     }
 
     @Test
@@ -145,7 +145,7 @@ class WorkoutTransitionsTest {
         var state = WorkoutStateMapper.toState(w, T0.plusSeconds(6));
         assertThat(state.restEndsAt()).isNull();
         assertThat(state.nextAction()).isEqualTo(WorkoutDtos.NextAction.COMPLETE_SET);
-        assertThat(w.lastCompletedSet()).isPresent();
+        assertThat(w.getExercises().getFirst().getSets().getFirst().isCompleted()).isTrue();
     }
 
 }

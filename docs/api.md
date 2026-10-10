@@ -12,7 +12,7 @@ uguale al cookie `XSRF-TOKEN` (ottenibile con `GET /api/auth/csrf`).
 | Metodo | Endpoint | Accesso | Risposte |
 | --- | --- | --- | --- |
 | GET | `/api/auth/csrf` | pubblico | 200 `{headerName, token}` + cookie `XSRF-TOKEN` |
-| POST | `/api/auth/login` | pubblico | 200 utente corrente; 401 `INVALID_CREDENTIALS` (sempre generico) |
+| POST | `/api/auth/login` | pubblico | 200 utente corrente; 401 `INVALID_CREDENTIALS` (sempre generico); 429 `RATE_LIMITED` da Nginx oltre 20 tentativi/minuto per IP (burst 20, `Retry-After: 60`) |
 | POST | `/api/auth/logout` | autenticato | 204 |
 | GET | `/api/auth/me` | autenticato | 200 `{id, username, firstName, lastName, email, role, mustChangePassword}` |
 | POST | `/api/auth/change-password` | autenticato | 200 utente; 400 `VALIDATION_ERROR` (`currentPassword`, `newPassword`) |
@@ -48,7 +48,7 @@ Altri codici nuovi: `ASSIGNMENT_NOT_ACTIVE` (422), `CANNOT_DELETE_SELF`, `PROTEC
 | GET | `/api/admin/users?q=&role=&active=&page=&size=` | elenco paginato e ricerca (nome, username, email) | 200 `Page<User>` |
 | POST | `/api/admin/users` | crea USER (ruolo sempre USER) | 201 `{user, temporaryPassword}`; 409 `USERNAME_TAKEN`/`EMAIL_TAKEN` |
 | GET | `/api/admin/users/{id}` | dettaglio | 200; 404 |
-| PUT | `/api/admin/users/{id}` | modifica nome, cognome, username, email, telefono | 200; 409 |
+| PUT | `/api/admin/users/{id}` | modifica nome, cognome, username, email, telefono | 200; 409; 422 `PROTECTED_ACCOUNT` se si cambia lo username dell'ADMIN iniziale |
 | POST | `/api/admin/users/{id}/activate` | riattiva | 200 |
 | POST | `/api/admin/users/{id}/deactivate` | disattiva e invalida le sessioni | 200; 422 `CANNOT_DEACTIVATE_SELF`, `LAST_ACTIVE_ADMIN` |
 | POST | `/api/admin/users/{id}/reset-password` | password temporanea mostrata una sola volta | 200 `{user, temporaryPassword}`; 422 `ACCOUNT_DELETED` |
@@ -152,7 +152,7 @@ un'assegnazione.
 | GET | `/api/admin/plans/{id}/assignments` | assegnatari della scheda | 404 |
 | GET | `/api/admin/users/{id}/assignments` | assegnazioni dell'utente | 404 |
 | POST | `/api/admin/assignments` | assegna a uno o più USER (tutto o niente) | 422 `USER_NOT_ASSIGNABLE`, `PLAN_NOT_EXECUTABLE`, `PLAN_DELETED`; 409 `ASSIGNMENT_ALREADY_ACTIVE` |
-| POST | `/api/admin/assignments/{id}/activate` | attiva un'assegnazione in attesa `{copySchedule?}` | 422 `ASSIGNMENT_CLOSED`, `PLAN_NOT_EXECUTABLE` |
+| POST | `/api/admin/assignments/{id}/activate` | attiva un'assegnazione in attesa `{copySchedule?}` (corpo assente = nessuna copia) | 422 `ASSIGNMENT_CLOSED`, `PLAN_NOT_EXECUTABLE` |
 | POST | `/api/admin/assignments/{id}/close` | chiude (`active=false`, `endDate`) | |
 | GET | `/api/admin/assignments/recommended-duration-ended` | assegnazioni attive con durata consigliata terminata `[{userId, assignmentId, planId, planName, expiresOn}]` | |
 

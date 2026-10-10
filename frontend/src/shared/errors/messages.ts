@@ -50,9 +50,19 @@ const MESSAGES: Record<string, string> = {
   REST_NOT_PAUSED: 'Il recupero non è in pausa.',
   REST_NOT_FINISHED: 'Il recupero non è ancora finito: la schermata è stata allineata al server.',
   CANNOT_DELETE_SELF: 'Non puoi eliminare il tuo account.',
-  PROTECTED_ACCOUNT: "L'account ADMIN iniziale non può essere eliminato.",
+  PROTECTED_ACCOUNT: "L'account ADMIN iniziale è protetto: non può essere eliminato né cambiare username.",
   ACCOUNT_DELETED: "L'account è stato eliminato e non può essere modificato.",
   ASSIGNMENT_NOT_ACTIVE: 'La scheda non è attiva: non puoi sceglierne i giorni.',
+  SCHEDULE_DAYS_REQUIRED: 'Scegli e salva prima almeno un giorno di allenamento.',
+  INVALID_EXERCISE_ORDER: "L'ordine degli esercizi non è più valido: la schermata è stata aggiornata.",
+  WORKOUT_STATE_CHANGED: "L'allenamento è cambiato nel frattempo: la schermata è stata aggiornata.",
+  SET_RESULTS_WINDOW_CLOSED: 'Il recupero di questa serie è terminato: i risultati non possono più essere modificati.',
+  RATE_LIMITED: 'Troppi tentativi in poco tempo. Attendi un minuto e riprova.',
+  UNPROCESSABLE: "L'operazione non è consentita nello stato attuale.",
+  METHOD_NOT_ALLOWED: 'Operazione non supportata.',
+  PAYLOAD_TOO_LARGE: 'I dati inviati sono troppo grandi.',
+  UNSUPPORTED_MEDIA_TYPE: 'Formato della richiesta non supportato.',
+  REQUEST_ERROR: 'La richiesta non può essere elaborata.',
 };
 
 const DAY_NAMES = ['', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];

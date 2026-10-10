@@ -5,8 +5,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
@@ -27,13 +25,13 @@ interface WorkoutRepository extends JpaRepository<Workout, UUID>, JpaSpecificati
 
     boolean existsByPlanAssignmentIdAndScheduledDate(UUID planAssignmentId, LocalDate scheduledDate);
 
-    Optional<Workout> findByPlanAssignmentIdAndScheduledDate(UUID planAssignmentId, LocalDate scheduledDate);
-
     Optional<Workout> findFirstByUserIdAndStatus(UUID userId, WorkoutStatus status);
 
-    List<Workout> findByPlanAssignmentIdAndStatus(UUID planAssignmentId, WorkoutStatus status);
+    /** Same row lock as {@link #lockOwned}: closing an assignment cannot race with "Fine serie". */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select w from Workout w where w.planAssignmentId = :assignmentId and w.status = :status")
+    List<Workout> lockByPlanAssignmentIdAndStatus(@Param("assignmentId") UUID assignmentId,
+            @Param("status") WorkoutStatus status);
 
     List<Workout> findByUserIdAndScheduledDateBetweenOrderByStartedAtAsc(UUID userId, LocalDate from, LocalDate to);
-
-    Page<Workout> findByUserId(UUID userId, Pageable pageable);
 }

@@ -220,13 +220,6 @@ public class Workout {
         return resultEntrySet(now).flatMap(this::finalResultEndsAt).orElse(null);
     }
 
-    /** Most recently completed set, used to derive the rest timer. */
-    Optional<WorkoutSet> lastCompletedSet() {
-        return exercises.stream().flatMap(e -> e.getSets().stream())
-                .filter(WorkoutSet::isCompleted)
-                .max(Comparator.comparing(WorkoutSet::getCompletedAt));
-    }
-
     void executionChanged() {
         executionVersion++;
     }

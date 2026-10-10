@@ -64,12 +64,14 @@ class WorkoutService {
             throw new BusinessRuleException("DATE_NOT_ALLOWED", "Only today's workout can be started");
         }
         // ADR 0008: a weekday belongs to at most one active plan, so at most one plan trains today.
+        Map<UUID, List<DayPlan>> dayPlans = calendarQueries.ranges(active, date, date);
         AssignmentView assignment = active.stream()
-                .filter(a -> calendarQueries.dayPlan(a, date).isTraining())
+                .filter(a -> dayPlans.get(a.id()).getFirst().isTraining())
                 .findFirst()
                 .orElseThrow(() -> new BusinessRuleException("NOT_A_TRAINING_DAY", "The date is not a planned training day"));
-        DayPlan day = calendarQueries.dayPlan(assignment, date);
-        plans.requireExecutable(assignment.planId());
+        DayPlan day = dayPlans.get(assignment.id()).getFirst();
+        PlanStructure structure = plans.getStructure(assignment.planId());
+        structure.requireExecutable();
         if (workouts.existsByPlanAssignmentIdAndScheduledDate(assignment.id(), date)) {
             throw new ConflictException("WORKOUT_ALREADY_EXISTS", "The workout of this day was already started");
         }
@@ -77,7 +79,6 @@ class WorkoutService {
             throw new ConflictException("WORKOUT_ALREADY_IN_PROGRESS", "Another workout is in progress");
         }
 
-        PlanStructure structure = plans.getStructure(assignment.planId());
         PlanStructure.Session session = structure.sessions().stream()
                 .filter(s -> s.id().equals(day.sessionId()))
                 .findFirst()
@@ -294,7 +295,7 @@ class WorkoutService {
     @Transactional
     public void onAssignmentClosed(AssignmentEvents.AssignmentClosed event) {
         Instant now = calendar.now();
-        for (Workout workout : workouts.findByPlanAssignmentIdAndStatus(event.assignmentId(), WorkoutStatus.IN_PROGRESS)) {
+        for (Workout workout : workouts.lockByPlanAssignmentIdAndStatus(event.assignmentId(), WorkoutStatus.IN_PROGRESS)) {
             workout.interrupt(now);
             workout.executionChanged();
             log.info("Workout id={} interrupted because its assignment was closed", workout.getId());

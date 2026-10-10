@@ -307,6 +307,23 @@ class CalendarIntegrationTest {
     }
 
     @Test
+    void activatingAPendingAssignmentWithoutBodyDoesNotCopyDays() {
+        assign(2, "Vecchia", MONDAY, "");
+        api.put(user, scheduleUrl(), days(2, 4)).expect(200);
+        close(assignmentId);
+        BuiltPlan plan = factory.executablePlan(admin, "Nuova", 2, 1, 2);
+        Api.Response created = api.post(admin, "/api/admin/assignments",
+                "{\"planId\":\"%s\",\"userIds\":[\"%s\"],\"startDate\":\"%s\",\"activate\":false}"
+                        .formatted(plan.planId(), user.id(), MONDAY)).expect(201);
+        UUID id = UUID.fromString(created.read("$[0].id"));
+
+        // docs/api.md: copySchedule defaults to false, also when the body is missing.
+        Api.Response activated = api.post(admin, "/api/admin/assignments/" + id + "/activate", null).expect(200);
+        assertThat((List<Integer>) activated.read("$.copiedWeekdays")).isEmpty();
+        assertThat((List<Integer>) api.get(user, "/api/me/schedules").expect(200).read("$[0].weekdays")).isEmpty();
+    }
+
+    @Test
     void datesOutsideTheAssignmentPeriodHaveNoSession() {
         assign(2, "Futura", MONDAY.plusDays(7), "");
         api.put(user, scheduleUrl(), days(1, 3, 5)).expect(200);
