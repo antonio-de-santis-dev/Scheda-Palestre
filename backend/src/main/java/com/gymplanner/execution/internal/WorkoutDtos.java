@@ -86,20 +86,5 @@ final class WorkoutDtos {
     record WorkoutSummary(UUID id, LocalDate scheduledDate, WorkoutStatus status, String planName,
             String sessionTitle, Instant startedAt, Instant finishedAt, int totalExercises, int completedExercises,
             int skippedExercises, Long durationSeconds, VolumeSummary volume) {
-
-        static WorkoutSummary of(Workout w) {
-            int completed = 0;
-            int skipped = 0;
-            for (WorkoutExercise e : w.getExercises()) {
-                if (e.getStatus() == WorkoutExerciseStatus.COMPLETED) {
-                    completed++;
-                } else if (e.getStatus() == WorkoutExerciseStatus.SKIPPED) {
-                    skipped++;
-                }
-            }
-            return new WorkoutSummary(w.getId(), w.getScheduledDate(), w.getStatus(), w.getPlanNameSnapshot(),
-                    w.getSessionTitleSnapshot(), w.getStartedAt(), w.getFinishedAt(), w.getExercises().size(),
-                    completed, skipped, w.durationSeconds(), WorkoutVolume.of(w));
-        }
     }
 }

@@ -1,5 +1,6 @@
 package com.gymplanner.workoutplan.api;
 
+import com.gymplanner.shared.error.BusinessRuleException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -24,6 +25,17 @@ public record PlanStructure(
 
     public boolean deleted() {
         return deletedAt != null;
+    }
+
+    /** Same rules and codes as {@link WorkoutPlanQueries#requireExecutable}, without reloading the plan. */
+    public void requireExecutable() {
+        if (deleted()) {
+            throw new BusinessRuleException("PLAN_DELETED", "The plan is deleted");
+        }
+        if (!executable) {
+            throw new BusinessRuleException("PLAN_NOT_EXECUTABLE",
+                    "The plan needs at least one session and every session needs at least one exercise");
+        }
     }
 
     public record Session(UUID id, String title, int position, List<Section> sections) {

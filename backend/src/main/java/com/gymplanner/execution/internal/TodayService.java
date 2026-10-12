@@ -103,12 +103,10 @@ class TodayService {
                     pending, null, false, 0, List.of(), List.of());
         }
         Map<UUID, PlanSummary> names = plans.findPlans(active.stream().map(AssignmentView::planId).toList());
-        Map<UUID, Set<Integer>> days = new HashMap<>();
+        // Bulk lookups: the number of queries does not grow with the number of active plans.
+        Map<UUID, Set<Integer>> days = calendarQueries.weekdays(active.stream().map(AssignmentView::id).toList());
         Map<UUID, DayPlan> dayPlans = new HashMap<>();
-        for (AssignmentView a : active) {
-            days.put(a.id(), calendarQueries.weekdays(a.id()));
-            dayPlans.put(a.id(), calendarQueries.dayPlan(a, date));
-        }
+        calendarQueries.ranges(active, date, date).forEach((id, range) -> dayPlans.put(id, range.getFirst()));
         List<PlanRef> withoutDays = active.stream().filter(a -> days.get(a.id()).isEmpty())
                 .map(a -> new PlanRef(a.id(), name(names, a))).toList();
         LocalDate businessToday = calendar.today();

@@ -139,6 +139,13 @@ class UserDeletionIntegrationTest {
         Api.Response detail = api.get(admin, "/api/admin/users/" + bootstrap).expect(200);
         assertThat((Boolean) detail.read("$.protectedAccount")).isTrue();
         api.delete(admin, "/api/admin/users/" + bootstrap).expectCode(422, "PROTECTED_ACCOUNT");
+        // Renaming would silently remove the protection: the username stays fixed, other data can change.
+        String body = """
+                {"firstName":"%s","lastName":"%s","username":"%%s","email":"%s"}""".formatted(
+                (String) detail.read("$.firstName"), (String) detail.read("$.lastName"), (String) detail.read("$.email"));
+        api.put(admin, "/api/admin/users/" + bootstrap, body.formatted("ex-admin")).expectCode(422, "PROTECTED_ACCOUNT");
+        api.put(admin, "/api/admin/users/" + bootstrap, body.formatted((String) detail.read("$.username"))).expect(200);
+        api.delete(admin, "/api/admin/users/" + bootstrap).expectCode(422, "PROTECTED_ACCOUNT");
         // Only an ADMIN can delete accounts.
         AuthenticatedUser user = fixtures.createUser();
         AuthenticatedUser other = fixtures.createUser();

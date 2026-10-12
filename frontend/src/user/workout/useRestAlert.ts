@@ -20,7 +20,8 @@ export function useRestAlert() {
   const audio = useRef<HTMLAudioElement | null>(null);
   useEffect(() => {
     const player = new Audio(url(settings.sound));
-    player.preload = 'auto';
+    // Download the clip only when the alert is enabled: most workouts never use it.
+    player.preload = settings.enabled ? 'auto' : 'none';
     audio.current = player;
     return () => { player.pause(); audio.current = null; };
     // One player per mounted workout; settings changes update its source in the event handler.
@@ -37,7 +38,10 @@ export function useRestAlert() {
   const setEnabled = (enabled: boolean) => {
     setSettings((old) => ({ ...old, enabled }));
     if (enabled) {
-      if (audio.current) void audio.current.play().catch(() => {});
+      if (audio.current) {
+        audio.current.preload = 'auto';
+        void audio.current.play().catch(() => {});
+      }
     } else audio.current?.pause();
   };
   const setSound = (sound: Sound) => {

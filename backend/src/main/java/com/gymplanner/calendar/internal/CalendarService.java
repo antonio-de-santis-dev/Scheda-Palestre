@@ -135,14 +135,14 @@ class CalendarService implements CalendarQueries {
         if (!assignment.active()) {
             throw new BusinessRuleException(
                     "ASSIGNMENT_NOT_ACTIVE",
-                    "La scheda deve essere attiva");
+                    "Days can be chosen only for an active plan");
         }
 
         Set<Integer> days = weekdays(assignmentId);
         if (days.isEmpty()) {
             throw new BusinessRuleException(
                     "SCHEDULE_DAYS_REQUIRED",
-                    "Scegli e salva prima i giorni di allenamento");
+                    "Save the training days before choosing the next session");
         }
 
         List<PlanSessionRef> sessions =
@@ -159,7 +159,7 @@ class CalendarService implements CalendarQueries {
         if (selectedIndex < 0) {
             throw BadRequestException.field(
                     "sessionId",
-                    "La sessione scelta non appartiene alla scheda");
+                    "The session does not belong to the plan");
         }
 
         LocalDate nextDate = calendar.today();
@@ -204,11 +204,7 @@ class CalendarService implements CalendarQueries {
             return List.of();
         }
 
-        Map<UUID, Set<Integer>> days = new TreeMap<>();
-        list.forEach(a -> days.put(a.id(), new TreeSet<>()));
-
-        schedules.findByPlanAssignmentIdIn(days.keySet())
-                .forEach(s -> days.get(s.getPlanAssignmentId()).add(s.getWeekday()));
+        Map<UUID, Set<Integer>> days = weekdays(list.stream().map(AssignmentView::id).toList());
 
         Map<UUID, PlanSummary> names = plans.findPlans(
                 list.stream().map(AssignmentView::planId).toList());
@@ -287,10 +283,7 @@ class CalendarService implements CalendarQueries {
     @Transactional(readOnly = true)
     public Map<UUID, List<DayPlan>> ranges(Collection<AssignmentView> active, LocalDate from, LocalDate to) {
         if (active.isEmpty()) return Map.of();
-        Map<UUID, Set<Integer>> days = new java.util.HashMap<>();
-        active.forEach(a -> days.put(a.id(), new TreeSet<>()));
-        schedules.findByPlanAssignmentIdIn(days.keySet())
-                .forEach(s -> days.get(s.getPlanAssignmentId()).add(s.getWeekday()));
+        Map<UUID, Set<Integer>> days = weekdays(active.stream().map(AssignmentView::id).toList());
         var sessions = plans.sessionsInOrder(active.stream().map(AssignmentView::planId).distinct().toList());
         Map<UUID, List<DayPlan>> result = new java.util.HashMap<>();
         for (var assignment : active) {
@@ -309,6 +302,17 @@ class CalendarService implements CalendarQueries {
         return schedules.findByPlanAssignmentIdOrderByWeekday(assignmentId).stream()
                 .map(WeeklySchedule::getWeekday)
                 .collect(Collectors.toCollection(TreeSet::new));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, Set<Integer>> weekdays(Collection<UUID> assignmentIds) {
+        if (assignmentIds.isEmpty()) return Map.of();
+        Map<UUID, Set<Integer>> days = new TreeMap<>();
+        assignmentIds.forEach(id -> days.put(id, new TreeSet<>()));
+        schedules.findByPlanAssignmentIdIn(days.keySet())
+                .forEach(s -> days.get(s.getPlanAssignmentId()).add(s.getWeekday()));
+        return days;
     }
 
     @Override

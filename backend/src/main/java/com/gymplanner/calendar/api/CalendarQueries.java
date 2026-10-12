@@ -15,6 +15,9 @@ public interface CalendarQueries {
 
     Set<Integer> weekdays(UUID assignmentId);
 
+    /** Weekdays of several assignments in one query; every requested id is present (maybe empty). */
+    java.util.Map<UUID, Set<Integer>> weekdays(java.util.Collection<UUID> assignmentIds);
+
     DayPlan dayPlan(AssignmentView assignment, LocalDate date);
 
     /** Plans for every date of [from, to] (inclusive), computed with a single structure lookup. */
