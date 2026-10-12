@@ -16,7 +16,7 @@ I link sono personali e persistono nel database, disponibili su tutti i disposit
 
 ## Riproduzione e compatibilità
 
-Il player ufficiale viene caricato soltanto dopo la selezione del link; l’avvio resta manuale. Video e playlist dipendono da disponibilità, restrizioni e autorizzazione all’incorporamento stabilite da YouTube e dal proprietario. Pubblicità e controlli ufficiali restano intatti. Non viene offerta riproduzione audio nascosta o a schermo bloccato. Il player va in pausa quando viene fatto scorrere fuori dallo schermo, quando la pagina passa in background o un dialogo copre il contenuto; la ripresa è manuale. Cambiando pagina, concludendo/interrompendo l’allenamento o chiudendo il player la riproduzione si interrompe.
+Il player ufficiale viene caricato soltanto dopo la selezione del link; l’avvio resta manuale. Video e playlist dipendono da disponibilità, restrizioni e autorizzazione all’incorporamento stabilite da YouTube e dal proprietario. Pubblicità e controlli ufficiali restano intatti. Non viene offerta riproduzione audio nascosta o a schermo bloccato. Scorrere gli esercizi nella stessa pagina non interrompe la riproduzione. Il player va in pausa quando la pagina passa in background o un dialogo copre il contenuto; la ripresa è manuale. Cambiando pagina, concludendo/interrompendo l’allenamento o chiudendo il player la riproduzione si interrompe.
 
 La CSP Nginx consente esclusivamente i domini necessari al player: script `www.youtube.com`, `s.ytimg.com` e frame `www.youtube-nocookie.com`; le richieste di metadati sono consentite esclusivamente su `https://www.youtube.com/oembed`. Nessun `unsafe-inline` aggiunto per JavaScript. Il Referer del player e dello script usa `strict-origin-when-cross-origin`; la policy globale resta `same-origin`. Il sito mantiene `frame-ancestors 'none'` e `X-Frame-Options DENY`.
 
@@ -60,10 +60,10 @@ Test backend: formati link e host malevoli; persistenza, duplicati, isolamento t
 
 ## Scelta dei brani e riproduzione casuale
 
-Per una playlist, sotto il video compaiono **Precedente**, **Successivo**, **Casuale** ed **Scegli un brano**. I controlli si attivano quando YouTube restituisce l’elenco, talvolta dopo il primo Play. L’elenco mostra i titoli disponibili, il brano attuale e pagine da 20 elementi. Se un titolo manca, resta il numero del brano; i contenuti privati o non incorporabili restano soggetti alle restrizioni di YouTube.
+Per una playlist, sotto il video compaiono **Casuale** e **Scegli un brano**. I controlli si attivano quando YouTube restituisce l’elenco, talvolta dopo il primo Play. L’elenco mostra i titoli disponibili, il brano attuale e pagine da 20 elementi. Se un titolo manca, resta il numero del brano; i contenuti privati o non incorporabili restano soggetti alle restrizioni di YouTube.
 
 **Casuale** usa `setShuffle` del player ufficiale: il brano corrente continua e cambia l’ordine dei successivi. Disattivando il pulsante torna l’ordine originale. La scelta del brano usa l’indice nell’ordine attuale, anche in modalità casuale. I cambi dai comandi nativi e l’avanzamento automatico aggiornano l’indicazione del brano. Il player non viene ricreato da questi controlli. Una nuova playlist riparte in modalità sequenziale.
 
-L’elenco è inizialmente chiuso per mantenere compatta la vista mobile. Scegliendo un brano o usando Precedente/Successivo il video viene riportato in vista; restano le pause su finestra di conferma, pagina nascosta e video fuori schermo.
+L’elenco è inizialmente chiuso per mantenere compatta la vista mobile. Scegliendo un brano il video viene riportato in vista; restano le pause su finestra di conferma e pagina nascosta. Lo scorrimento nella stessa pagina non mette più in pausa il video. Per cambiare brano si possono usare l’elenco e i comandi nativi di YouTube.
 
 Verifica manuale: aprire una playlist pubblica, premere Play, scegliere un brano dall’elenco, attivare Casuale e passare al successivo. Disattivare Casuale e controllare l’ordine ripristinato. Provare anche i comandi nativi, una playlist lunga e un titolo non disponibile. Le correzioni della revisione Claude Code (limite link, eliminazione account, errori nel dialogo) restano applicate.

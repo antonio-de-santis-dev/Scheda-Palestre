@@ -25,7 +25,7 @@ export function WorkoutMusic() {
       <details className="music-help muted small">
         <summary>Come funziona</summary>
         <p>Selezionando un link caricherai il player YouTube e ti collegherai al servizio esterno. Premi Play nel video; serve una connessione Internet.</p>
-        <p>YouTube può mostrare pubblicità e alcuni contenuti non consentono la riproduzione nei siti esterni. Mantieni il video visibile: a schermo bloccato la riproduzione non è garantita.</p>
+        <p>YouTube può mostrare pubblicità e alcuni contenuti non consentono la riproduzione nei siti esterni. Tieni aperta la pagina dell’allenamento: a schermo bloccato la riproduzione non è garantita.</p>
       </details>
     </section>
     <section className={`card music-playback${selected ? '' : ' music-playback--empty'}`} aria-label="Riproduzione musicale">

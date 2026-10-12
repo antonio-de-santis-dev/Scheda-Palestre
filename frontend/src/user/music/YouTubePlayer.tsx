@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Shuffle } from 'lucide-react';
+import { Shuffle } from 'lucide-react';
 import { Button } from '../../shared/components/Button';
 import type { MusicEntry } from './api';
 import { embedUrl } from './embed';
@@ -28,16 +28,9 @@ export function YouTubePlayer({ entry }: { entry: MusicEntry }) {
   useEffect(() => {
     let cancelled = false;
     let player: Player | undefined;
-    let inViewport = true;
     shuffleApplied.current = false;
     const pause = () => player?.pauseVideo();
-    const covered = () => {
-      // Read fresh geometry after a track button scrolls the video into view: the observer
-      // callback may still describe the previous scroll position.
-      const rect = container.current?.getBoundingClientRect();
-      const visible = rect && rect.height > 0 ? rect.bottom > 0 && rect.top < window.innerHeight : inViewport;
-      return document.hidden || !visible || !!document.querySelector('dialog[open]');
-    };
+    const covered = () => document.hidden || !!document.querySelector('dialog[open]');
     const visibility = () => { if (covered()) pause(); };
     const syncPlaylist = () => {
       if (cancelled || !player || entry.kind !== 'PLAYLIST') return;
@@ -53,11 +46,6 @@ export function YouTubePlayer({ entry }: { entry: MusicEntry }) {
     };
     const observer = new MutationObserver(visibility);
     observer.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['open'] });
-    const viewport = typeof IntersectionObserver === 'undefined' ? undefined : new IntersectionObserver(entries => {
-      inViewport = entries[0]?.isIntersecting ?? false;
-      visibility();
-    });
-    if (container.current) viewport?.observe(container.current);
     document.addEventListener('visibilitychange', visibility);
     window.addEventListener('pagehide', pause);
     // Native YouTube controls and automatic advancement must also update our selection.
@@ -92,7 +80,6 @@ export function YouTubePlayer({ entry }: { entry: MusicEntry }) {
     return () => {
       cancelled = true;
       observer.disconnect();
-      viewport?.disconnect();
       window.clearInterval(interval);
       document.removeEventListener('visibilitychange', visibility);
       window.removeEventListener('pagehide', pause);
@@ -123,10 +110,6 @@ export function YouTubePlayer({ entry }: { entry: MusicEntry }) {
     {error ? <p role="alert">{error}</p> : null}
     {entry.kind === 'PLAYLIST' ? <div className="playlist-controls">
       <div className="playlist-actions" role="group" aria-label="Controlli playlist">
-        <Button variant="secondary" size="sm" disabled={!loaded} icon={<ChevronLeft size={18} aria-hidden="true" />}
-          onClick={() => play(player => player.previousVideo())}>Precedente</Button>
-        <Button variant="secondary" size="sm" disabled={!loaded} icon={<ChevronRight size={18} aria-hidden="true" />}
-          onClick={() => play(player => player.nextVideo())}>Successivo</Button>
         <Button variant={shuffle ? 'primary' : 'secondary'} size="sm" aria-pressed={shuffle} disabled={!loaded}
           icon={<Shuffle size={18} aria-hidden="true" />} onClick={toggleShuffle}>Casuale</Button>
       </div>

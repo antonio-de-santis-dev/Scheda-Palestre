@@ -80,15 +80,31 @@ describe('controlli playlist', () => {
     expect(random).toHaveAttribute('aria-pressed', 'false');
     expect(handle.player!.order).toEqual(ids);
   });
-  it('updates the selection for native player changes and next/previous buttons', async () => {
+  it('updates the selection for native player changes without redundant navigation buttons', async () => {
     show();
     await screen.findByText('Brano 1 di 3 · Ordine della playlist');
-    fireEvent.click(screen.getByRole('button', { name: 'Successivo' }));
-    expect(await screen.findByText('Brano 2 di 3 · Ordine della playlist')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Precedente' }));
-    expect(await screen.findByText('Brano 1 di 3 · Ordine della playlist')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Precedente' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Successivo' })).not.toBeInTheDocument();
     act(() => { handle.player!.index = 2; handle.player!.changed(); });
     expect(await screen.findByText('Brano 3 di 3 · Ordine della playlist')).toBeInTheDocument();
+  });
+  it('keeps playing when scrolled out of view while still pausing for a confirmation dialog', async () => {
+    show();
+    await screen.findByText('Brano 1 di 3 · Ordine della playlist');
+    handle.player!.pauseVideo.mockClear();
+    const geometry = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+      x: 0, y: -1000, top: -1000, bottom: -800, left: 0, right: 300, width: 300, height: 200, toJSON: () => ({}),
+    });
+    try {
+      fireEvent.scroll(window);
+      act(() => handle.player!.changed());
+      expect(handle.player!.pauseVideo).not.toHaveBeenCalled();
+      const dialog = document.createElement('dialog');
+      document.body.append(dialog);
+      dialog.setAttribute('open', '');
+      await waitFor(() => expect(handle.player!.pauseVideo).toHaveBeenCalled());
+      dialog.remove();
+    } finally { geometry.mockRestore(); }
   });
   it('waits for a late playlist and keeps track selection available when metadata fails', async () => {
     initialIds = [];
