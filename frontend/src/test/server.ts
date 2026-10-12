@@ -13,6 +13,7 @@ export const server = setupServer(
   http.get('*/api/me/workout-stats', () => HttpResponse.json({ totalWorkouts: 0, completedWorkouts: 0,
     interruptedWorkouts: 0, inProgressWorkouts: 0, recordedDurationSeconds: null, workoutsWithDuration: 0,
     workoutsMissingDuration: 0, volume: { recordedKgReps: null, completedSets: 0, recordedSets: 0, missingWeightSets: 0, missingRepsSets: 0 } })),
+  http.get('*/api/me/music', () => HttpResponse.json([])),
   http.get('*/api/me/schedules', () => HttpResponse.json([])),
   http.get('*/api/admin/users/:id/activity-report', () =>
     HttpResponse.json({

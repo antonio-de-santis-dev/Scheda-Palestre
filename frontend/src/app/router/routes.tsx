@@ -68,6 +68,7 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <Navigate to="/app/today" replace /> },
       { path: 'today', ...page(() => import('../../user/today/TodayPage'), (m) => m.TodayPage) },
+      { path: 'music', ...page(() => import('../../user/music/MusicPage'), (m) => m.MusicPage) },
       { path: 'workout/:id', ...page(() => import('../../user/workout/WorkoutPage'), (m) => m.WorkoutPage) },
       { path: 'calendar', ...page(() => import('../../user/calendar/CalendarPage'), (m) => m.CalendarPage) },
       { path: 'plans', ...page(() => import('../../user/plans/MyPlansPage'), (m) => m.MyPlansPage) },

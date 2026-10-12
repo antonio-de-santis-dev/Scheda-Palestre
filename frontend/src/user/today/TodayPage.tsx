@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { BedDouble, CalendarClock, ClipboardList, Play, RotateCcw } from 'lucide-react';
+import { BedDouble, CalendarClock, ClipboardList, Music, Play, RotateCcw } from 'lucide-react';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
 import { Alert, ErrorAlert } from '../../shared/components/Alert';
@@ -34,6 +34,7 @@ function TodayContent({ today }: { today: Today }) {
 
   return (
     <div className="stack">
+      <Link to="/app/music" className="btn btn--secondary"><Music size={20} aria-hidden="true" /> Aggiungi canzoni o playlist</Link>
       {today.pendingWorkout ? <PendingWorkout today={today} /> : null}
 
       {today.recommendedDurationEnded.map((p) => (

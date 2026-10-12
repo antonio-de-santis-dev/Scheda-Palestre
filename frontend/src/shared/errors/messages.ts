@@ -19,6 +19,7 @@ const MESSAGES: Record<string, string> = {
   EMAIL_TAKEN: 'Email già in uso.',
   CANNOT_DEACTIVATE_SELF: 'Non puoi disattivare il tuo account.',
   LAST_ACTIVE_ADMIN: 'Deve sempre esistere almeno un ADMIN attivo.',
+  MUSIC_DUPLICATE: 'Questo video o questa playlist è già nella tua musica.',
   NAME_TAKEN: 'Esiste già un elemento con questo nome.',
   CATALOG_ITEM_INACTIVE: "L'elemento selezionato è disattivato e non può essere usato.",
   PLAN_DELETED: 'La scheda è eliminata: ripristinala prima di modificarla.',

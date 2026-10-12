@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [delpy]
   push:
-    branches: [desaig, fixV2, veloce, 'fix/**']
+    branches: [musica, desaig, fixV2, veloce, 'fix/**']
   workflow_dispatch:
 
 permissions:

@@ -12,6 +12,7 @@ import { STALE_STATE_CODES, useWorkout, useWorkoutAction, workoutApi, type Recor
 import { useRestTimer } from './useRestTimer';
 import { WorkoutStatusBadge } from './ExerciseStatusBadge';
 import { celebrate, transitions, type Feedback } from './feedback';
+import { WorkoutMusic } from '../music/WorkoutMusic';
 import { useRestAlert } from './useRestAlert';
 import { WorkoutDuration } from './WorkoutDuration';
 import { WorkoutExerciseList } from './WorkoutExerciseList';
@@ -180,6 +181,7 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
       <div className="workout-progress" role="progressbar" aria-label="Serie completate" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
         <span style={{ width: `${progress}%` }} />
       </div>
+      {!finished ? <WorkoutMusic /> : null}
       <div className="workout-layout">
         <div className="workout-primary">
       {finished ? (
