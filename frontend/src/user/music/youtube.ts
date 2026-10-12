@@ -1,9 +1,19 @@
 export interface YouTubePlayer {
   pauseVideo(): void;
   destroy(): void;
+  getPlaylist(): string[] | undefined;
+  getPlaylistIndex(): number;
+  playVideoAt(index: number): void;
+  previousVideo(): void;
+  nextVideo(): void;
+  setShuffle(enabled: boolean): void;
 }
 interface PlayerOptions {
-  events: { onReady: () => void; onError: (event: { data: number }) => void };
+  events: {
+    onReady: (event: { target: YouTubePlayer }) => void;
+    onStateChange?: (event: { target: YouTubePlayer; data: number }) => void;
+    onError: (event: { data: number }) => void;
+  };
 }
 export interface YouTubeApi {
   Player: new (element: HTMLIFrameElement, options: PlayerOptions) => YouTubePlayer;

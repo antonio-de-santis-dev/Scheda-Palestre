@@ -12,13 +12,13 @@ Branch: `musica`, creato da `delpy`. Nessun merge o deploy automatico su `delpy`
 
 Durante l’allenamento non vengono mostrati moduli per aggiungere o eliminare link. La gestione resta nella pagina Musica. Un link watch con parametro `list` viene salvato come playlist intera: per salvare il singolo video rimuovere `list` dal link. Supportati link watch, youtu.be, playlist, shorts, live e embed, anche da YouTube Music.
 
-I link sono personali e persistono nel database, disponibili su tutti i dispositivi dello stesso account. Non vengono scaricati file audio/video e non serve una chiave YouTube Data API. Titoli inseriti dall’utente; nessun recupero di metadati o richiesta server verso URL forniti dagli utenti.
+I link sono personali e persistono nel database, disponibili su tutti i dispositivi dello stesso account. Non vengono scaricati file audio/video e non serve una chiave YouTube Data API. I nomi dei link salvati sono inseriti dall’utente. Aprendo l’elenco di una playlist, il browser recupera i titoli pubblici da YouTube oEmbed, senza cookie e soltanto per i 20 brani della pagina visibile. Nessuna richiesta server verso URL forniti dagli utenti.
 
 ## Riproduzione e compatibilità
 
 Il player ufficiale viene caricato soltanto dopo la selezione del link; l’avvio resta manuale. Video e playlist dipendono da disponibilità, restrizioni e autorizzazione all’incorporamento stabilite da YouTube e dal proprietario. Pubblicità e controlli ufficiali restano intatti. Non viene offerta riproduzione audio nascosta o a schermo bloccato. Il player va in pausa quando viene fatto scorrere fuori dallo schermo, quando la pagina passa in background o un dialogo copre il contenuto; la ripresa è manuale. Cambiando pagina, concludendo/interrompendo l’allenamento o chiudendo il player la riproduzione si interrompe.
 
-La CSP Nginx consente esclusivamente i domini necessari al player: script `www.youtube.com`, `s.ytimg.com` e frame `www.youtube-nocookie.com`. Nessun `unsafe-inline` aggiunto per JavaScript. Il Referer del player e dello script usa `strict-origin-when-cross-origin`; la policy globale resta `same-origin`. Il sito mantiene `frame-ancestors 'none'` e `X-Frame-Options DENY`.
+La CSP Nginx consente esclusivamente i domini necessari al player: script `www.youtube.com`, `s.ytimg.com` e frame `www.youtube-nocookie.com`; le richieste di metadati sono consentite esclusivamente su `https://www.youtube.com/oembed`. Nessun `unsafe-inline` aggiunto per JavaScript. Il Referer del player e dello script usa `strict-origin-when-cross-origin`; la policy globale resta `same-origin`. Il sito mantiene `frame-ancestors 'none'` e `X-Frame-Options DENY`.
 
 ## Backend
 
@@ -57,3 +57,13 @@ Test backend: formati link e host malevoli; persistenza, duplicati, isolamento t
 - Pagina Musica: l’errore di eliminazione era mostrato dietro la finestra di conferma (invisibile); ora è dentro la finestra. Un link già eliminato altrove non produce più un errore.
 - Messaggi tecnici del backend in inglese come nel resto dell’API; il testo per l’utente arriva dal codice (`MUSIC_DUPLICATE`, `MUSIC_LIMIT_REACHED`).
 - Nota sulla CSP: autorizzare `https://www.youtube.com` fra gli script è necessario per l’API ufficiale, ma amplia leggermente la superficie in caso di XSS. Restringerla ai soli percorsi `/iframe_api` e `/s/player/` è possibile, va però provata su un dispositivo reale prima del rilascio.
+
+## Scelta dei brani e riproduzione casuale
+
+Per una playlist, sotto il video compaiono **Precedente**, **Successivo**, **Casuale** ed **Scegli un brano**. I controlli si attivano quando YouTube restituisce l’elenco, talvolta dopo il primo Play. L’elenco mostra i titoli disponibili, il brano attuale e pagine da 20 elementi. Se un titolo manca, resta il numero del brano; i contenuti privati o non incorporabili restano soggetti alle restrizioni di YouTube.
+
+**Casuale** usa `setShuffle` del player ufficiale: il brano corrente continua e cambia l’ordine dei successivi. Disattivando il pulsante torna l’ordine originale. La scelta del brano usa l’indice nell’ordine attuale, anche in modalità casuale. I cambi dai comandi nativi e l’avanzamento automatico aggiornano l’indicazione del brano. Il player non viene ricreato da questi controlli. Una nuova playlist riparte in modalità sequenziale.
+
+L’elenco è inizialmente chiuso per mantenere compatta la vista mobile. Scegliendo un brano o usando Precedente/Successivo il video viene riportato in vista; restano le pause su finestra di conferma, pagina nascosta e video fuori schermo.
+
+Verifica manuale: aprire una playlist pubblica, premere Play, scegliere un brano dall’elenco, attivare Casuale e passare al successivo. Disattivare Casuale e controllare l’ordine ripristinato. Provare anche i comandi nativi, una playlist lunga e un titolo non disponibile. Le correzioni della revisione Claude Code (limite link, eliminazione account, errori nel dialogo) restano applicate.
