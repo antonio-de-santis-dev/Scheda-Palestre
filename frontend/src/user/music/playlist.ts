@@ -12,7 +12,8 @@ function titleSlot(signal: AbortSignal): Promise<() => void> {
     };
     const start = () => {
       signal.removeEventListener('abort', cancel);
-      if (signal.aborted) { reject(signal.reason); return; }
+      // A cancelled request hands its slot straight to the next one, so the queue never stalls.
+      if (signal.aborted) { reject(signal.reason); waiting.shift()?.(); return; }
       activeRequests++;
       resolve(() => { activeRequests--; waiting.shift()?.(); });
     };
@@ -22,12 +23,16 @@ function titleSlot(signal: AbortSignal): Promise<() => void> {
   });
 }
 
-/** Only identifiers returned by the official player become fixed-host metadata requests. */
-export function useTrackTitles(ids: string[], enabled: boolean) {
+/**
+ * Only identifiers returned by the official player become fixed-host metadata requests.
+ * {@code wanted}, when given, limits the requests to those ids (e.g. the rows that are visible).
+ */
+export function useTrackTitles(ids: string[], enabled: boolean, wanted?: ReadonlySet<string>) {
   const uniqueIds = [...new Set(ids)];
+  const position = new Map(uniqueIds.map((id, index) => [id, index]));
   const results = useQueries({ queries: uniqueIds.map(id => ({
     queryKey: ['youtube', 'title', id],
-    enabled: enabled && /^[A-Za-z0-9_-]{11}$/.test(id),
+    enabled: enabled && (!wanted || wanted.has(id)) && /^[A-Za-z0-9_-]{11}$/.test(id),
     staleTime: 60 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     retry: false,
@@ -47,5 +52,5 @@ export function useTrackTitles(ids: string[], enabled: boolean) {
       } finally { release(); }
     },
   })) });
-  return ids.map(id => results[uniqueIds.indexOf(id)]);
+  return ids.map(id => results[position.get(id)!]);
 }

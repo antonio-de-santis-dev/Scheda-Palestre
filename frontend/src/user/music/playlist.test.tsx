@@ -138,6 +138,31 @@ describe('controlli playlist', () => {
     fireEvent.click(within(tracks).getAllByRole('button')[20]!);
     expect(handle.player!.playVideoAt).toHaveBeenCalledWith(20);
   });
+  it('requests titles only for the rows that are visible in the list', async () => {
+    const requested: string[] = [];
+    server.use(http.get('https://www.youtube.com/oembed', ({ request }) => {
+      requested.push(new URL(new URL(request.url).searchParams.get('url')!).searchParams.get('v')!);
+      return HttpResponse.json({ title: 'Visibile' });
+    }));
+    vi.stubGlobal('IntersectionObserver', class {
+      private readonly callback: IntersectionObserverCallback;
+      constructor(callback: IntersectionObserverCallback) { this.callback = callback; }
+      observe(row: HTMLElement) {
+        // Only the first two rows fit in the list viewport.
+        if (Number(row.dataset.trackId!.slice(5)) < 2) this.callback([{ isIntersecting: true, target: row } as unknown as IntersectionObserverEntry], this as unknown as IntersectionObserver);
+      }
+      disconnect() {}
+    });
+    try {
+      initialIds = Array.from({ length: 45 }, (_, i) => `video${String(i).padStart(6, '0')}`);
+      show();
+      await screen.findByText('Brano 1 di 45 · Ordine della playlist');
+      fireEvent.click(screen.getByText('Scegli un brano (45)'));
+      expect(await screen.findAllByText('Visibile')).toHaveLength(2);
+      expect(requested.sort()).toEqual(['video000000', 'video000001']);
+      expect(screen.getByRole('button', { name: 'Brano 45' })).toBeInTheDocument();
+    } finally { vi.unstubAllGlobals(); }
+  });
   it('does not add playlist controls to individual songs and clears shuffle on another playlist', async () => {
     const client = testQueryClient();
     const view = render(<AppProviders client={client}><YouTubePlayer key={entry.id} entry={entry} /></AppProviders>);

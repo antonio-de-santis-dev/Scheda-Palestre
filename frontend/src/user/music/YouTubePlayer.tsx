@@ -7,6 +7,7 @@ import { loadYouTube, type YouTubePlayer as Player } from './youtube';
 import { useTrackTitles } from './playlist';
 
 type PlaylistState = { ids: string[]; index: number };
+const lazyTitles = () => typeof IntersectionObserver !== 'undefined';
 const EMPTY_PLAYLIST: PlaylistState = { ids: [], index: -1 };
 
 export function YouTubePlayer({ entry }: { entry: MusicEntry }) {
@@ -19,17 +20,31 @@ export function YouTubePlayer({ entry }: { entry: MusicEntry }) {
   const [shuffle, setShuffle] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const tracksList = useRef<HTMLOListElement>(null);
-  const titles = useTrackTitles(playlist.ids, listOpen);
+  // Titles are requested only for rows that scroll into (or near) the list viewport: a long
+  // playlist must not trigger hundreds of oEmbed requests when the list is opened.
+  const [seenIds, setSeenIds] = useState<ReadonlySet<string>>(() => new Set());
+  const titles = useTrackTitles(playlist.ids, listOpen, lazyTitles() ? seenIds : undefined);
 
   useEffect(() => {
     if (!listOpen) return;
     const list = tracksList.current;
     const current = list?.querySelector<HTMLElement>('[aria-current="true"]');
     if (list && current) {
-      // Keep Claude's current-track shortcut without paging or scrolling the whole page.
+      // Bring the current track into view inside the list, without scrolling the whole page.
       list.scrollTop += current.getBoundingClientRect().top - list.getBoundingClientRect().top;
     }
   }, [listOpen, playlist.index]);
+
+  useEffect(() => {
+    const list = tracksList.current;
+    if (!lazyTitles() || !listOpen || !list) return;
+    const observer = new IntersectionObserver(entries => {
+      const shown = entries.filter(e => e.isIntersecting).map(e => (e.target as HTMLElement).dataset.trackId ?? '');
+      setSeenIds(previous => shown.every(id => previous.has(id)) ? previous : new Set([...previous, ...shown]));
+    }, { root: list, rootMargin: '160px 0px' });
+    list.querySelectorAll('li[data-track-id]').forEach(row => observer.observe(row));
+    return () => observer.disconnect();
+  }, [listOpen, playlist.ids]);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,8 +142,8 @@ export function YouTubePlayer({ entry }: { entry: MusicEntry }) {
           {listOpen ? <>
             <ol ref={tracksList} className="playlist-tracks" aria-label="Brani della playlist">
               {playlist.ids.map((id, index) => {
-                return <li key={`${index}:${id}`}><button type="button" className="playlist-track" aria-current={index === playlist.index ? 'true' : undefined}
-                  aria-label={`Brano ${index + 1}: ${titles[index]?.data ?? (titles[index]?.isLoading ? 'caricamento del titolo' : 'titolo non disponibile')}`} onClick={() => play(player => player.playVideoAt(index))}>
+                return <li key={`${index}:${id}`} data-track-id={id}><button type="button" className="playlist-track" aria-current={index === playlist.index ? 'true' : undefined}
+                  aria-label={trackLabel(index, titles[index])} onClick={() => play(player => player.playVideoAt(index))}>
                   <span className="playlist-track__number">{index + 1}</span>
                   <span>{titles[index]?.data ?? `Brano ${index + 1}`}</span>
                   {index === playlist.index ? <span className="playlist-track__current">Attuale</span> : null}
@@ -141,4 +156,10 @@ export function YouTubePlayer({ entry }: { entry: MusicEntry }) {
       </> : <p className="small muted">Premi Play nel video per caricare i brani della playlist. I controlli si attiveranno quando YouTube renderà disponibile l’elenco.</p>}
     </div> : null}
   </>;
+}
+
+/** A row whose title was not requested yet is announced only by its number. */
+function trackLabel(index: number, title: { data?: string; isLoading: boolean; isError: boolean } | undefined) {
+  const detail = title?.data ?? (title?.isLoading ? 'caricamento del titolo' : title?.isError ? 'titolo non disponibile' : null);
+  return detail ? `Brano ${index + 1}: ${detail}` : `Brano ${index + 1}`;
 }

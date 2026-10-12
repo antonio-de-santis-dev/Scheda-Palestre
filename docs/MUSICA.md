@@ -78,3 +78,10 @@ Verifica manuale: aprire una playlist pubblica, premere Play, scegliere un brano
 ### Elenco unico dei brani
 
 Rimossa la paginazione: tutti i brani restituiti dal player sono presenti nello stesso elenco, con la grafica e lo scorrimento interno già esistenti. Il brano attuale resta evidenziato e viene portato in vista aprendo l’elenco. I titoli vengono recuperati progressivamente con un massimo di quattro richieste contemporanee; un brano può essere scelto anche prima che arrivi il titolo.
+
+### Revisione dell’elenco unico dei brani (Claude Code)
+
+- I titoli vengono richiesti solo per i brani visibili nell’elenco (più un margine di scorrimento), non per l’intera playlist: aprire una playlist di 200 brani non invia più 200 richieste a YouTube. Senza `IntersectionObserver` (browser molto vecchi) resta il comportamento precedente.
+- Coda delle richieste (massimo 4 alla volta): una richiesta annullata passa subito il posto alla successiva, così la coda non può bloccarsi.
+- I brani non ancora caricati sono annunciati come "Brano N"; "titolo non disponibile" solo quando la richiesta è davvero fallita.
+- Rimossi lo stile `.playlist-pages` non più usato e la ricerca lineare ripetuta degli ID (ora una mappa).
