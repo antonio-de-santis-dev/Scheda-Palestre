@@ -8,7 +8,7 @@ Branch: `musica`, creato da `delpy`. Nessun merge o deploy automatico su `delpy`
 2. Inserire un nome e il link HTTPS condiviso da YouTube, quindi salvare.
 3. Tornare a Oggi e iniziare o riprendere l’allenamento.
 4. Nella sezione Musica selezionare un link salvato e premere Play nel player YouTube.
-5. Il player resta visibile mentre si scorrono esercizi e serie. **Ferma e chiudi musica** interrompe la riproduzione.
+5. Su PC il video si trova a destra della scelta musicale, sopra l’elenco esercizi. Su telefono è tra la scelta musicale e la scheda della serie. Le istruzioni si aprono con **Come funziona**; non ci sono finestre flottanti. **Ferma e chiudi musica** interrompe la riproduzione.
 
 Durante l’allenamento non vengono mostrati moduli per aggiungere o eliminare link. La gestione resta nella pagina Musica. Un link watch con parametro `list` viene salvato come playlist intera: per salvare il singolo video rimuovere `list` dal link. Supportati link watch, youtu.be, playlist, shorts, live e embed, anche da YouTube Music.
 
@@ -16,7 +16,7 @@ I link sono personali e persistono nel database, disponibili su tutti i disposit
 
 ## Riproduzione e compatibilità
 
-Il player ufficiale viene caricato soltanto dopo la selezione del link; l’avvio resta manuale. Video e playlist dipendono da disponibilità, restrizioni e autorizzazione all’incorporamento stabilite da YouTube e dal proprietario. Pubblicità e controlli ufficiali restano intatti. Non viene offerta riproduzione audio nascosta o a schermo bloccato. Il player va in pausa quando la pagina passa in background o un dialogo copre il contenuto; la ripresa è manuale. Cambiando pagina, concludendo/interrompendo l’allenamento o chiudendo il player la riproduzione si interrompe.
+Il player ufficiale viene caricato soltanto dopo la selezione del link; l’avvio resta manuale. Video e playlist dipendono da disponibilità, restrizioni e autorizzazione all’incorporamento stabilite da YouTube e dal proprietario. Pubblicità e controlli ufficiali restano intatti. Non viene offerta riproduzione audio nascosta o a schermo bloccato. Il player va in pausa quando viene fatto scorrere fuori dallo schermo, quando la pagina passa in background o un dialogo copre il contenuto; la ripresa è manuale. Cambiando pagina, concludendo/interrompendo l’allenamento o chiudendo il player la riproduzione si interrompe.
 
 La CSP Nginx consente esclusivamente i domini necessari al player: script `www.youtube.com`, `s.ytimg.com` e frame `www.youtube-nocookie.com`. Nessun `unsafe-inline` aggiunto per JavaScript. Il Referer del player e dello script usa `strict-origin-when-cross-origin`; la policy globale resta `same-origin`. Il sito mantiene `frame-ancestors 'none'` e `X-Frame-Options DENY`.
 

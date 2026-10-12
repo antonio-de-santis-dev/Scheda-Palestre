@@ -14,6 +14,11 @@ export function YouTubePlayer({ entry }: { entry: MusicEntry }) {
     const visibility = () => { if (covered()) pause(); };
     const observer = new MutationObserver(visibility);
     observer.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['open'] });
+    // Inline video pauses when scrolling it out of view instead of becoming a floating player.
+    const viewport = typeof IntersectionObserver === 'undefined' ? undefined : new IntersectionObserver(entries => {
+      if (!entries[0]?.isIntersecting) pause();
+    });
+    if (container.current) viewport?.observe(container.current);
     document.addEventListener('visibilitychange', visibility);
     window.addEventListener('pagehide', pause);
     void loadYouTube().then(api => {
@@ -35,6 +40,7 @@ export function YouTubePlayer({ entry }: { entry: MusicEntry }) {
     return () => {
       cancelled = true;
       observer.disconnect();
+      viewport?.disconnect();
       document.removeEventListener('visibilitychange', visibility);
       window.removeEventListener('pagehide', pause);
       player?.destroy();

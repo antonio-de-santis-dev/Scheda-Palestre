@@ -6,28 +6,35 @@ import { useMusic, type MusicEntry } from './api';
 import { YouTubePlayer } from './YouTubePlayer';
 import './music.css';
 
-/** Kept outside exercise keys: completing sets/refetching never recreates the player. */
+/** Two grid cards share selection state; the player survives workout refetches. */
 export function WorkoutMusic() {
   const { query } = useMusic();
   const [selected, setSelected] = useState<MusicEntry | null>(null);
-  return <section className="card stack workout-music" aria-labelledby="workout-music-title">
-    <h2 id="workout-music-title"><Music size={22} aria-hidden="true" /> Musica</h2>
-    <QueryState isLoading={query.isLoading} error={query.error} onRetry={() => void query.refetch()}>
-      {query.data?.length === 0 ? <p className="muted">Nessun link salvato. Puoi aggiungere canzoni e playlist nella sezione Musica prima dell’allenamento.</p> : null}
-      {query.data?.length ? <label className="stack">Scegli dalla tua musica
-        <select className="input" value={selected?.id ?? ''} onChange={event => setSelected(query.data?.find(entry => entry.id === event.target.value) ?? null)}>
-          <option value="">Seleziona canzone o playlist</option>
-          {query.data.map(entry => <option key={entry.id} value={entry.id}>{entry.title} · {entry.kind === 'PLAYLIST' ? 'Playlist' : 'Video'}</option>)}
-        </select>
-      </label> : null}
-    </QueryState>
-    {selected ? <>
-      <p className="muted small">Premi Play nel video. YouTube può mostrare pubblicità; alcuni contenuti non consentono la riproduzione nei siti esterni.</p>
-      <div className="music-playback">
-      <YouTubePlayer key={selected.id} entry={selected} />
-      <Button variant="secondary" size="sm" icon={<X size={18} aria-hidden="true" />} onClick={() => setSelected(null)}>Ferma e chiudi musica</Button>
-      </div>
-    </> : <p className="muted small">Selezionando un link caricherai il player YouTube e ti collegherai al servizio esterno. La riproduzione richiede una connessione Internet.</p>}
-    <p className="muted small">Mantieni il player visibile e la pagina aperta. A schermo bloccato la riproduzione non è garantita.</p>
-  </section>;
+  return <>
+    <section className="card workout-music" aria-labelledby="workout-music-title">
+      <h2 id="workout-music-title"><Music size={20} aria-hidden="true" /> Musica</h2>
+      <QueryState isLoading={query.isLoading} error={query.error} onRetry={() => void query.refetch()}>
+        {query.data?.length === 0 ? <p className="muted small">Nessun link salvato. Aggiungi canzoni e playlist nella sezione Musica prima dell’allenamento.</p> : null}
+        {query.data?.length ? <label className="music-choice">Scegli canzone o playlist
+          <select className="input" value={selected?.id ?? ''} onChange={event => setSelected(query.data?.find(entry => entry.id === event.target.value) ?? null)}>
+            <option value="">Seleziona dalla tua musica</option>
+            {query.data.map(entry => <option key={entry.id} value={entry.id}>{entry.title} · {entry.kind === 'PLAYLIST' ? 'Playlist' : 'Video'}</option>)}
+          </select>
+        </label> : null}
+      </QueryState>
+      <details className="music-help muted small">
+        <summary>Come funziona</summary>
+        <p>Selezionando un link caricherai il player YouTube e ti collegherai al servizio esterno. Premi Play nel video; serve una connessione Internet.</p>
+        <p>YouTube può mostrare pubblicità e alcuni contenuti non consentono la riproduzione nei siti esterni. Mantieni il video visibile: a schermo bloccato la riproduzione non è garantita.</p>
+      </details>
+    </section>
+    <section className={`card music-playback${selected ? '' : ' music-playback--empty'}`} aria-label="Riproduzione musicale">
+      {selected ? <>
+        <div className="music-playback__header"><span className="small" title={selected.title}>{selected.title}</span>
+          <Button variant="ghost" size="sm" aria-label="Ferma e chiudi musica" icon={<X size={18} aria-hidden="true" />} onClick={() => setSelected(null)}>Ferma</Button>
+        </div>
+        <YouTubePlayer key={selected.id} entry={selected} />
+      </> : <p className="muted small">Seleziona una canzone o una playlist per visualizzare il video qui.</p>}
+    </section>
+  </>;
 }
