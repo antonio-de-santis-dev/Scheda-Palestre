@@ -46,11 +46,13 @@ export function MusicPage() {
           <Button variant="secondary" size="sm" aria-label={`Elimina ${entry.title}`} icon={<Trash2 size={18} aria-hidden="true" />} onClick={() => { remove.reset(); setDeleting(entry); }}>Elimina</Button>
         </li>)}</ul>
       </QueryState>
-      {remove.error ? <ErrorAlert error={remove.error} /> : null}
     </section>
     <ConfirmDialog open={deleting !== null} title="Eliminare dalla tua musica?" confirmLabel="Elimina" loading={remove.isPending}
-      onCancel={() => setDeleting(null)} onConfirm={() => { if (deleting) remove.mutate(deleting.id, { onSuccess: () => setDeleting(null) }); }}>
+      onCancel={() => { remove.reset(); setDeleting(null); }}
+      onConfirm={() => { if (deleting && !remove.isPending) remove.mutate(deleting.id, { onSuccess: () => setDeleting(null) }); }}>
       <p>Il link di “{deleting?.title}” sarà rimosso dal tuo account. Potrai aggiungerlo di nuovo.</p>
+      {/* Shown inside the modal: anything behind it is not visible while it is open. */}
+      {remove.error ? <ErrorAlert error={remove.error} /> : null}
     </ConfirmDialog>
   </div>;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { normalUser, renderApp } from '../../test/render';
@@ -47,6 +47,25 @@ describe('Musica', () => {
     dialog.remove();
     fireEvent.click(screen.getByRole('button', { name: 'Ferma e chiudi musica' }));
     expect(document.querySelector('iframe')).toBeNull();
+  });
+  it('shows a failed deletion inside the confirmation dialog', async () => {
+    mockMusic();
+    server.use(http.delete('*/api/me/music/:id', () => HttpResponse.json({ code: 'INTERNAL_ERROR' }, { status: 500 })));
+    renderApp('/app/music');
+    fireEvent.click(await screen.findByRole('button', { name: 'Elimina Energia' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Elimina' }));
+    expect(await within(dialog).findByText(/errore imprevisto/i)).toBeInTheDocument();
+  });
+  it('treats a link already removed elsewhere as deleted', async () => {
+    mockMusic();
+    server.use(http.delete('*/api/me/music/:id', () => HttpResponse.json({ code: 'NOT_FOUND' }, { status: 404 })));
+    renderApp('/app/music');
+    fireEvent.click(await screen.findByRole('button', { name: 'Elimina Energia' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Elimina' }));
+    await waitFor(() => expect(dialog).not.toHaveAttribute('open'));
+    expect(screen.queryByText('Elemento non trovato o non accessibile.')).not.toBeInTheDocument();
   });
   it('builds official video and playlist embeds without autoplay', () => {
     expect(embedUrl(entry, 'https://gym.test')).toContain('/embed/M7lc1UVf-VE?');

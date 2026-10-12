@@ -22,13 +22,13 @@ La CSP Nginx consente esclusivamente i domini necessari al player: script `www.y
 
 ## Backend
 
-Migrazione Flyway V22 crea `music_entries`; non modifica tabelle di allenamenti, serie e recuperi. Vincolo univoco per account/tipo/ID YouTube. La cancellazione dell’account elimina anche i suoi link.
+Migrazione Flyway V22 crea `music_entries`; non modifica tabelle di allenamenti, serie e recuperi. Vincolo univoco per account/tipo/ID YouTube. Massimo 200 link per account (422 `MUSIC_LIMIT_REACHED`, controllo sotto `UserLock`). Gli account sono eliminati solo logicamente (ADR 0010), quindi il `ON DELETE CASCADE` non scatta mai: i link vengono cancellati dal modulo `music` alla ricezione di `UserEvents.UserDeleted`.
 
 API protette dalla sessione e dal ruolo USER:
 
 - GET `/api/me/music`: lista personale.
 - POST `/api/me/music`: `{ "title": "...", "url": "https://..." }`.
-- DELETE `/api/me/music/{id}`: elimina soltanto un proprio elemento; 404 per ID di altri utenti.
+- DELETE `/api/me/music/{id}`: elimina soltanto un proprio elemento; 404 per ID di altri utenti. Il frontend considera il 404 come già eliminato (es. da un altro dispositivo) e mostra gli altri errori dentro la finestra di conferma.
 
 Validazione server: HTTPS, host esatti, no credenziali/porte arbitrarie, identificatori verificati, nome non vuoto e massimo 120 caratteri, URL massimo 2048. Query parametrizzate. CSRF e protezioni di sessione esistenti restano applicate.
 
@@ -49,3 +49,11 @@ Validazione server: HTTPS, host esatti, no credenziali/porte arbitrarie, identif
 Test frontend: salvataggio tramite API, scelta senza modulo durante la sessione, continuità del player nei rerender, pausa sui dialoghi, chiusura, URL video/playlist e assenza di autoplay.
 
 Test backend: formati link e host malevoli; persistenza, duplicati, isolamento tra utenti, cancellazione, accesso anonimo/ADMIN e validazione. Il modulo `music` è incluso nelle regole ArchUnit. La pipeline Verify si attiva anche sui push del branch `musica` e controlla backend PostgreSQL, frontend e container Nginx.
+
+## Correzioni dopo la revisione
+
+- Eliminazione dell’account: i link e i titoli scritti dall’utente vengono rimossi (prima restavano nel database, perché l’eliminazione è logica).
+- Limite di 200 link per account: senza limite un utente poteva riempire il database e l’elenco, caricato senza paginazione.
+- Pagina Musica: l’errore di eliminazione era mostrato dietro la finestra di conferma (invisibile); ora è dentro la finestra. Un link già eliminato altrove non produce più un errore.
+- Messaggi tecnici del backend in inglese come nel resto dell’API; il testo per l’utente arriva dal codice (`MUSIC_DUPLICATE`, `MUSIC_LIMIT_REACHED`).
+- Nota sulla CSP: autorizzare `https://www.youtube.com` fra gli script è necessario per l’API ufficiale, ma amplia leggermente la superficie in caso di XSS. Restringerla ai soli percorsi `/iframe_api` e `/s/player/` è possibile, va però provata su un dispositivo reale prima del rilascio.

@@ -26,7 +26,8 @@ class ArchitectureTest {
     /** Allowed module -> module dependencies ({@code shared} is always allowed). */
     private static final Map<String, Set<String>> ALLOWED = Map.of(
             "identity", Set.of(),
-            "music", Set.of(),
+            // identity: personal links are removed when the account is deleted (ADR 0010).
+            "music", Set.of("identity"),
             "catalog", Set.of(),
             "workoutplan", Set.of("catalog"),
             "assignment", Set.of("identity", "workoutplan"),
