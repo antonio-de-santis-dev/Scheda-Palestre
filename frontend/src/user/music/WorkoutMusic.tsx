@@ -15,7 +15,7 @@ export function WorkoutMusic() {
       <h2 id="workout-music-title"><Music size={20} aria-hidden="true" /> Musica</h2>
       <QueryState isLoading={query.isLoading} error={query.error} onRetry={() => void query.refetch()}>
         {query.data?.length === 0 ? <p className="muted small">Nessun link salvato. Aggiungi canzoni e playlist nella sezione Musica prima dell’allenamento.</p> : null}
-        {query.data?.length ? <label className="music-choice">Scegli canzone o playlist
+        {query.data?.length ? <label className="music-choice"><span className="music-choice__label">Scegli canzone o playlist</span>
           <select className="input" value={selected?.id ?? ''} onChange={event => setSelected(query.data?.find(entry => entry.id === event.target.value) ?? null)}>
             <option value="">Seleziona dalla tua musica</option>
             {query.data.map(entry => <option key={entry.id} value={entry.id}>{entry.title} · {entry.kind === 'PLAYLIST' ? 'Playlist' : 'Video'}</option>)}
