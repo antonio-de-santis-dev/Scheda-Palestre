@@ -12,7 +12,7 @@ Branch: `musica`, creato da `delpy`. Nessun merge o deploy automatico su `delpy`
 
 Durante l’allenamento non vengono mostrati moduli per aggiungere o eliminare link. La gestione resta nella pagina Musica. Un link watch con parametro `list` viene salvato come playlist intera: per salvare il singolo video rimuovere `list` dal link. Supportati link watch, youtu.be, playlist, shorts, live e embed, anche da YouTube Music.
 
-I link sono personali e persistono nel database, disponibili su tutti i dispositivi dello stesso account. Non vengono scaricati file audio/video e non serve una chiave YouTube Data API. I nomi dei link salvati sono inseriti dall’utente. Aprendo l’elenco di una playlist, il browser recupera i titoli pubblici da YouTube oEmbed, senza cookie e soltanto per i 20 brani della pagina visibile. Nessuna richiesta server verso URL forniti dagli utenti.
+I link sono personali e persistono nel database, disponibili su tutti i dispositivi dello stesso account. Non vengono scaricati file audio/video e non serve una chiave YouTube Data API. I nomi dei link salvati sono inseriti dall’utente. Aprendo l’elenco di una playlist, il browser recupera i titoli pubblici da YouTube oEmbed, senza cookie e progressivamente per i brani dell’elenco, con al massimo quattro richieste contemporanee. Nessuna richiesta server verso URL forniti dagli utenti.
 
 ## Riproduzione e compatibilità
 
@@ -60,7 +60,7 @@ Test backend: formati link e host malevoli; persistenza, duplicati, isolamento t
 
 ## Scelta dei brani e riproduzione casuale
 
-Per una playlist, sotto il video compaiono **Casuale** e **Scegli un brano**. I controlli si attivano quando YouTube restituisce l’elenco, talvolta dopo il primo Play. L’elenco mostra i titoli disponibili, il brano attuale e pagine da 20 elementi. Se un titolo manca, resta il numero del brano; i contenuti privati o non incorporabili restano soggetti alle restrizioni di YouTube.
+Per una playlist, sotto il video compaiono **Casuale** e **Scegli un brano**. I controlli si attivano quando YouTube restituisce l’elenco, talvolta dopo il primo Play. L’elenco mostra i titoli disponibili, il brano attuale in un unico elenco scorrevole, senza paginazione. Se un titolo manca, resta il numero del brano; i contenuti privati o non incorporabili restano soggetti alle restrizioni di YouTube.
 
 **Casuale** usa `setShuffle` del player ufficiale: il brano corrente continua e cambia l’ordine dei successivi. Disattivando il pulsante torna l’ordine originale. La scelta del brano usa l’indice nell’ordine attuale, anche in modalità casuale. I cambi dai comandi nativi e l’avanzamento automatico aggiornano l’indicazione del brano. Il player non viene ricreato da questi controlli. Una nuova playlist riparte in modalità sequenziale.
 
@@ -70,7 +70,11 @@ Verifica manuale: aprire una playlist pubblica, premere Play, scegliere un brano
 
 ### Revisione dei controlli playlist (Claude Code)
 
-- Aprendo **Scegli un brano** l’elenco mostra la pagina del brano in riproduzione (prima ripartiva sempre dalla pagina 1, anche con il brano 43 in corso).
+- Aprendo **Scegli un brano** l’elenco porta in vista il brano in riproduzione (prima ripartiva sempre dalla pagina 1, anche con il brano 43 in corso).
 - Durante il caricamento del titolo il lettore di schermo annuncia "caricamento del titolo" invece di "titolo non disponibile".
 - Rimossi `previousVideo`/`nextVideo` dall’interfaccia del player: dopo la semplificazione dei controlli non erano più usati.
 - Da verificare su dispositivo reale (la rete dell’ambiente di revisione blocca YouTube): che `https://www.youtube.com/oembed` risponda con gli header CORS e senza reindirizzamenti (per esempio verso la pagina dei consensi UE). In caso contrario i titoli restano "Brano N": la scelta per numero continua a funzionare.
+
+### Elenco unico dei brani
+
+Rimossa la paginazione: tutti i brani restituiti dal player sono presenti nello stesso elenco, con la grafica e lo scorrimento interno già esistenti. Il brano attuale resta evidenziato e viene portato in vista aprendo l’elenco. I titoli vengono recuperati progressivamente con un massimo di quattro richieste contemporanee; un brano può essere scelto anche prima che arrivi il titolo.

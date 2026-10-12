@@ -4,7 +4,7 @@ import { Button } from '../../shared/components/Button';
 import type { MusicEntry } from './api';
 import { embedUrl } from './embed';
 import { loadYouTube, type YouTubePlayer as Player } from './youtube';
-import { TRACKS_PER_PAGE, useTrackTitles } from './playlist';
+import { useTrackTitles } from './playlist';
 
 type PlaylistState = { ids: string[]; index: number };
 const EMPTY_PLAYLIST: PlaylistState = { ids: [], index: -1 };
@@ -18,12 +18,18 @@ export function YouTubePlayer({ entry }: { entry: MusicEntry }) {
   const [playlist, setPlaylist] = useState<PlaylistState>(EMPTY_PLAYLIST);
   const [shuffle, setShuffle] = useState(false);
   const [listOpen, setListOpen] = useState(false);
-  const [page, setPage] = useState(0);
-  const pageCount = Math.max(1, Math.ceil(playlist.ids.length / TRACKS_PER_PAGE));
-  const safePage = Math.min(page, pageCount - 1);
-  const start = safePage * TRACKS_PER_PAGE;
-  const visibleIds = playlist.ids.slice(start, start + TRACKS_PER_PAGE);
-  const titles = useTrackTitles(visibleIds, listOpen);
+  const tracksList = useRef<HTMLOListElement>(null);
+  const titles = useTrackTitles(playlist.ids, listOpen);
+
+  useEffect(() => {
+    if (!listOpen) return;
+    const list = tracksList.current;
+    const current = list?.querySelector<HTMLElement>('[aria-current="true"]');
+    if (list && current) {
+      // Keep Claude's current-track shortcut without paging or scrolling the whole page.
+      list.scrollTop += current.getBoundingClientRect().top - list.getBoundingClientRect().top;
+    }
+  }, [listOpen, playlist.index]);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,30 +122,19 @@ export function YouTubePlayer({ entry }: { entry: MusicEntry }) {
       {loaded ? <>
         <p className="small muted">{playlist.index >= 0 ? `Brano ${playlist.index + 1} di ${playlist.ids.length}` : `${playlist.ids.length} brani`}
           {shuffle ? ' · Ordine casuale' : ' · Ordine della playlist'}</p>
-        <details className="playlist-picker" onToggle={event => {
-          const open = event.currentTarget.open;
-          setListOpen(open);
-          // Opening the list shows the page of the track that is playing, not always the first one.
-          if (open && playlist.index >= 0) setPage(Math.floor(playlist.index / TRACKS_PER_PAGE));
-        }}>
+        <details className="playlist-picker" onToggle={event => setListOpen(event.currentTarget.open)}>
           <summary>Scegli un brano ({playlist.ids.length})</summary>
           {listOpen ? <>
-            <ol className="playlist-tracks" start={start + 1} aria-label="Brani della playlist">
-              {visibleIds.map((id, offset) => {
-                const index = start + offset;
+            <ol ref={tracksList} className="playlist-tracks" aria-label="Brani della playlist">
+              {playlist.ids.map((id, index) => {
                 return <li key={`${index}:${id}`}><button type="button" className="playlist-track" aria-current={index === playlist.index ? 'true' : undefined}
-                  aria-label={`Brano ${index + 1}: ${titles[offset]?.data ?? (titles[offset]?.isLoading ? 'caricamento del titolo' : 'titolo non disponibile')}`} onClick={() => play(player => player.playVideoAt(index))}>
+                  aria-label={`Brano ${index + 1}: ${titles[index]?.data ?? (titles[index]?.isLoading ? 'caricamento del titolo' : 'titolo non disponibile')}`} onClick={() => play(player => player.playVideoAt(index))}>
                   <span className="playlist-track__number">{index + 1}</span>
-                  <span>{titles[offset]?.data ?? `Brano ${index + 1}`}</span>
+                  <span>{titles[index]?.data ?? `Brano ${index + 1}`}</span>
                   {index === playlist.index ? <span className="playlist-track__current">Attuale</span> : null}
                 </button></li>;
               })}
             </ol>
-            {pageCount > 1 ? <div className="playlist-pages">
-              <Button variant="ghost" size="sm" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>Pagina precedente</Button>
-              <span className="small">{safePage + 1}/{pageCount}</span>
-              <Button variant="ghost" size="sm" disabled={safePage === pageCount - 1} onClick={() => setPage(safePage + 1)}>Pagina successiva</Button>
-            </div> : null}
             <p className="small muted">Se un titolo non è disponibile, puoi scegliere il brano dal suo numero.</p>
           </> : null}
         </details>

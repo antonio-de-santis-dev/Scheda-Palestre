@@ -115,7 +115,7 @@ describe('controlli playlist', () => {
     fireEvent.click(within(await screen.findByRole('list', { name: 'Brani della playlist' })).getAllByRole('button')[1]!);
     expect(handle.player!.playVideoAt).toHaveBeenCalledWith(1);
   });
-  it('opens the track list on the page of the current track', async () => {
+  it('shows every track in one list and highlights the current track', async () => {
     initialIds = Array.from({ length: 45 }, (_, i) => `video${String(i).padStart(6, '0')}`);
     show();
     await screen.findByText('Brano 1 di 45 · Ordine della playlist');
@@ -123,18 +123,19 @@ describe('controlli playlist', () => {
     await screen.findByText('Brano 43 di 45 · Ordine della playlist');
     fireEvent.click(screen.getByText('Scegli un brano (45)'));
     const tracks = await screen.findByRole('list', { name: 'Brani della playlist' });
-    expect(tracks).toHaveAttribute('start', '41');
+    expect(within(tracks).getAllByRole('button')).toHaveLength(45);
     expect(within(tracks).getByText('Attuale')).toBeInTheDocument();
-    expect(screen.getByText('3/3')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Pagina successiva' })).not.toBeInTheDocument();
   });
-  it('paginates longer playlists using the actual playlist index', async () => {
+  it('selects a track beyond the former first page directly from the complete list', async () => {
     initialIds = Array.from({ length: 21 }, (_, i) => `video${String(i).padStart(6, '0')}`);
     show();
     await screen.findByText('Brano 1 di 21 · Ordine della playlist');
     fireEvent.click(screen.getByText('Scegli un brano (21)'));
-    fireEvent.click(await screen.findByRole('button', { name: 'Pagina successiva' }));
-    await waitFor(() => expect(within(screen.getByRole('list', { name: 'Brani della playlist' })).getAllByRole('button')).toHaveLength(1));
-    fireEvent.click(within(screen.getByRole('list', { name: 'Brani della playlist' })).getAllByRole('button')[0]!);
+    const tracks = await screen.findByRole('list', { name: 'Brani della playlist' });
+    expect(within(tracks).getAllByRole('button')).toHaveLength(21);
+    expect(screen.queryByRole('button', { name: 'Pagina precedente' })).not.toBeInTheDocument();
+    fireEvent.click(within(tracks).getAllByRole('button')[20]!);
     expect(handle.player!.playVideoAt).toHaveBeenCalledWith(20);
   });
   it('does not add playlist controls to individual songs and clears shuffle on another playlist', async () => {
