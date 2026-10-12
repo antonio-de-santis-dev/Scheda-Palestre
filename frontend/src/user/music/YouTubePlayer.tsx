@@ -39,6 +39,6 @@ export function YouTubePlayer({ entry }: { entry: MusicEntry }) {
       window.removeEventListener('pagehide', pause);
       player?.destroy();
     };
-  }, [entry.id, entry.title, entry.kind, entry.youtubeId]);
+  }, [entry]);
   return <><div ref={container} className="music-player" />{error ? <p role="alert">{error}</p> : null}</>;
 }
