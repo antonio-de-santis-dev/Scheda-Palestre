@@ -23,7 +23,7 @@ export function YouTubePlayer({ entry }: { entry: MusicEntry }) {
       frame.src = embedUrl(entry, window.location.origin);
       frame.allow = 'autoplay; encrypted-media; fullscreen';
       frame.allowFullscreen = true;
-      frame.referrerPolicy = 'strict-origin-when-cross-origin';
+      frame.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
       container.current.append(frame);
       player = new api.Player(frame, { events: {
         onReady: visibility,

@@ -19,7 +19,7 @@ export function loadYouTube(): Promise<YouTubeApi> {
   pending = new Promise((resolve, reject) => {
     const script = document.createElement('script');
     script.src = 'https://www.youtube.com/iframe_api';
-    script.referrerPolicy = 'strict-origin-when-cross-origin';
+    script.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
     const previous = window.onYouTubeIframeAPIReady;
     const timer = window.setTimeout(() => fail(), 15000);
     const fail = () => {
