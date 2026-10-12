@@ -21,11 +21,13 @@ class ArchitectureTest {
 
     private static final String BASE = "com.gymplanner";
     private static final List<String> MODULES =
-            List.of("identity", "catalog", "workoutplan", "assignment", "calendar", "execution");
+            List.of("identity", "catalog", "workoutplan", "assignment", "calendar", "execution", "music");
 
     /** Allowed module -> module dependencies ({@code shared} is always allowed). */
     private static final Map<String, Set<String>> ALLOWED = Map.of(
             "identity", Set.of(),
+            // identity: personal links are removed when the account is deleted (ADR 0010).
+            "music", Set.of("identity"),
             "catalog", Set.of(),
             "workoutplan", Set.of("catalog"),
             "assignment", Set.of("identity", "workoutplan"),

@@ -1,4 +1,4 @@
-import { CalendarCheck, CalendarDays, ClipboardList, Dumbbell, History, LayoutDashboard, Sun, UserRound, Users } from 'lucide-react';
+import { CalendarCheck, CalendarDays, ClipboardList, Dumbbell, History, LayoutDashboard, Music, Sun, UserRound, Users } from 'lucide-react';
 import type { ComponentType } from 'react';
 import type { NavItem } from '../layouts/AppLayout';
 
@@ -14,6 +14,7 @@ export const USER_NAV: NavItem[] = [
   { to: '/app/today', label: 'Oggi', icon: Sun },
   { to: '/app/calendar', label: 'Calendario', icon: CalendarDays },
   { to: '/app/plans', label: 'Schede', icon: ClipboardList },
+  { to: '/app/music', label: 'Musica', icon: Music, mobile: false },
   { to: '/app/schedule', label: 'Giorni', icon: CalendarCheck, mobile: false },
   { to: '/app/history', label: 'Storico', icon: History },
   { to: '/app/profile', label: 'Profilo', icon: UserRound },
