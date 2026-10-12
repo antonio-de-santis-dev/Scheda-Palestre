@@ -67,3 +67,10 @@ Per una playlist, sotto il video compaiono **Casuale** e **Scegli un brano**. I 
 L’elenco è inizialmente chiuso per mantenere compatta la vista mobile. Scegliendo un brano il video viene riportato in vista; restano le pause su finestra di conferma e pagina nascosta. Lo scorrimento nella stessa pagina non mette più in pausa il video. Per cambiare brano si possono usare l’elenco e i comandi nativi di YouTube.
 
 Verifica manuale: aprire una playlist pubblica, premere Play, scegliere un brano dall’elenco, attivare Casuale e passare al successivo. Disattivare Casuale e controllare l’ordine ripristinato. Provare anche i comandi nativi, una playlist lunga e un titolo non disponibile. Le correzioni della revisione Claude Code (limite link, eliminazione account, errori nel dialogo) restano applicate.
+
+### Revisione dei controlli playlist (Claude Code)
+
+- Aprendo **Scegli un brano** l’elenco mostra la pagina del brano in riproduzione (prima ripartiva sempre dalla pagina 1, anche con il brano 43 in corso).
+- Durante il caricamento del titolo il lettore di schermo annuncia "caricamento del titolo" invece di "titolo non disponibile".
+- Rimossi `previousVideo`/`nextVideo` dall’interfaccia del player: dopo la semplificazione dei controlli non erano più usati.
+- Da verificare su dispositivo reale (la rete dell’ambiente di revisione blocca YouTube): che `https://www.youtube.com/oembed` risponda con gli header CORS e senza reindirizzamenti (per esempio verso la pagina dei consensi UE). In caso contrario i titoli restano "Brano N": la scelta per numero continua a funzionare.

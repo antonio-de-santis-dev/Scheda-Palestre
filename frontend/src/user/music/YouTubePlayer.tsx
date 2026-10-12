@@ -116,14 +116,19 @@ export function YouTubePlayer({ entry }: { entry: MusicEntry }) {
       {loaded ? <>
         <p className="small muted">{playlist.index >= 0 ? `Brano ${playlist.index + 1} di ${playlist.ids.length}` : `${playlist.ids.length} brani`}
           {shuffle ? ' · Ordine casuale' : ' · Ordine della playlist'}</p>
-        <details className="playlist-picker" onToggle={event => setListOpen(event.currentTarget.open)}>
+        <details className="playlist-picker" onToggle={event => {
+          const open = event.currentTarget.open;
+          setListOpen(open);
+          // Opening the list shows the page of the track that is playing, not always the first one.
+          if (open && playlist.index >= 0) setPage(Math.floor(playlist.index / TRACKS_PER_PAGE));
+        }}>
           <summary>Scegli un brano ({playlist.ids.length})</summary>
           {listOpen ? <>
             <ol className="playlist-tracks" start={start + 1} aria-label="Brani della playlist">
               {visibleIds.map((id, offset) => {
                 const index = start + offset;
                 return <li key={`${index}:${id}`}><button type="button" className="playlist-track" aria-current={index === playlist.index ? 'true' : undefined}
-                  aria-label={`Brano ${index + 1}: ${titles[offset]?.data ?? 'Titolo non disponibile'}`} onClick={() => play(player => player.playVideoAt(index))}>
+                  aria-label={`Brano ${index + 1}: ${titles[offset]?.data ?? (titles[offset]?.isLoading ? 'caricamento del titolo' : 'titolo non disponibile')}`} onClick={() => play(player => player.playVideoAt(index))}>
                   <span className="playlist-track__number">{index + 1}</span>
                   <span>{titles[offset]?.data ?? `Brano ${index + 1}`}</span>
                   {index === playlist.index ? <span className="playlist-track__current">Attuale</span> : null}

@@ -20,8 +20,6 @@ class FakePlayer {
   pauseVideo = vi.fn();
   setShuffle = vi.fn((enabled: boolean) => { this.order = enabled ? [...initialIds].reverse() : [...initialIds]; });
   playVideoAt = vi.fn((index: number) => { this.index = index; this.changed(); });
-  nextVideo = vi.fn(() => { this.index = (this.index + 1) % this.order.length; this.changed(); });
-  previousVideo = vi.fn(() => { this.index = (this.index - 1 + this.order.length) % this.order.length; this.changed(); });
   private frame: HTMLIFrameElement;
   private options: Options;
   constructor(frame: HTMLIFrameElement, options: Options) {
@@ -116,6 +114,18 @@ describe('controlli playlist', () => {
     fireEvent.click(screen.getByText('Scegli un brano (3)'));
     fireEvent.click(within(await screen.findByRole('list', { name: 'Brani della playlist' })).getAllByRole('button')[1]!);
     expect(handle.player!.playVideoAt).toHaveBeenCalledWith(1);
+  });
+  it('opens the track list on the page of the current track', async () => {
+    initialIds = Array.from({ length: 45 }, (_, i) => `video${String(i).padStart(6, '0')}`);
+    show();
+    await screen.findByText('Brano 1 di 45 · Ordine della playlist');
+    act(() => { handle.player!.index = 42; handle.player!.changed(); });
+    await screen.findByText('Brano 43 di 45 · Ordine della playlist');
+    fireEvent.click(screen.getByText('Scegli un brano (45)'));
+    const tracks = await screen.findByRole('list', { name: 'Brani della playlist' });
+    expect(tracks).toHaveAttribute('start', '41');
+    expect(within(tracks).getByText('Attuale')).toBeInTheDocument();
+    expect(screen.getByText('3/3')).toBeInTheDocument();
   });
   it('paginates longer playlists using the actual playlist index', async () => {
     initialIds = Array.from({ length: 21 }, (_, i) => `video${String(i).padStart(6, '0')}`);

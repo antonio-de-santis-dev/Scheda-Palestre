@@ -4,8 +4,6 @@ export interface YouTubePlayer {
   getPlaylist(): string[] | undefined;
   getPlaylistIndex(): number;
   playVideoAt(index: number): void;
-  previousVideo(): void;
-  nextVideo(): void;
   setShuffle(enabled: boolean): void;
 }
 interface PlayerOptions {

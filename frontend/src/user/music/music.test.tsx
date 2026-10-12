@@ -8,7 +8,7 @@ import { embedUrl } from './embed';
 import { loadYouTube } from './youtube';
 vi.mock('./youtube', () => ({ loadYouTube: vi.fn() }));
 const pause = vi.fn();
-vi.mocked(loadYouTube).mockResolvedValue({ Player: class { pauseVideo = pause; getPlaylist() { return []; } getPlaylistIndex() { return -1; } playVideoAt = vi.fn(); previousVideo = vi.fn(); nextVideo = vi.fn(); setShuffle = vi.fn(); destroy() { document.querySelector('iframe')?.remove(); } } });
+vi.mocked(loadYouTube).mockResolvedValue({ Player: class { pauseVideo = pause; getPlaylist() { return []; } getPlaylistIndex() { return -1; } playVideoAt = vi.fn(); setShuffle = vi.fn(); destroy() { document.querySelector('iframe')?.remove(); } } });
 import { AppProviders } from '../../app/providers/AppProviders';
 import { testQueryClient } from '../../test/render';
 
