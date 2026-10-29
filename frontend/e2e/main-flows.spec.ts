@@ -63,9 +63,9 @@ async function addGroup(page: Page, name: string) {
   await page.goto('/admin/catalog');
   await page.getByLabel(/^Nuovo gruppo muscolare/).fill(name);
   await page.getByRole('button', { name: 'Aggiungi gruppo' }).click();
-  // The list is paginated alphabetically: search the new name so it is on the first page.
-  await page.getByLabel('Cerca gruppo').fill(name);
-  await expect(page.getByRole('list', { name: 'Elenco gruppi muscolari' }).getByText(name, { exact: true })).toBeVisible();
+  // The new group opens right away (the list is paginated: it could be on another page).
+  await expect(page.getByLabel(new RegExp(`^Nuovo esercizio in ${name}`))).toBeVisible();
+  await expect(page).toHaveURL(/[?&]group=/);
 }
 
 async function addExercisesToGroup(page: Page, group: string, exercises: string[]) {
