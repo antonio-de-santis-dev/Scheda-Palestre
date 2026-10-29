@@ -8,6 +8,7 @@ import { PasswordField, TextField } from '../shared/components/Field';
 import { ErrorAlert } from '../shared/components/Alert';
 import { LoadingState } from '../shared/components/States';
 import { BrandMark } from '../app/layouts/BrandMark';
+import { ThemeToggle } from '../shared/components/ThemeToggle';
 import { homePathFor, useCurrentUser, useLogin } from './useAuth';
 
 const schema = z.object({
@@ -49,12 +50,10 @@ export function LoginPage() {
 
   return (
     <main className="auth-page">
+      <div className="auth-layout"><div className="auth-card__brand"><BrandMark />GymPlanner</div>
       <div className="card auth-card">
-        <div className="auth-card__brand">
-          <BrandMark />
-          GymPlanner
-        </div>
-        <h1>Accedi</h1>
+
+        <h1>Bentornato</h1>
         <p className="muted">Usa le credenziali ricevute dalla palestra.</p>
         <form className="form" onSubmit={onSubmit} noValidate>
           {login.error ? <ErrorAlert error={login.error} /> : null}
@@ -78,7 +77,8 @@ export function LoginPage() {
             Accedi
           </Button>
         </form>
-      </div>
+        <p className="small muted auth-help">Al primo accesso ti chiederemo di creare una nuova password.</p>
+      </div><div className="auth-theme"><ThemeToggle /></div></div>
     </main>
   );
 }

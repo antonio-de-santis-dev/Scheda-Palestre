@@ -56,6 +56,14 @@ class UserAndPasswordPolicyTest {
     }
 
     @Test
+    void bcryptBoundaryIncludesUtf8Bytes() {
+        assertThat(PasswordPolicy.isValid("a1" + "a".repeat(70))).isTrue();
+        assertThat(PasswordPolicy.isValid("a1" + "a".repeat(71))).isFalse();
+        assertThat(PasswordPolicy.isValid("é".repeat(35) + "a1")).isTrue();
+        assertThat(PasswordPolicy.isValid("é".repeat(36) + "a1")).isFalse();
+    }
+
+    @Test
     void passwordPolicy() {
         assertThat(PasswordPolicy.isValid("abc12345")).isTrue();
         assertThat(PasswordPolicy.isValid("abcdefgh")).isFalse();

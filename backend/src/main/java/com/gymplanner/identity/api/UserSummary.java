@@ -4,7 +4,7 @@ import java.util.UUID;
 
 /** Public, non-sensitive view of an account for other modules. */
 public record UserSummary(UUID id, String firstName, String lastName, String username, String email,
-        UserRole role, boolean active) {
+        UserRole role, boolean active, boolean deleted) {
 
     public String fullName() {
         return firstName + " " + lastName;

@@ -5,6 +5,8 @@ import com.gymplanner.execution.internal.WorkoutDtos.WorkoutState;
 import com.gymplanner.shared.security.AuthenticatedUser;
 import com.gymplanner.shared.web.PageResponse;
 import com.gymplanner.shared.web.Paging;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -25,15 +27,13 @@ import org.springframework.web.bind.annotation.RestController;
 /** USER execution endpoints (spec 13.6). The user always comes from the session. */
 @RestController
 @RequestMapping("/api/me")
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class WorkoutController {
 
     private final WorkoutService workouts;
     private final TodayService today;
-
-    WorkoutController(WorkoutService workouts, TodayService today) {
-        this.workouts = workouts;
-        this.today = today;
-    }
+    private final WorkoutHistoryStatsService historyStats;
+    private final WorkoutRecordsService records;
 
     @GetMapping("/today")
     TodayService.TodayResponse today(@AuthenticationPrincipal AuthenticatedUser user,
@@ -63,9 +63,38 @@ class WorkoutController {
 
     @GetMapping("/workouts")
     PageResponse<WorkoutDtos.WorkoutSummary> history(@AuthenticationPrincipal AuthenticatedUser user,
-            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
-        Sort sort = Sort.by(Sort.Order.desc("scheduledDate"), Sort.Order.desc("startedAt"));
-        return PageResponse.of(workouts.history(user.id(), Paging.of(page, size, sort)), s -> s);
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) WorkoutStatus status,
+            @RequestParam(required = false) String q) {
+        Sort sort = Sort.by(Sort.Order.desc("scheduledDate"), Sort.Order.desc("startedAt"), Sort.Order.desc("id"));
+        return PageResponse.of(workouts.history(user.id(), Paging.of(page, size, sort),
+                new WorkoutHistoryFilter(from, to, status, q)), s -> s);
+    }
+
+    @GetMapping("/workout-stats")
+    WorkoutHistoryStatsService.HistoryStats stats(@AuthenticationPrincipal AuthenticatedUser user,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) WorkoutStatus status, @RequestParam(required = false) String q) {
+        return historyStats.get(user.id(), new WorkoutHistoryFilter(from, to, status, q));
+    }
+
+    @GetMapping("/workout-progress")
+    List<WorkoutHistoryStatsService.MonthlyProgress> progress(@AuthenticationPrincipal AuthenticatedUser user,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) WorkoutStatus status, @RequestParam(required = false) String q) {
+        return historyStats.progress(user.id(), new WorkoutHistoryFilter(from, to, status, q));
+    }
+
+    @GetMapping("/workout-records")
+    List<WorkoutRecordsService.ExerciseRecords> records(@AuthenticationPrincipal AuthenticatedUser user,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) WorkoutStatus status, @RequestParam(required = false) String q) {
+        return records.get(user.id(), new WorkoutHistoryFilter(from, to, status, q));
     }
 
     /** Full state of one of the user's workouts (resume after reload, history detail). */
@@ -76,14 +105,32 @@ class WorkoutController {
 
     @PostMapping("/workouts/{id}/sets/{setId}/complete")
     WorkoutState completeSet(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id,
-            @PathVariable UUID setId) {
-        return workouts.completeSet(user.id(), id, setId);
+            @PathVariable UUID setId, @Valid @RequestBody(required = false) WorkoutDtos.CompleteSetRequest request) {
+        return workouts.completeSet(user.id(), id, setId, request);
+    }
+
+    @PostMapping("/workouts/{id}/sets/{setId}/results")
+    WorkoutState recordSetResults(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id,
+            @PathVariable UUID setId, @Valid @RequestBody WorkoutDtos.RecordSetResultsRequest request) {
+        return workouts.recordSetResults(user.id(), id, setId, request);
     }
 
     @PostMapping("/workouts/{id}/exercises/{exerciseId}/skip")
     WorkoutState skip(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id,
             @PathVariable UUID exerciseId) {
         return workouts.skipExercise(user.id(), id, exerciseId);
+    }
+
+    @PostMapping("/workouts/{id}/exercises/reorder")
+    WorkoutState reorder(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id,
+            @Valid @RequestBody WorkoutDtos.ReorderExercisesRequest body) {
+        return workouts.reorderExercises(user.id(), id, body);
+    }
+
+    @PostMapping("/workouts/{id}/rest")
+    WorkoutState changeRest(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id,
+            @Valid @RequestBody WorkoutDtos.RestRequest body) {
+        return workouts.changeRest(user.id(), id, body);
     }
 
     @PostMapping("/workouts/{id}/interrupt")

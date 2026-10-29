@@ -35,7 +35,13 @@ public class WorkoutExercise {
     @Column(name = "plan_exercise_id", updatable = false)
     private UUID planExerciseId;
 
-    @Column(nullable = false, updatable = false)
+    @Column(updatable = false)
+    private UUID catalogExerciseId;
+
+    @Column(updatable = false)
+    private UUID legacyExerciseId;
+
+    @Column(nullable = false)
     private int position;
 
     @Enumerated(EnumType.STRING)
@@ -58,10 +64,12 @@ public class WorkoutExercise {
     protected WorkoutExercise() {
     }
 
-    WorkoutExercise(Workout workout, UUID planExerciseId, int position, String exerciseNameSnapshot,
+    WorkoutExercise(Workout workout, UUID planExerciseId, UUID catalogExerciseId, int position, String exerciseNameSnapshot,
             String muscleGroupNameSnapshot) {
         this.workout = workout;
         this.planExerciseId = planExerciseId;
+        this.catalogExerciseId = catalogExerciseId;
+        this.legacyExerciseId = planExerciseId;
         this.position = position;
         this.exerciseNameSnapshot = exerciseNameSnapshot;
         this.muscleGroupNameSnapshot = muscleGroupNameSnapshot;
@@ -76,6 +84,14 @@ public class WorkoutExercise {
     /** First set not completed yet: the only one that can be completed next. */
     Optional<WorkoutSet> nextSet() {
         return sets.stream().filter(s -> !s.isCompleted()).findFirst();
+    }
+
+    void moveTo(int position) {
+        this.position = position;
+    }
+
+    void markTodo() {
+        this.status = WorkoutExerciseStatus.TODO;
     }
 
     void markInProgress() {
@@ -100,6 +116,15 @@ public class WorkoutExercise {
 
     public UUID getPlanExerciseId() {
         return planExerciseId;
+    }
+
+    /** Names and mutable plan/catalog relationships never participate in history grouping. */
+    WorkoutDtos.ExerciseIdentity historicalIdentity() {
+        if (catalogExerciseId != null) {
+            return new WorkoutDtos.ExerciseIdentity(WorkoutDtos.IdentitySource.CATALOG, catalogExerciseId);
+        }
+        return new WorkoutDtos.ExerciseIdentity(WorkoutDtos.IdentitySource.LEGACY,
+                legacyExerciseId == null ? id : legacyExerciseId);
     }
 
     public int getPosition() {

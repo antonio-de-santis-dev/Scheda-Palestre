@@ -5,9 +5,22 @@ import type { PlanSession } from '../../shared/api/planTypes';
 
 export type WorkoutStatus = 'IN_PROGRESS' | 'COMPLETED' | 'INTERRUPTED';
 export type ExerciseStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED';
+export type RestAction = 'PAUSE' | 'RESUME' | 'EXTEND' | 'SKIP';
+export interface RestRequest { action: RestAction; expectedVersion: number; expectedExecutionVersion: number }
+
 export type NextAction = 'COMPLETE_SET' | 'WAIT_FOR_REST' | 'FINISHED';
 
-export interface WorkoutSetState {
+export interface VolumeSummary {
+  recordedKgReps: number | null;
+  completedSets: number;
+  recordedSets: number;
+  missingWeightSets: number;
+  missingRepsSets: number;
+}
+
+export interface SetResults { weightKgUsed: number | null; repsActual: number | null }
+
+export interface WorkoutSetState extends SetResults {
   id: string;
   setIndex: number;
   repsPlanned: number;
@@ -16,7 +29,11 @@ export interface WorkoutSetState {
   completedAt: string | null;
 }
 
+export interface ExerciseIdentity { source: 'CATALOG' | 'LEGACY'; id: string }
+
 export interface WorkoutExerciseState {
+  identity: ExerciseIdentity;
+  volume: VolumeSummary;
   id: string;
   position: number;
   status: ExerciseStatus;
@@ -27,19 +44,30 @@ export interface WorkoutExerciseState {
   sets: WorkoutSetState[];
 }
 
+export interface RecordSetResultsRequest { results: SetResults; expectedExecutionVersion: number; expectedRestVersion: number }
+
 export interface WorkoutState {
+  resultEntrySetId: string | null;
+  finalResultEndsAt: string | null;
   workoutId: string;
+  executionVersion: number;
   status: WorkoutStatus;
   scheduledDate: string;
   planName: string;
   sessionTitle: string;
   startedAt: string;
   finishedAt: string | null;
+  /** Final seconds calculated by the backend from persisted start/end instants. */
+  durationSeconds: number | null;
+  volume: VolumeSummary;
   exercises: WorkoutExerciseState[];
   currentExerciseId: string | null;
   currentSetId: string | null;
   restEndsAt: string | null;
   restSeconds: number | null;
+  restPaused: boolean;
+  restRemainingMillis: number;
+  restVersion: number;
   serverTime: string;
   nextAction: NextAction;
   /** Client clock when the response arrived: used to compute the server/client offset. */
@@ -54,6 +82,9 @@ export interface WorkoutSummary {
   sessionTitle: string;
   startedAt: string;
   finishedAt: string | null;
+  /** Final seconds calculated by the backend from persisted start/end instants. */
+  durationSeconds: number | null;
+  volume: VolumeSummary;
   totalExercises: number;
   completedExercises: number;
   skippedExercises: number;
@@ -76,14 +107,25 @@ export interface Today {
   session: PlanSession | null;
   workout: WorkoutSummary | null;
   pendingWorkout: WorkoutSummary | null;
-  nextTraining: { date: string; sessionTitle: string } | null;
+  nextTraining: { date: string; sessionTitle: string; planName: string } | null;
   canStart: boolean;
+  /** A USER can have several active plans (ADR 0008). */
+  activePlanCount: number;
+  /** Active plans that still have no weekdays: the USER is guided to choose them. */
+  plansWithoutDays: { assignmentId: string; planName: string }[];
+  /** Active plans past their recommended duration (informative, ADR 0009). */
+  recommendedDurationEnded: { assignmentId: string; planName: string; expiresOn: string; ended: boolean }[];
 }
 
 export interface CalendarDay {
   date: string;
   type: 'TRAINING' | 'REST' | 'NONE';
   sessionTitle: string | null;
+  /** Stable session identity; titles may be duplicated or renamed. */
+  sessionId: string | null;
+  /** Plan that trains on that day (null on rest days). */
+  assignmentId: string | null;
+  planName: string | null;
   workout: WorkoutSummary | null;
 }
 
@@ -97,34 +139,40 @@ export const workoutKeys = {
 };
 
 export const workoutApi = {
-  today: (date: string) => http.get<Today>('/api/me/today', { date }),
-  calendar: (from: string, to: string) => http.get<CalendarDay[]>('/api/me/calendar', { from, to }),
+  today: (date: string, signal?: AbortSignal) => http.get<Today>('/api/me/today', { date }, signal),
+  calendar: (from: string, to: string, signal?: AbortSignal) => http.get<CalendarDay[]>('/api/me/calendar', { from, to }, signal),
   start: async (date: string) => stamp(await http.post<RawState>('/api/me/workouts', { date })),
-  get: async (id: string) => stamp(await http.get<RawState>(`/api/me/workouts/${id}`)),
-  completeSet: async (workoutId: string, setId: string) =>
-    stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/sets/${setId}/complete`)),
+  get: async (id: string, signal?: AbortSignal) => stamp(await http.get<RawState>(`/api/me/workouts/${id}`, undefined, signal)),
+  completeSet: async (workoutId: string, setId: string, results: SetResults) =>
+    stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/sets/${setId}/complete`, results)),
+  recordResults: async (workoutId: string, setId: string, request: RecordSetResultsRequest) =>
+    stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/sets/${setId}/results`, request)),
   skip: async (workoutId: string, exerciseId: string) =>
     stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/exercises/${exerciseId}/skip`)),
+  reorder: async (workoutId: string, exerciseIds: string[], expectedVersion: number) =>
+    stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/exercises/reorder`, { exerciseIds, expectedVersion })),
+  changeRest: async (workoutId: string, request: RestRequest) =>
+    stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/rest`, request)),
   interrupt: async (workoutId: string) => stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/interrupt`)),
 };
 
 export function useToday(date: string) {
-  return useQuery({ queryKey: workoutKeys.today(date), queryFn: () => workoutApi.today(date) });
+  return useQuery({ queryKey: workoutKeys.today(date), queryFn: ({ signal }) => workoutApi.today(date, signal) });
 }
 
 export function useCalendar(from: string, to: string) {
-  return useQuery({ queryKey: workoutKeys.calendar(from, to), queryFn: () => workoutApi.calendar(from, to) });
+  return useQuery({ queryKey: workoutKeys.calendar(from, to), queryFn: ({ signal }) => workoutApi.calendar(from, to, signal) });
 }
 
 export function useWorkout(id: string) {
-  return useQuery({ queryKey: workoutKeys.workout(id), queryFn: () => workoutApi.get(id), staleTime: 0 });
+  return useQuery({ queryKey: workoutKeys.workout(id), queryFn: ({ signal }) => workoutApi.get(id, signal), staleTime: 0 });
 }
 
 /** Retries only transport failures: used for idempotent actions (Fine serie, skip, interrupt). */
 const retryNetwork = (failureCount: number, error: unknown) => failureCount < 3 && isApiError(error) && error.isNetwork;
 
 /** Errors meaning "the screen is stale": the state is reloaded from the server. */
-export const STALE_STATE_CODES = ['SET_NOT_CURRENT', 'WORKOUT_NOT_IN_PROGRESS', 'EXERCISE_NOT_IN_PROGRESS'];
+export const STALE_STATE_CODES = ['SET_RESULTS_WINDOW_CLOSED', 'SET_RESULTS_CHANGED', 'REST_STATE_CHANGED', 'REST_NOT_ACTIVE', 'REST_ALREADY_PAUSED', 'REST_NOT_PAUSED', 'SET_NOT_CURRENT', 'WORKOUT_NOT_IN_PROGRESS', 'EXERCISE_NOT_IN_PROGRESS', 'REST_NOT_FINISHED', 'WORKOUT_STATE_CHANGED', 'INVALID_EXERCISE_ORDER'];
 
 export function useWorkoutAction<TArgs>(workoutId: string, fn: (args: TArgs) => Promise<WorkoutState>, idempotent: boolean) {
   const queryClient = useQueryClient();

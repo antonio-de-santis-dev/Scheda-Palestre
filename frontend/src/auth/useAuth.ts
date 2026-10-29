@@ -16,8 +16,9 @@ export function useLogin() {
   return useMutation({
     mutationFn: ({ username, password }: { username: string; password: string }) =>
       authApi.login(username, password),
-    onSuccess: (user) => {
-      // A new session starts: drop anything cached for a previous user.
+    onSuccess: async (user) => {
+      // Cancel in-flight reads before dropping data from a previous user.
+      await queryClient.cancelQueries();
       queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== AUTH_KEY[0] });
       queryClient.setQueryData<CurrentUser | null>(AUTH_KEY, user);
     },

@@ -38,6 +38,7 @@ class CatalogIntegrationTest {
     JdbcTemplate jdbc;
 
     AuthenticatedUser admin;
+    UUID groupId;
 
     @BeforeEach
     void setUp() {
@@ -46,11 +47,22 @@ class CatalogIntegrationTest {
 
     private String create(String base, String name) throws Exception {
         String json = mvc.perform(post(base).with(fixtures.as(admin)).with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"" + name + "\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content(body(base, name)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.active").value(true))
                 .andReturn().getResponse().getContentAsString();
         return JsonPath.read(json, "$.id");
+    }
+
+    /** Exercises always need their muscle group (ADR 0007). */
+    private String body(String base, String name) {
+        if (base.endsWith("/exercises")) {
+            if (groupId == null) {
+                groupId = fixtures.createMuscleGroup("Gruppo");
+            }
+            return "{\"name\":\"" + name + "\",\"muscleGroupId\":\"" + groupId + "\"}";
+        }
+        return "{\"name\":\"" + name + "\"}";
     }
 
     private static String unique(String prefix) {
@@ -70,7 +82,7 @@ class CatalogIntegrationTest {
 
         String renamed = unique("Pettorali");
         mvc.perform(put(base + "/" + id).with(fixtures.as(admin)).with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"" + renamed + "\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content(body(base, renamed)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value(renamed));
 
@@ -93,21 +105,29 @@ class CatalogIntegrationTest {
         String name = unique("Dorso");
         create(base, name);
         mvc.perform(post(base).with(fixtures.as(admin)).with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"" + name.toUpperCase() + "\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content(body(base, name.toUpperCase())))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("NAME_TAKEN"))
                 .andExpect(jsonPath("$.errors[0].field").value("name"));
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"muscle_groups", "exercises"})
-    void databaseEnforcesCaseInsensitiveUniqueness(String table) {
+    @org.junit.jupiter.api.Test
+    void databaseEnforcesCaseInsensitiveUniquenessAndExerciseGroup() {
         String name = unique("Db");
-        jdbc.update("insert into " + table + " (id, name, active, created_at, updated_at) values (?, ?, true, now(), now())",
-                UUID.randomUUID(), name);
-        assertThatThrownBy(() -> jdbc.update(
-                "insert into " + table + " (id, name, active, created_at, updated_at) values (?, ?, true, now(), now())",
-                UUID.randomUUID(), name.toUpperCase()))
+        String insertGroup = "insert into muscle_groups (id, name, active, created_at, updated_at) values (?, ?, true, now(), now())";
+        jdbc.update(insertGroup, UUID.randomUUID(), name);
+        assertThatThrownBy(() -> jdbc.update(insertGroup, UUID.randomUUID(), name.toUpperCase()))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+
+        UUID group = fixtures.createMuscleGroup("Unicita");
+        String exercise = unique("DbEx");
+        String insert = "insert into exercises (id, name, active, muscle_group_id, created_at, updated_at) "
+                + "values (?, ?, true, ?, now(), now())";
+        jdbc.update(insert, UUID.randomUUID(), exercise, group);
+        assertThatThrownBy(() -> jdbc.update(insert, UUID.randomUUID(), exercise.toUpperCase(), group))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        // An exercise without group is rejected by the database (NOT NULL).
+        assertThatThrownBy(() -> jdbc.update(insert, UUID.randomUUID(), unique("Orfano"), null))
                 .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
     }
 
@@ -133,13 +153,65 @@ class CatalogIntegrationTest {
     @org.junit.jupiter.api.Test
     void lookupExposesInactiveItemsButRejectsThemForNewConfigurations() throws Exception {
         String id = create("/api/admin/exercises", unique("Squat"));
+        UUID group = groupId;
         mvc.perform(post("/api/admin/exercises/" + id + "/deactivate").with(fixtures.as(admin)).with(csrf()))
                 .andExpect(status().isOk());
         UUID uuid = UUID.fromString(id);
         assertThat(lookup.exercises(List.of(uuid))).containsKey(uuid);
         assertThat(lookup.exercises(List.of(uuid)).get(uuid).active()).isFalse();
-        assertThatThrownBy(() -> lookup.requireSelectableExercise(uuid))
+        assertThat(lookup.exercises(List.of(uuid)).get(uuid).muscleGroupId()).isEqualTo(group);
+        assertThatThrownBy(() -> lookup.requireSelectableExercise(uuid, group))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("deactivated");
+    }
+
+    @org.junit.jupiter.api.Test
+    void exercisesBelongToOneGroupAndCanBeMovedOnlyToActiveGroups() throws Exception {
+        UUID chest = fixtures.createMuscleGroup("Petto");
+        UUID back = fixtures.createMuscleGroup("Dorso");
+        String missingGroup = mvc.perform(post("/api/admin/exercises").with(fixtures.as(admin)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"" + unique("Senza") + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andReturn().getResponse().getContentAsString();
+        assertThat((String) JsonPath.read(missingGroup, "$.errors[0].field")).isEqualTo("muscleGroupId");
+
+        groupId = chest;
+        String bench = create("/api/admin/exercises", unique("Panca"));
+        create("/api/admin/exercises", unique("Croci"));
+        groupId = back;
+        create("/api/admin/exercises", unique("Rematore"));
+
+        mvc.perform(get("/api/admin/exercises").param("muscleGroupId", chest.toString()).with(fixtures.as(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[0].muscleGroupId").value(chest.toString()));
+        mvc.perform(get("/api/admin/muscle-groups/" + chest).with(fixtures.as(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.exerciseCount").value(2));
+        mvc.perform(get("/api/admin/muscle-groups/" + UUID.randomUUID()).with(fixtures.as(admin)))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/admin/muscle-groups").param("q", "Petto").param("size", "200").with(fixtures.as(admin)))
+                .andExpect(jsonPath("$.content[?(@.id == '" + chest + "')].exerciseCount").value(2))
+                .andExpect(jsonPath("$.content[?(@.id == '" + chest + "')].activeExerciseCount").value(2));
+
+        // Moving to an inactive group is refused, to an active one is allowed.
+        UUID closed = fixtures.createMuscleGroup("Chiuso");
+        jdbc.update("update muscle_groups set active = false where id = ?", closed);
+        mvc.perform(put("/api/admin/exercises/" + bench).with(fixtures.as(admin)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"" + unique("Panca") + "\",\"muscleGroupId\":\"" + closed + "\"}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("CATALOG_ITEM_INACTIVE"));
+        mvc.perform(put("/api/admin/exercises/" + bench).with(fixtures.as(admin)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"" + unique("Panca") + "\",\"muscleGroupId\":\"" + back + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.muscleGroupId").value(back.toString()));
+        // A new exercise cannot be created in an inactive group.
+        groupId = closed;
+        mvc.perform(post("/api/admin/exercises").with(fixtures.as(admin)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(body("/api/admin/exercises", unique("Nuovo"))))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("CATALOG_ITEM_INACTIVE"));
     }
 }

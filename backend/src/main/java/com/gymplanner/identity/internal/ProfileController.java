@@ -6,6 +6,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/me/profile")
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class ProfileController {
 
     record ProfileResponse(UUID id, String firstName, String lastName, String username, String email, String phone,
@@ -36,10 +39,6 @@ class ProfileController {
     }
 
     private final ProfileService service;
-
-    ProfileController(ProfileService service) {
-        this.service = service;
-    }
 
     @GetMapping
     ProfileResponse get(@AuthenticationPrincipal AuthenticatedUser principal) {

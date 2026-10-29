@@ -13,11 +13,17 @@ public interface WorkoutPlanQueries {
 
     Map<UUID, PlanSummary> findPlans(Collection<UUID> planIds);
 
+    /** Not deleted plans with a duration configured, for the ADMIN indicator. */
+    Map<UUID, PlanSummary> findPlansWithRecommendedDuration();
+
     /** @throws com.gymplanner.shared.error.NotFoundException if the plan does not exist */
     PlanStructure getStructure(UUID planId);
 
     /** Sessions ordered by position: the rotation order decided by the ADMIN. */
     List<PlanSessionRef> sessionsInOrder(UUID planId);
+
+    /** Ordered session references for several plans, loaded in one query. */
+    Map<UUID, List<PlanSessionRef>> sessionsInOrder(Collection<UUID> planIds);
 
     /**
      * @throws com.gymplanner.shared.error.NotFoundException     if the plan does not exist

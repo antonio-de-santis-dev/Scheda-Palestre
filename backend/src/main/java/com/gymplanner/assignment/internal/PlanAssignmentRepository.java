@@ -1,24 +1,23 @@
 package com.gymplanner.assignment.internal;
 
-import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 interface PlanAssignmentRepository extends JpaRepository<PlanAssignment, UUID> {
 
-    Optional<PlanAssignment> findByUserIdAndActiveTrue(UUID userId);
+    List<PlanAssignment> findByUserIdAndActiveTrueOrderByCreatedAtAsc(UUID userId);
 
-    /** Locks the active assignment row so concurrent activations serialise. */
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select a from PlanAssignment a where a.userId = :userId and a.active = true")
-    Optional<PlanAssignment> lockActiveByUser(@Param("userId") UUID userId);
+    boolean existsByUserIdAndWorkoutPlanIdAndActiveTrue(UUID userId, UUID workoutPlanId);
+
+    /** The most recently closed assignment of the user: source of the optional days copy. */
+    Optional<PlanAssignment> findFirstByUserIdAndActiveFalseAndEndDateIsNotNullAndIdNotOrderByCreatedAtDesc(
+            UUID userId, UUID excludedId);
 
     List<PlanAssignment> findByWorkoutPlanIdAndActiveTrue(UUID workoutPlanId);
+
+    List<PlanAssignment> findByWorkoutPlanIdInAndActiveTrue(java.util.Collection<UUID> workoutPlanIds);
 
     List<PlanAssignment> findByWorkoutPlanIdOrderByCreatedAtDesc(UUID workoutPlanId);
 

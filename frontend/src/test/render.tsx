@@ -10,9 +10,9 @@ export function testQueryClient() {
   });
 }
 
-/** Renders the real route tree at the given URL with a fresh QueryClient. */
-export function renderApp(url: string) {
-  const router = createMemoryRouter(routes, { initialEntries: [url] });
+/** Renders the real route tree at the given URL (optionally with navigation state) with a fresh QueryClient. */
+export function renderApp(url: string, state?: unknown) {
+  const router = createMemoryRouter(routes, { initialEntries: [state === undefined ? url : { pathname: url, state }] });
   const client = testQueryClient();
   const utils = render(
     <AppProviders client={client}>

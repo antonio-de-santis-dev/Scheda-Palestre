@@ -1,19 +1,21 @@
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Save } from 'lucide-react';
+import { LogOut, Save } from 'lucide-react';
 import { http } from '../../shared/api/http';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
 import { Alert, ErrorAlert } from '../../shared/components/Alert';
-import { TextField } from '../../shared/components/Field';
+import { SelectField, TextField } from '../../shared/components/Field';
 import { QueryState } from '../../shared/components/States';
 import { applyServerErrors } from '../../shared/errors/formErrors';
 import { ChangePasswordForm } from '../../auth/ChangePasswordForm';
 import type { UserRole } from '../../auth/api';
+import { useTheme, type ThemePreference } from '../../app/providers/theme';
+import { useLogout } from '../../auth/useAuth';
 
 interface Profile {
   id: string;
@@ -38,12 +40,15 @@ export function ProfilePage() {
   const query = useQuery({ queryKey: ['me', 'profile'], queryFn: () => http.get<Profile>('/api/me/profile') });
   const [passwordChanged, setPasswordChanged] = useState(false);
   const p = query.data;
+  const { theme, setTheme } = useTheme();
+  const logout = useLogout();
+  const navigate = useNavigate();
   return (
     <>
       <PageHeader title="Profilo" />
       <QueryState isLoading={query.isLoading} error={query.error} onRetry={() => void query.refetch()}>
         {p ? (
-          <div className="stack">
+          <div className="profile-layout">
             <section className="card" aria-labelledby="profile-data">
               <h2 id="profile-data" className="card__title">
                 I tuoi dati
@@ -67,7 +72,7 @@ export function ProfilePage() {
               <PhoneForm key={p.id} initial={p.phone ?? ''} />
             </section>
             {p.role === 'USER' ? (
-              <p>
+              <p className="profile-days">
                 <Link to="/app/schedule">Modifica i giorni di allenamento</Link>
               </p>
             ) : null}
@@ -83,6 +88,14 @@ export function ProfilePage() {
                 </div>
               ) : null}
               <ChangePasswordForm onChanged={() => setPasswordChanged(true)} />
+            </section>
+            <section className="card profile-preferences" aria-labelledby="preferences-title">
+              <h2 id="preferences-title">Preferenze</h2>
+              <SelectField label="Tema" value={theme} onChange={(e) => setTheme(e.target.value as ThemePreference)}>
+                <option value="system">Automatico (dispositivo)</option><option value="light">Chiaro</option><option value="dark">Scuro</option>
+              </SelectField>
+              <Button variant="secondary" icon={<LogOut size={18} aria-hidden="true" />} loading={logout.isPending}
+                onClick={() => logout.mutate(undefined, { onSettled: () => navigate('/login', { replace: true }) })}>Esci</Button>
             </section>
           </div>
         ) : null}

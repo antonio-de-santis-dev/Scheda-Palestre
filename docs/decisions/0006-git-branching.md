@@ -11,3 +11,8 @@
 - Frontend e backend di una user story vivono nello stesso branch (slice verticale), così ogni
   merge in `develop` è una funzionalità completa e verificabile.
 - Conventional Commits; nessun force-push; nessuna modifica a migrazioni Flyway già pubblicate.
+
+**Deroga (branch `modifiche`).** Su richiesta del proprietario, le fasi A-F sono sviluppate su
+`modifiche`, creato da `main` aggiornato invece che da `develop`. Il branch contiene un commit per
+ogni passo e una PR verso `main` lasciata aperta. Nessun merge avviene prima della revisione del
+proprietario.

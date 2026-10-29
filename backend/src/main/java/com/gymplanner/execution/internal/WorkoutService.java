@@ -6,6 +6,7 @@ import com.gymplanner.assignment.api.AssignmentView;
 import com.gymplanner.calendar.api.CalendarQueries;
 import com.gymplanner.calendar.api.DayPlan;
 import com.gymplanner.execution.internal.WorkoutDtos.WorkoutState;
+import com.gymplanner.shared.error.BadRequestException;
 import com.gymplanner.shared.error.BusinessRuleException;
 import com.gymplanner.shared.error.ConflictException;
 import com.gymplanner.shared.error.NotFoundException;
@@ -16,8 +17,15 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
@@ -30,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
  * complete state. Ownership is always checked against the authenticated user (404 otherwise).
  */
 @Service
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class WorkoutService {
 
     private static final Logger log = LoggerFactory.getLogger(WorkoutService.class);
@@ -37,34 +46,32 @@ class WorkoutService {
     private static final long START_TOLERANCE_DAYS = 1;
 
     private final WorkoutRepository workouts;
+    private final WorkoutSummaryLoader summaries;
     private final AssignmentQueries assignments;
     private final CalendarQueries calendarQueries;
     private final WorkoutPlanQueries plans;
     private final BusinessCalendar calendar;
 
-    WorkoutService(WorkoutRepository workouts, AssignmentQueries assignments, CalendarQueries calendarQueries,
-            WorkoutPlanQueries plans, BusinessCalendar calendar) {
-        this.workouts = workouts;
-        this.assignments = assignments;
-        this.calendarQueries = calendarQueries;
-        this.plans = plans;
-        this.calendar = calendar;
-    }
-
     /** Spec 10.7: validation + immutable snapshot in a single transaction. */
     @Transactional
     public WorkoutState start(UUID userId, LocalDate date) {
-        AssignmentView assignment = assignments.findActiveForUser(userId)
-                .orElseThrow(() -> new BusinessRuleException("NO_ACTIVE_ASSIGNMENT", "No active plan assignment"));
+        List<AssignmentView> active = assignments.listActiveForUser(userId);
+        if (active.isEmpty()) {
+            throw new BusinessRuleException("NO_ACTIVE_ASSIGNMENT", "No active plan assignment");
+        }
         LocalDate today = calendar.today();
         if (Math.abs(ChronoUnit.DAYS.between(today, date)) > START_TOLERANCE_DAYS) {
             throw new BusinessRuleException("DATE_NOT_ALLOWED", "Only today's workout can be started");
         }
-        DayPlan day = calendarQueries.dayPlan(assignment, date);
-        if (!day.isTraining()) {
-            throw new BusinessRuleException("NOT_A_TRAINING_DAY", "The date is not a planned training day");
-        }
-        plans.requireExecutable(assignment.planId());
+        // ADR 0008: a weekday belongs to at most one active plan, so at most one plan trains today.
+        Map<UUID, List<DayPlan>> dayPlans = calendarQueries.ranges(active, date, date);
+        AssignmentView assignment = active.stream()
+                .filter(a -> dayPlans.get(a.id()).getFirst().isTraining())
+                .findFirst()
+                .orElseThrow(() -> new BusinessRuleException("NOT_A_TRAINING_DAY", "The date is not a planned training day"));
+        DayPlan day = dayPlans.get(assignment.id()).getFirst();
+        PlanStructure structure = plans.getStructure(assignment.planId());
+        structure.requireExecutable();
         if (workouts.existsByPlanAssignmentIdAndScheduledDate(assignment.id(), date)) {
             throw new ConflictException("WORKOUT_ALREADY_EXISTS", "The workout of this day was already started");
         }
@@ -72,7 +79,6 @@ class WorkoutService {
             throw new ConflictException("WORKOUT_ALREADY_IN_PROGRESS", "Another workout is in progress");
         }
 
-        PlanStructure structure = plans.getStructure(assignment.planId());
         PlanStructure.Session session = structure.sessions().stream()
                 .filter(s -> s.id().equals(day.sessionId()))
                 .findFirst()
@@ -86,7 +92,7 @@ class WorkoutService {
                 .forEach(section -> section.exercises().stream()
                         .sorted(Comparator.comparingInt(PlanStructure.Exercise::position))
                         .forEach(exercise -> {
-                            WorkoutExercise we = workout.addExercise(exercise.id(), exercise.exerciseName(),
+                            WorkoutExercise we = workout.addExercise(exercise.id(), exercise.exerciseId(), exercise.exerciseName(),
                                     section.muscleGroupName());
                             exercise.sets().forEach(s -> we.addSet(s.setIndex(), s.reps(), s.toFailure(), s.restSeconds()));
                         }));
@@ -110,8 +116,10 @@ class WorkoutService {
     /** Essential history (US-24): newest first, values taken from the snapshot. */
     @Transactional(readOnly = true)
     public org.springframework.data.domain.Page<WorkoutDtos.WorkoutSummary> history(UUID userId,
-            org.springframework.data.domain.Pageable pageable) {
-        return workouts.findByUserId(userId, pageable).map(WorkoutDtos.WorkoutSummary::of);
+            org.springframework.data.domain.Pageable pageable, WorkoutHistoryFilter filter) {
+        var page = workouts.findAll(filter.ownedBy(userId), pageable);
+        var summaryById = summaries.load(page.getContent());
+        return page.map(workout -> summaryById.get(workout.getId()));
     }
 
     @Transactional(readOnly = true)
@@ -123,14 +131,18 @@ class WorkoutService {
 
     /**
      * "Fine serie" (spec 10.8), idempotent: an already completed set returns the current state
-     * without advancing twice. The completion instant comes from the server clock.
+     * without advancing twice. Identical results are retryable; different results cannot
+     * overwrite a completed set. The completion instant comes from the server clock.
      */
     @Transactional
-    public WorkoutState completeSet(UUID userId, UUID workoutId, UUID setId) {
+    public WorkoutState completeSet(UUID userId, UUID workoutId, UUID setId, WorkoutDtos.CompleteSetRequest request) {
         Workout workout = lockOwned(userId, workoutId);
         WorkoutSet set = workout.findSet(setId).orElseThrow(() -> new NotFoundException("Set"));
         Instant now = calendar.now();
         if (set.isCompleted()) {
+            if (request != null && !set.hasResults(request.weightKgUsed(), request.actualRepetitions())) {
+                throw new ConflictException("SET_RESULTS_CHANGED", "Completed set results cannot be overwritten");
+            }
             return WorkoutStateMapper.toState(workout, now);
         }
         requireInProgress(workout);
@@ -140,11 +152,105 @@ class WorkoutService {
         if (!isCurrent) {
             throw new BusinessRuleException("SET_NOT_CURRENT", "Only the current set can be completed");
         }
-        set.complete(now);
+        // Fase F (supersedes O-06): the next set cannot start while the rest is running. A repeated
+        // request for an already completed set was answered above (idempotency is preserved).
+        if (workout.remainingRestMillis(now) > 0) {
+            throw new BusinessRuleException("REST_NOT_FINISHED", "The rest period is not over yet")
+                    .with("restEndsAt", workout.getRestEndsAt())
+                    .with("restPaused", workout.isRestPaused())
+                    .with("serverTime", now);
+        }
+        set.complete(now, request == null ? null : request.weightKgUsed(),
+                request == null ? null : request.actualRepetitions());
+        workout.executionChanged();
         if (exercise.nextSet().isEmpty()) {
             exercise.markCompleted();
             advance(workout, now);
         }
+        if (workout.isInProgress()) workout.startRest(now, set.getRestSeconds());
+        workout.attachRestSet(set);
+        workouts.flush();
+        return WorkoutStateMapper.toState(workout, now);
+    }
+
+    /** Recovery changes share the set-completion lock and reject duplicate/stale revisions. */
+    @Transactional
+    public WorkoutState changeRest(UUID userId, UUID workoutId, WorkoutDtos.RestRequest request) {
+        Workout workout = lockOwned(userId, workoutId);
+        requireInProgress(workout);
+        if (request.expectedVersion() != workout.getRestVersion()
+                || request.expectedExecutionVersion() != workout.getExecutionVersion()) {
+            throw new ConflictException("REST_STATE_CHANGED", "Workout or rest changed; reload before retrying");
+        }
+        Instant now = calendar.now();
+        workout.changeRest(request.action(), now);
+        workout.executionChanged();
+        workouts.flush();
+        return WorkoutStateMapper.toState(workout, now);
+    }
+
+    /** Changes only this workout's execution order, never the shared plan or saved sets. */
+    @Transactional
+    public WorkoutState reorderExercises(UUID userId, UUID workoutId, WorkoutDtos.ReorderExercisesRequest request) {
+        Workout workout = lockOwned(userId, workoutId);
+        requireInProgress(workout);
+        List<WorkoutExercise> pending = workout.getExercises().stream()
+                .filter(e -> e.getStatus() == WorkoutExerciseStatus.TODO
+                        || e.getStatus() == WorkoutExerciseStatus.IN_PROGRESS)
+                .sorted(Comparator.comparingInt(WorkoutExercise::getPosition)).toList();
+        List<UUID> currentOrder = pending.stream().map(WorkoutExercise::getId).toList();
+        List<UUID> requestedOrder = request.exerciseIds();
+        if (requestedOrder.size() != currentOrder.size()
+                || new HashSet<>(requestedOrder).size() != requestedOrder.size()
+                || !new HashSet<>(requestedOrder).equals(new HashSet<>(currentOrder))) {
+            throw new BadRequestException("INVALID_EXERCISE_ORDER", "Include every unfinished exercise exactly once");
+        }
+        long version = workout.getExecutionVersion();
+        // A network retry of the last applied reorder is safe; later actions must not be overwritten.
+        if (version == request.expectedVersion() + 1 && currentOrder.equals(requestedOrder)) {
+            return WorkoutStateMapper.toState(workout, calendar.now());
+        }
+        if (version != request.expectedVersion()) {
+            throw new ConflictException("WORKOUT_STATE_CHANGED", "Workout changed; reload before reordering");
+        }
+        if (currentOrder.equals(requestedOrder)) {
+            return WorkoutStateMapper.toState(workout, calendar.now());
+        }
+        Map<UUID, WorkoutExercise> byId = pending.stream()
+                .collect(Collectors.toMap(WorkoutExercise::getId, Function.identity()));
+        List<Integer> positions = pending.stream().map(WorkoutExercise::getPosition).toList();
+        // Release the partial unique index before activating a different exercise.
+        workout.currentExercise().ifPresent(WorkoutExercise::markTodo);
+        workouts.flush();
+        for (int i = 0; i < requestedOrder.size(); i++) {
+            byId.get(requestedOrder.get(i)).moveTo(positions.get(i));
+        }
+        byId.get(requestedOrder.getFirst()).markInProgress();
+        workout.executionChanged();
+        workouts.flush();
+        return WorkoutStateMapper.toState(workout, calendar.now());
+    }
+
+    /** Save only the exact completed series attached to this recovery; never advance or restart its timer. */
+    @Transactional
+    public WorkoutState recordSetResults(UUID userId, UUID workoutId, UUID setId, WorkoutDtos.RecordSetResultsRequest request) {
+        Workout workout = lockOwned(userId, workoutId);
+        WorkoutSet set = workout.findSet(setId).orElseThrow(() -> new NotFoundException("Set"));
+        Instant now = calendar.now();
+        var results = request.results();
+        // Identical retries do not write anything, even if the recovery ended during network retry.
+        if (set.isCompleted() && set.hasResults(results.weightKgUsed(), results.actualRepetitions())) {
+            return WorkoutStateMapper.toState(workout, now);
+        }
+        if (workout.getExecutionVersion() != request.expectedExecutionVersion()
+                || workout.getRestVersion() != request.expectedRestVersion()) {
+            throw new ConflictException("SET_RESULTS_CHANGED", "Recovery results were changed or the screen is stale");
+        }
+        if (workout.resultEntrySet(now).filter(candidate -> candidate.getId().equals(setId)).isEmpty()) {
+            throw new ConflictException("SET_RESULTS_WINDOW_CLOSED", "Results can only be entered for the completed recovery series");
+        }
+        set.recordResults(results.weightKgUsed(), results.actualRepetitions());
+        workout.executionChanged();
         workouts.flush();
         return WorkoutStateMapper.toState(workout, now);
     }
@@ -164,6 +270,7 @@ class WorkoutService {
             throw new BusinessRuleException("EXERCISE_NOT_IN_PROGRESS", "Only the exercise in progress can be skipped");
         }
         exercise.markSkipped();
+        workout.executionChanged();
         advance(workout, now);
         workouts.flush();
         return WorkoutStateMapper.toState(workout, now);
@@ -178,6 +285,7 @@ class WorkoutService {
         }
         requireInProgress(workout);
         workout.interrupt(now);
+        workout.executionChanged();
         workouts.flush();
         return WorkoutStateMapper.toState(workout, now);
     }
@@ -187,8 +295,9 @@ class WorkoutService {
     @Transactional
     public void onAssignmentClosed(AssignmentEvents.AssignmentClosed event) {
         Instant now = calendar.now();
-        for (Workout workout : workouts.findByPlanAssignmentIdAndStatus(event.assignmentId(), WorkoutStatus.IN_PROGRESS)) {
+        for (Workout workout : workouts.lockByPlanAssignmentIdAndStatus(event.assignmentId(), WorkoutStatus.IN_PROGRESS)) {
             workout.interrupt(now);
+            workout.executionChanged();
             log.info("Workout id={} interrupted because its assignment was closed", workout.getId());
         }
     }

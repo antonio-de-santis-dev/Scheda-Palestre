@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
-import { server } from '../../test/server';
+import { problem, server } from '../../test/server';
 import { adminUser, renderApp } from '../../test/render';
 import { exercise, planStructure } from '../../test/planFixtures';
 
@@ -17,13 +17,15 @@ const catalogPage = (items: { id: string; name: string }[]) => ({
 function setup(plan = planStructure()) {
   let current = plan;
   const calls: { method: string; url: string; body: unknown }[] = [];
+  const exerciseQueries: string[] = [];
   server.use(
     http.get('*/api/auth/me', () => HttpResponse.json(adminUser)),
     http.get('*/api/admin/plans/:id', () => HttpResponse.json(current)),
     http.get('*/api/admin/plans/:id/assignments', () => HttpResponse.json([])),
-    http.get('*/api/admin/exercises', () =>
-      HttpResponse.json(catalogPage([{ id: 'ex-1', name: 'Panca piana' }, { id: 'ex-3', name: 'Squat' }])),
-    ),
+    http.get('*/api/admin/exercises', ({ request }) => {
+      exerciseQueries.push(new URL(request.url).search);
+      return HttpResponse.json(catalogPage([{ id: 'ex-1', name: 'Panca piana' }, { id: 'ex-3', name: 'Squat' }]));
+    }),
     http.get('*/api/admin/muscle-groups', () =>
       HttpResponse.json(catalogPage([{ id: 'mg-1', name: 'Petto' }, { id: 'mg-2', name: 'Dorso' }])),
     ),
@@ -35,6 +37,7 @@ function setup(plan = planStructure()) {
   );
   return {
     calls,
+    exerciseQueries,
     setPlan: (p: typeof plan) => {
       current = p;
     },
@@ -42,15 +45,44 @@ function setup(plan = planStructure()) {
 }
 
 describe('plan editor', () => {
+  it('shows a failed rename and preserves the title draft for retry', async () => {
+    setup();
+    server.use(http.put('*/api/admin/sessions/:id', () => problem(409, 'OPTIMISTIC_LOCK')));
+    renderApp('/admin/plans/plan-1/edit');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Rinomina Giorno 1' }));
+    const input = screen.getByRole('textbox', { name: 'Titolo sessione' });
+    await user.clear(input);
+    await user.type(input, 'Titolo da riprovare');
+    await user.click(screen.getByRole('button', { name: 'Salva' }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(input).toHaveValue('Titolo da riprovare');
+  });
+
+  it('keeps unsaved metadata when a structure mutation increments the plan version', async () => {
+    setup();
+    server.use(http.post('*/api/admin/plans/:id/sessions', () => HttpResponse.json(planStructure({ version: 2 }))));
+    const { client } = renderApp('/admin/plans/plan-1/edit');
+    const user = userEvent.setup();
+    const name = await screen.findByRole('textbox', { name: 'Nome scheda' });
+    await user.clear(name);
+    await user.type(name, 'Bozza non salvata');
+    await user.click(screen.getByRole('button', { name: 'Aggiungi sessione' }));
+    await waitFor(() => expect(client.getQueryData<{ version: number }>(['admin', 'plans', 'detail', 'plan-1'])?.version).toBe(2));
+    expect(screen.getByRole('textbox', { name: 'Nome scheda' })).toHaveValue('Bozza non salvata');
+  });
+
   it('renders sessions, sections and MAX for exercises to failure', async () => {
     setup();
     renderApp('/admin/plans/plan-1/edit');
     expect(await screen.findByRole('heading', { name: '1. Giorno 1' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '2. Giorno 2' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '2. Giorno 2' })).not.toBeInTheDocument();
     const section = screen.getByRole('region', { name: 'Sezione Petto' });
     expect(within(section).getByText(/3 × 10/)).toBeInTheDocument();
     expect(within(section).getByText(/3 × MAX/)).toBeInTheDocument();
     expect(screen.getByText('Pronta')).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('tab', { name: /Sessione B/ }));
+    expect(screen.getByRole('heading', { name: '2. Giorno 2' })).toBeInTheDocument();
   });
 
   it('adds a session with the suggested title', async () => {
@@ -81,6 +113,7 @@ describe('plan editor', () => {
     const { calls } = setup();
     renderApp('/admin/plans/plan-1/edit');
     const user = userEvent.setup();
+    await user.click(await screen.findByRole('tab', { name: /Sessione B/ }));
     await user.click(await screen.findByRole('button', { name: 'Elimina Giorno 2' }));
     const dialog = await screen.findByRole('dialog');
     expect(calls.filter((c) => c.method === 'DELETE')).toHaveLength(0);
@@ -89,21 +122,31 @@ describe('plan editor', () => {
   });
 
   it('adds an exercise to failure sending reps 0', async () => {
-    const { calls } = setup();
+    const { calls, exerciseQueries } = setup();
     renderApp('/admin/plans/plan-1/edit');
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Aggiungi esercizio a Petto' }));
     const form = screen.getByRole('form', { name: 'Nuovo esercizio' });
-    await user.selectOptions(within(form).getByLabelText(/^Esercizio/), 'ex-3');
+    await user.click(within(form).getByRole('combobox', { name: 'Esercizio' }));
+    await user.click(within(form).getByRole('option', { name: 'Squat' }));
     await user.click(within(form).getByLabelText('A cedimento (MAX)'));
     await user.click(within(form).getByRole('button', { name: 'Aggiungi esercizio' }));
     await waitFor(() =>
       expect(calls).toContainEqual({
         method: 'POST',
         url: '/api/admin/sections/sec-1/exercises',
-        body: { exerciseId: 'ex-3', setsCount: 3, reps: 0, toFailure: true, restSeconds: 90, customSets: [] },
-      }),
+        body: { exerciseId: 'ex-3', setsCount: 3, reps: 0, toFailure: true, restSeconds: 60, customSets: [] },      }),
     );
+    // Only the active exercises of the section's group are offered.
+    expect(exerciseQueries.some((q) => q.includes('muscleGroupId=mg-1') && q.includes('active=true'))).toBe(true);
+  });
+
+  it('flags a historic exercise that now belongs to another group', async () => {
+    const plan = planStructure();
+    plan.sessions[0]!.sections[0]!.exercises = [exercise({ exerciseInSectionGroup: false })];
+    setup(plan);
+    renderApp('/admin/plans/plan-1/edit');
+    expect(await screen.findByText('ora in un altro gruppo')).toBeInTheDocument();
   });
 
   it('validates the configuration on the client', async () => {
@@ -184,7 +227,7 @@ describe('plans page', () => {
               id: 'plan-1',
               name: 'Forza',
               description: null,
-              expiresOn: null,
+              durationWeeks: null,
               sessionCount: 2,
               executable: true,
               copiedFromPlanId: null,

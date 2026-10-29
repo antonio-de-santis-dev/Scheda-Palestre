@@ -13,6 +13,12 @@ import org.springframework.data.repository.query.Param;
 
 interface UserRepository extends JpaRepository<User, UUID> {
 
+    /** Serialise login attempts so concurrent failures cannot overwrite the lock counter. */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where lower(u.username) = lower(:username)")
+    Optional<User> lockByUsername(@Param("username") String username);
+
+
     @Query("select u from User u where lower(u.username) = lower(:username)")
     Optional<User> findByUsernameIgnoreCase(@Param("username") String username);
 
@@ -34,6 +40,7 @@ interface UserRepository extends JpaRepository<User, UUID> {
                 or lower(concat(u.lastName, ' ', u.firstName)) like :pattern escape '\\')
               and (:role is null or u.role = :role)
               and (:active is null or u.active = :active)
+              and u.deletedAt is null
             """)
     Page<User> search(@Param("pattern") String pattern, @Param("role") UserRole role,
             @Param("active") Boolean active, Pageable pageable);

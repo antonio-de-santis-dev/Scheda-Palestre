@@ -7,6 +7,7 @@ import { AppLayout } from '../layouts/AppLayout';
 import { LoadingState } from '../../shared/components/States';
 import { NotFoundPage } from './AccessDeniedPage';
 import { ADMIN_NAV, USER_NAV } from './navigation';
+import { RouteErrorPage } from './RouteErrorPage';
 
 /**
  * Route-level code splitting: each page is downloaded only when first opened, so a USER on a
@@ -43,11 +44,10 @@ export const routes: RouteObject[] = [
       { index: true, ...page(() => import('../../admin/AdminDashboardPage'), (m) => m.AdminDashboardPage) },
       { path: 'users', ...page(() => import('../../admin/users/UsersPage'), (m) => m.UsersPage) },
       { path: 'users/:id', ...page(() => import('../../admin/users/UserDetailPage'), (m) => m.UserDetailPage) },
-      {
-        path: 'catalog/muscle-groups',
-        ...page(() => import('../../admin/catalog/CatalogPage'), (m) => m.MuscleGroupsPage),
-      },
-      { path: 'catalog/exercises', ...page(() => import('../../admin/catalog/CatalogPage'), (m) => m.ExercisesPage) },
+      { path: 'catalog', ...page(() => import('../../admin/catalog/CatalogPage'), (m) => m.CatalogPage) },
+      // Old URLs (bookmarks) of the two separate catalogs.
+      { path: 'catalog/muscle-groups', element: <Navigate to="/admin/catalog" replace /> },
+      { path: 'catalog/exercises', element: <Navigate to="/admin/catalog" replace /> },
       { path: 'plans', ...page(() => import('../../admin/plans/PlansPage'), (m) => m.PlansPage) },
       { path: 'plans/:id/edit', ...page(() => import('../../admin/plans/PlanEditorPage'), (m) => m.PlanEditorPage) },
       {
@@ -68,6 +68,7 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <Navigate to="/app/today" replace /> },
       { path: 'today', ...page(() => import('../../user/today/TodayPage'), (m) => m.TodayPage) },
+      { path: 'music', ...page(() => import('../../user/music/MusicPage'), (m) => m.MusicPage) },
       { path: 'workout/:id', ...page(() => import('../../user/workout/WorkoutPage'), (m) => m.WorkoutPage) },
       { path: 'calendar', ...page(() => import('../../user/calendar/CalendarPage'), (m) => m.CalendarPage) },
       { path: 'plans', ...page(() => import('../../user/plans/MyPlansPage'), (m) => m.MyPlansPage) },
@@ -85,4 +86,4 @@ export const routes: RouteObject[] = [
     ],
   },
   { path: '*', element: <NotFoundPage /> },
-];
+].map((route) => ({ ...route, errorElement: <RouteErrorPage /> }));

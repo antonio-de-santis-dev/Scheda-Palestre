@@ -1,6 +1,8 @@
 package com.gymplanner.shared.error;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.http.HttpStatus;
 
 /**
@@ -13,6 +15,7 @@ public abstract class ApiException extends RuntimeException {
     private final HttpStatus status;
     private final String code;
     private final List<FieldViolation> errors;
+    private final Map<String, Object> properties = new LinkedHashMap<>();
 
     protected ApiException(HttpStatus status, String code, String detail, List<FieldViolation> errors) {
         super(detail);
@@ -31,5 +34,18 @@ public abstract class ApiException extends RuntimeException {
 
     public List<FieldViolation> errors() {
         return errors;
+    }
+
+    /**
+     * Adds a machine-readable member to the Problem Details (e.g. the conflicting days), so the
+     * frontend can write a precise message without parsing {@code detail}. Never put secrets here.
+     */
+    public ApiException with(String name, Object value) {
+        properties.put(name, value);
+        return this;
+    }
+
+    public Map<String, Object> properties() {
+        return java.util.Collections.unmodifiableMap(properties);
     }
 }

@@ -2,21 +2,20 @@ package com.gymplanner.catalog.internal;
 
 import com.gymplanner.catalog.api.CatalogItemView;
 import com.gymplanner.catalog.api.CatalogLookup;
+import com.gymplanner.catalog.api.ExerciseView;
 import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class CatalogLookupService implements CatalogLookup {
 
     private final MuscleGroupService muscleGroups;
     private final ExerciseService exercises;
-
-    CatalogLookupService(MuscleGroupService muscleGroups, ExerciseService exercises) {
-        this.muscleGroups = muscleGroups;
-        this.exercises = exercises;
-    }
 
     @Override
     public Map<UUID, CatalogItemView> muscleGroups(Collection<UUID> ids) {
@@ -24,8 +23,8 @@ class CatalogLookupService implements CatalogLookup {
     }
 
     @Override
-    public Map<UUID, CatalogItemView> exercises(Collection<UUID> ids) {
-        return exercises.views(ids);
+    public Map<UUID, ExerciseView> exercises(Collection<UUID> ids) {
+        return exercises.exerciseViews(ids);
     }
 
     @Override
@@ -34,7 +33,7 @@ class CatalogLookupService implements CatalogLookup {
     }
 
     @Override
-    public CatalogItemView requireSelectableExercise(UUID id) {
-        return exercises.requireSelectable(id);
+    public ExerciseView requireSelectableExercise(UUID id, UUID muscleGroupId) {
+        return exercises.requireSelectable(id, muscleGroupId);
     }
 }

@@ -8,7 +8,11 @@ import java.util.UUID;
 /** Assignment access for calendar and execution. */
 public interface AssignmentQueries {
 
-    Optional<AssignmentView> findActiveForUser(UUID userId);
+    /** Every ACTIVE assignment of the user, oldest first (a USER can have several, ADR 0008). */
+    List<AssignmentView> listActiveForUser(UUID userId);
+
+    /** Every assignment of the user (active, pending, closed), newest first. */
+    List<AssignmentView> listAllForUser(UUID userId);
 
     /** Empty when the assignment does not exist or belongs to someone else. */
     Optional<AssignmentView> findForUser(UUID assignmentId, UUID userId);

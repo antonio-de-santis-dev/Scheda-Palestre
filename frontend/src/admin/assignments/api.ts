@@ -16,6 +16,14 @@ export interface Assignment {
   active: boolean;
   status: AssignmentStatus;
   createdAt: string;
+  /** Filled only by an activation that asked to copy the days (ADR 0008). */
+  copiedWeekdays?: number[];
+  skippedWeekdays?: number[];
+  /** End of the plan's recommended duration (not the end of the assignment). */
+  planExpiresOn: string | null;
+  /** Server-side: active assignment and today > planExpiresOn (gym time zone). */
+  recommendedDurationEnded: boolean;
+  recommendedDurationWarning: boolean;
 }
 
 export interface AssignInput {
@@ -43,6 +51,22 @@ export const assignmentsApi = {
 
 export function usePlanAssignments(planId: string) {
   return useQuery({ queryKey: assignmentKeys.forPlan(planId), queryFn: () => assignmentsApi.forPlan(planId) });
+}
+
+export interface EndedDuration {
+  userId: string;
+  assignmentId: string;
+  planId: string;
+  planName: string;
+  expiresOn: string;
+}
+
+/** Active assignments in the final recommended week or later (one request). */
+export function useRecommendedDurationEnded() {
+  return useQuery({
+    queryKey: [...assignmentKeys.all, 'recommended-duration-ended'],
+    queryFn: () => http.get<EndedDuration[]>('/api/admin/assignments/recommended-duration-ended'),
+  });
 }
 
 export function useUserAssignments(userId: string) {

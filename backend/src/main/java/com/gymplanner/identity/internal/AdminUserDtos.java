@@ -34,12 +34,16 @@ final class AdminUserDtos {
 
     record UserResponse(UUID id, String firstName, String lastName, String username, String email, String phone,
             UserRole role, boolean active, boolean mustChangePassword, boolean locked, Instant createdAt,
-            Instant updatedAt) {
+            Instant updatedAt, boolean deleted, boolean protectedAccount) {
 
         static UserResponse of(User user, Instant now) {
+            return of(user, now, false);
+        }
+
+        static UserResponse of(User user, Instant now, boolean protectedAccount) {
             return new UserResponse(user.getId(), user.getFirstName(), user.getLastName(), user.getUsername(),
                     user.getEmail(), user.getPhone(), user.getRole(), user.isActive(), user.isMustChangePassword(),
-                    user.isLocked(now), user.getCreatedAt(), user.getUpdatedAt());
+                    user.isLocked(now), user.getCreatedAt(), user.getUpdatedAt(), user.isDeleted(), protectedAccount);
         }
     }
 

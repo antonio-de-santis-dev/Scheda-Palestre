@@ -6,6 +6,7 @@ import com.gymplanner.execution.internal.WorkoutDtos.SetState;
 import com.gymplanner.execution.internal.WorkoutDtos.WorkoutState;
 import java.time.Instant;
 import java.util.List;
+import java.util.Comparator;
 import java.util.UUID;
 
 /** Builds the execution state; the timer is derived from server instants (spec 10.9). */
@@ -16,13 +17,14 @@ final class WorkoutStateMapper {
 
     static WorkoutState toState(Workout w, Instant serverTime) {
         List<ExerciseState> exercises = w.getExercises().stream()
+                .sorted(Comparator.comparingInt(WorkoutExercise::getPosition))
                 .map(e -> new ExerciseState(e.getId(), e.getPosition(), e.getStatus(), e.getExerciseNameSnapshot(),
                         e.getMuscleGroupNameSnapshot(), e.getSetsPlanned(),
                         (int) e.getSets().stream().filter(WorkoutSet::isCompleted).count(),
                         e.getSets().stream()
                                 .map(s -> new SetState(s.getId(), s.getSetIndex(), s.getRepsPlanned(), s.isToFailure(),
-                                        s.getRestSeconds(), s.getCompletedAt()))
-                                .toList()))
+                                        s.getRestSeconds(), s.getCompletedAt(), s.getWeightKgUsed(), s.getRepsActual()))
+                                .toList(), e.historicalIdentity(), WorkoutVolume.of(e.getSets().stream())))
                 .toList();
 
         UUID currentExerciseId = null;
@@ -35,24 +37,14 @@ final class WorkoutStateMapper {
             }
         }
 
-        Instant restEndsAt = null;
-        Integer restSeconds = null;
-        if (w.isInProgress()) {
-            var last = w.lastCompletedSet();
-            if (last.isPresent() && last.get().getRestSeconds() > 0) {
-                Instant end = last.get().getCompletedAt().plusSeconds(last.get().getRestSeconds());
-                if (end.isAfter(serverTime)) {
-                    restEndsAt = end;
-                    restSeconds = last.get().getRestSeconds();
-                }
-            }
-        }
-
+        long remaining = w.remainingRestMillis(serverTime);
+        Instant restEndsAt = remaining > 0 && !w.isRestPaused() ? w.getRestEndsAt() : null;
+        Integer restSeconds = remaining > 0 ? w.getRestDurationSeconds() : null;
         NextAction next = !w.isInProgress() ? NextAction.FINISHED
-                : restEndsAt != null ? NextAction.WAIT_FOR_REST : NextAction.COMPLETE_SET;
+                : remaining > 0 ? NextAction.WAIT_FOR_REST : NextAction.COMPLETE_SET;
 
         return new WorkoutState(w.getId(), w.getStatus(), w.getScheduledDate(), w.getPlanNameSnapshot(),
                 w.getSessionTitleSnapshot(), w.getStartedAt(), w.getFinishedAt(), exercises, currentExerciseId,
-                currentSetId, restEndsAt, restSeconds, serverTime, next);
+                currentSetId, restEndsAt, restSeconds, serverTime, next, w.getExecutionVersion(), w.durationSeconds(), w.isRestPaused(), remaining, w.getRestVersion(), WorkoutVolume.of(w), w.resultEntrySet(serverTime).map(WorkoutSet::getId).orElse(null), w.finalResultEndsAt(serverTime));
     }
 }

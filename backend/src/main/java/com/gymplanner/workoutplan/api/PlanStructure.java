@@ -1,7 +1,7 @@
 package com.gymplanner.workoutplan.api;
 
+import com.gymplanner.shared.error.BusinessRuleException;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -13,7 +13,7 @@ public record PlanStructure(
         UUID id,
         String name,
         String description,
-        LocalDate expiresOn,
+        Integer durationWeeks,
         UUID createdBy,
         UUID copiedFromPlanId,
         Instant createdAt,
@@ -27,6 +27,17 @@ public record PlanStructure(
         return deletedAt != null;
     }
 
+    /** Same rules and codes as {@link WorkoutPlanQueries#requireExecutable}, without reloading the plan. */
+    public void requireExecutable() {
+        if (deleted()) {
+            throw new BusinessRuleException("PLAN_DELETED", "The plan is deleted");
+        }
+        if (!executable) {
+            throw new BusinessRuleException("PLAN_NOT_EXECUTABLE",
+                    "The plan needs at least one session and every session needs at least one exercise");
+        }
+    }
+
     public record Session(UUID id, String title, int position, List<Section> sections) {
     }
 
@@ -35,9 +46,12 @@ public record PlanStructure(
     }
 
     /**
-     * @param customized true when per-set values exist; {@code sets} always holds the N effective sets
+     * @param exerciseInSectionGroup false for a tolerated historic entry whose exercise now belongs
+     *                               to another muscle group (ADR 0007)
+     * @param customized             true when per-set values exist; {@code sets} always holds the N effective sets
      */
-    public record Exercise(UUID id, UUID exerciseId, String exerciseName, boolean exerciseActive, int position,
+    public record Exercise(UUID id, UUID exerciseId, String exerciseName, boolean exerciseActive,
+            boolean exerciseInSectionGroup, int position,
             int setsCount, int reps, boolean toFailure, int restSeconds, boolean customized, List<Set> sets) {
     }
 

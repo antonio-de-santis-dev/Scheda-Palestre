@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,7 +13,7 @@ import type { PlanMetadata } from './api';
 const schema = z.object({
   name: z.string().trim().min(1, 'Inserisci il nome della scheda').max(100, 'Al massimo 100 caratteri'),
   description: z.string().max(2000, 'Al massimo 2000 caratteri'),
-  expiresOn: z.string(),
+  durationWeeks: z.union([z.literal(''), z.coerce.number<number>().int('Inserisci settimane intere').min(1, 'Almeno 1 settimana').max(520, 'Al massimo 520 settimane')]),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -32,25 +33,36 @@ export function PlanMetadataForm({ initial, submitLabel, pending, error, disable
     register,
     handleSubmit,
     setError,
-    formState: { errors },
+    reset,
+    formState: { errors, dirtyFields },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       name: initial?.name ?? '',
       description: initial?.description ?? '',
-      expiresOn: initial?.expiresOn ?? '',
+      durationWeeks: initial?.durationWeeks ?? '',
     },
   });
+
+  // Subscribe to dirty fields so background updates preserve the user's draft.
+  void dirtyFields;
+  useEffect(() => {
+    reset({
+      name: initial?.name ?? '',
+      description: initial?.description ?? '',
+      durationWeeks: initial?.durationWeeks ?? '',
+    }, { keepDirtyValues: true });
+  }, [initial, reset]);
 
   const submit = handleSubmit(async (values) => {
     try {
       await onSubmit({
         name: values.name.trim(),
         description: values.description.trim() === '' ? null : values.description.trim(),
-        expiresOn: values.expiresOn === '' ? null : values.expiresOn,
+        durationWeeks: values.durationWeeks === '' ? null : values.durationWeeks,
       });
     } catch (err) {
-      applyServerErrors(err, setError, ['name', 'description', 'expiresOn']);
+      applyServerErrors(err, setError, ['name', 'description', 'durationWeeks']);
     }
   });
 
@@ -63,11 +75,11 @@ export function PlanMetadataForm({ initial, submitLabel, pending, error, disable
         <div className="form-grid form-grid--2">
           <TextField label="Nome scheda" required error={errors.name?.message} {...register('name')} />
           <TextField
-            label="Scadenza"
-            type="date"
-            hint="Facoltativa, solo informativa"
-            error={errors.expiresOn?.message}
-            {...register('expiresOn')}
+            label="Durata consigliata (settimane)"
+            type="number" min="1" max="520" step="1"
+            hint="Facoltativa. Il conteggio parte dalla data di inizio dell’assegnazione; avviso nell’ultima settimana."
+            error={errors.durationWeeks?.message}
+            {...register('durationWeeks')}
           />
         </div>
         <TextAreaField label="Descrizione" hint="Facoltativa" error={errors.description?.message} {...register('description')} />

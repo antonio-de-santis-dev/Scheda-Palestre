@@ -11,6 +11,8 @@ export interface PlanExercise {
   exerciseId: string;
   exerciseName: string;
   exerciseActive: boolean;
+  /** False for a tolerated historic entry whose exercise now belongs to another group. */
+  exerciseInSectionGroup: boolean;
   position: number;
   setsCount: number;
   reps: number;
@@ -40,7 +42,7 @@ export interface PlanStructure {
   id: string;
   name: string;
   description: string | null;
-  expiresOn: string | null;
+  durationWeeks: number | null;
   createdBy: string;
   copiedFromPlanId: string | null;
   createdAt: string;

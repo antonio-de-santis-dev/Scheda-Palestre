@@ -38,7 +38,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     ResponseEntity<ProblemDetail> handleApi(ApiException ex, HttpServletRequest request) {
-        return build(ex.status(), ex.code(), titleFor(ex.status()), ex.getMessage(), ex.errors(), request);
+        ResponseEntity<ProblemDetail> response = build(ex.status(), ex.code(), titleFor(ex.status()), ex.getMessage(),
+                ex.errors(), request);
+        ex.properties().forEach(response.getBody()::setProperty);
+        return response;
     }
 
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)

@@ -58,17 +58,29 @@ test('1. ADMIN creates a USER who changes the password at first access', async (
   await expect(athlete.getByRole('heading', { name: 'Accesso negato' })).toBeVisible();
 });
 
-async function addCatalogItem(page: Page, kind: 'muscle-groups' | 'exercises', name: string) {
-  await page.goto(`/admin/catalog/${kind}`);
-  await page.getByLabel(kind === 'exercises' ? /^Nuovo esercizio/ : /^Nuovo gruppo muscolare/).fill(name);
-  await page.getByRole('button', { name: 'Aggiungi' }).click();
-  await expect(page.getByRole('list').getByText(name, { exact: true })).toBeVisible();
+/** Unified catalog: groups on the list, exercises inside the selected group. */
+async function addGroup(page: Page, name: string) {
+  await page.goto('/admin/catalog');
+  await page.getByLabel(/^Nuovo gruppo muscolare/).fill(name);
+  await page.getByRole('button', { name: 'Aggiungi gruppo' }).click();
+  await expect(page.getByRole('list', { name: 'Elenco gruppi muscolari' }).getByText(name, { exact: true })).toBeVisible();
+}
+
+async function addExercisesToGroup(page: Page, group: string, exercises: string[]) {
+  await page.goto('/admin/catalog');
+  await page.getByRole('list', { name: 'Elenco gruppi muscolari' }).getByRole('link', { name: new RegExp(group) }).click();
+  for (const name of exercises) {
+    await page.getByLabel(new RegExp(`^Nuovo esercizio in ${group}`)).fill(name);
+    await page.getByRole('button', { name: 'Aggiungi esercizio' }).click();
+    await expect(page.getByRole('list', { name: `Esercizi di ${group}` }).getByText(name, { exact: true })).toBeVisible();
+  }
 }
 
 async function addExercise(page: Page, group: string, exercise: string, sets: number, reps: number | 'MAX', rest: number) {
   await page.getByRole('button', { name: `Aggiungi esercizio a ${group}` }).click();
   const form = page.getByRole('form', { name: 'Nuovo esercizio' });
-  await form.getByLabel(/^Esercizio/).selectOption({ label: exercise });
+  await form.getByRole('combobox', { name: 'Esercizio' }).fill(exercise);
+  await form.getByRole('option', { name: exercise }).click();
   await form.getByRole('spinbutton', { name: 'Serie' }).fill(String(sets));
   await form.getByLabel(/^Recupero/).fill(String(rest));
   if (reps === 'MAX') {
@@ -81,16 +93,19 @@ async function addExercise(page: Page, group: string, exercise: string, sets: nu
 }
 
 test('2. ADMIN builds catalog and plan, then assigns it', async () => {
-  await addCatalogItem(admin, 'muscle-groups', names.chest);
-  await addCatalogItem(admin, 'muscle-groups', names.back);
-  await addCatalogItem(admin, 'exercises', names.bench);
-  await addCatalogItem(admin, 'exercises', names.pullUp);
-  await addCatalogItem(admin, 'exercises', names.row);
+  await addGroup(admin, names.chest);
+  await addGroup(admin, names.back);
+  await addExercisesToGroup(admin, names.chest, [names.bench, names.pullUp]);
+  await addExercisesToGroup(admin, names.back, [names.row]);
+  // Refresh on a deep link of the catalog keeps the selected group (SPA fallback + URL state).
+  await admin.reload();
+  await expect(admin.getByRole('list', { name: `Esercizi di ${names.back}` }).getByText(names.row, { exact: true })).toBeVisible();
 
   await admin.goto('/admin/plans');
   await admin.getByRole('button', { name: 'Nuova scheda' }).click();
   await admin.getByLabel(/^Nome scheda/).fill(names.plan);
   await admin.getByRole('button', { name: "Crea e apri l'editor" }).click();
+  await expect(admin).toHaveURL(/\/admin\/plans\/[0-9a-f-]+\/edit$/);
   await expect(admin.getByText('Incompleta')).toBeVisible();
   planEditorUrl = admin.url();
 
@@ -99,22 +114,40 @@ test('2. ADMIN builds catalog and plan, then assigns it', async () => {
   await admin.getByRole('button', { name: 'Aggiungi sessione' }).click();
   await expect(admin.getByRole('heading', { name: '2. Giorno 2' })).toBeVisible();
 
-  await admin.getByLabel('Nuova sezione in Giorno 1').selectOption({ label: names.chest });
+  await admin.getByRole('combobox', { name: 'Nuova sezione in Giorno 1' }).fill(names.chest);
+  await admin.getByRole('option', { name: names.chest }).click();
   await admin.getByRole('button', { name: 'Aggiungi sezione' }).first().click();
   await addExercise(admin, names.chest, names.bench, 2, 10, 3);
   await addExercise(admin, names.chest, names.pullUp, 1, 'MAX', 0);
 
-  await admin.getByLabel('Nuova sezione in Giorno 2').selectOption({ label: names.back });
+  await admin.getByRole('combobox', { name: 'Nuova sezione in Giorno 2' }).fill(names.back);
+  await admin.getByRole('option', { name: names.back }).click();
   await admin.getByRole('button', { name: 'Aggiungi sezione' }).nth(1).click();
   await addExercise(admin, names.back, names.row, 3, 12, 45);
 
   await expect(admin.getByText('Pronta')).toBeVisible();
   await expect(admin.getByText(/1 × MAX/)).toBeVisible();
 
+  // "Salva dati" confirms the creation: back to the list with a one-shot notification.
+  await admin.getByRole('button', { name: 'Salva dati' }).click();
+  await expect(admin).toHaveURL(/\/admin\/plans$/);
+  await expect(admin.getByText('Nuova scheda creata')).toBeVisible();
+  await admin.reload();
+  await expect(admin.getByRole('heading', { name: 'Schede' })).toBeVisible();
+  await expect(admin.getByText('Nuova scheda creata')).toBeHidden();
+
+  // Editing an existing plan says "Scheda modificata".
+  await admin.goto(planEditorUrl);
+  await admin.getByRole('button', { name: 'Salva dati' }).click();
+  await expect(admin.getByText('Scheda modificata')).toBeVisible();
+
   await admin.goto(planEditorUrl.replace('/edit', '/assignments'));
   await admin.getByLabel(new RegExp(`\\(@${user.username}\\)`)).check();
   await admin.getByRole('button', { name: 'Assegna' }).click();
-  await expect(admin.getByText('Scheda assegnata a 1 utente.')).toBeVisible();
+  await expect(admin).toHaveURL(/\/admin\/plans$/);
+  await expect(admin.getByText('Scheda assegnata', { exact: true })).toBeVisible();
+  await expect(admin.getByText(/assegnata a 1 utente\./)).toBeVisible();
+  await admin.goto(planEditorUrl.replace('/edit', '/assignments'));
   await expect(admin.getByRole('list', { name: 'Assegnatari' }).getByText('Attiva')).toBeVisible();
 });
 
@@ -125,7 +158,7 @@ test('3. USER chooses the days and sees today workout', async () => {
   for (const day of ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica']) {
     await athlete.getByRole('checkbox', { name: day }).check();
   }
-  await athlete.getByRole('button', { name: 'Salva giorni' }).click();
+  await athlete.getByRole('button', { name: `Salva giorni di ${names.plan}` }).click();
   await expect(athlete.getByText(/Giorni salvati/)).toBeVisible();
 
   await athlete.goto('/app/today');
@@ -148,13 +181,18 @@ test('4-5. USER completes sets with rest timer, skips an exercise and sees it in
   await finish.click();
   const timer = athlete.getByRole('timer');
   await expect(timer).toBeVisible();
+  // During the rest the button stays focusable but waits for the end of the timer.
+  await expect(finish).toHaveAttribute('aria-disabled', 'true');
 
   // The timer survives a reload (state comes from the server).
   await athlete.reload();
   await expect(athlete.getByText('2/2')).toBeVisible();
   await expect(athlete.getByText('Recupero terminato').or(athlete.getByRole('timer'))).toBeVisible();
 
+  // The 3 s rest ends: the button becomes available again.
+  await expect(athlete.getByRole('button', { name: 'Fine serie' })).not.toHaveAttribute('aria-disabled', { timeout: 10_000 });
   await athlete.getByRole('button', { name: 'Fine serie' }).click();
+  await expect(athlete.getByText(`Esercizio completato: ${names.bench}.`)).toBeVisible();
   await expect(athlete.getByRole('heading', { name: names.pullUp })).toBeVisible();
 
   await athlete.getByRole('button', { name: 'Salta esercizio' }).click();
@@ -167,6 +205,73 @@ test('4-5. USER completes sets with rest timer, skips an exercise and sees it in
   await list.getByRole('link').first().click();
   await expect(athlete.getByRole('region', { name: names.pullUp }).getByText('Saltato')).toBeVisible();
   await expect(athlete.getByRole('region', { name: names.bench }).getByText('Completato')).toBeVisible();
+});
+
+test('5b. ADMIN assigns a second plan and USER shares the week between the two', async () => {
+  const copyName = `${names.plan} (copia)`;
+  await admin.goto('/admin/plans');
+  await admin.getByRole('button', { name: `Duplica ${names.plan}` }).click();
+  await expect(admin).toHaveURL(/\/edit$/);
+  await admin.getByRole('button', { name: 'Salva dati' }).click();
+  await expect(admin.getByText('Nuova scheda creata')).toBeVisible();
+  await admin.getByRole('link', { name: `Assegnazioni di ${copyName}` }).click();
+  await admin.getByLabel(new RegExp(`\\(@${user.username}\\)`)).check();
+  await admin.getByRole('button', { name: 'Assegna' }).click();
+  await expect(admin.getByText('Scheda assegnata', { exact: true })).toBeVisible();
+
+  // The first plan stays active: today the USER is guided to choose the days of the new one.
+  await athlete.goto('/app/today');
+  await athlete.getByRole('link', { name: `Scegli i giorni di ${copyName}` }).click();
+  const copyForm = athlete.getByRole('region', { name: copyName });
+  const monday = copyForm.getByRole('checkbox', { name: /Lunedì/ });
+  await expect(monday).toHaveAttribute('aria-disabled', 'true');
+  await expect(copyForm.getByText(`Occupato da “${names.plan}”`).first()).toBeVisible();
+
+  // Free Sunday in the first plan, then give it to the new plan.
+  const firstForm = athlete.getByRole('region', { name: names.plan, exact: true });
+  await firstForm.getByRole('checkbox', { name: 'Domenica' }).uncheck();
+  await firstForm.getByRole('button', { name: `Salva giorni di ${names.plan}` }).click();
+  await expect(firstForm.getByText(/Giorni salvati/)).toBeVisible();
+  await copyForm.getByRole('checkbox', { name: 'Domenica' }).check();
+  await copyForm.getByRole('button', { name: `Salva giorni di ${copyName}` }).click();
+  await expect(copyForm.getByText(/Giorni salvati/)).toBeVisible();
+
+  await athlete.goto('/app/calendar');
+  await expect(athlete.getByRole('list', { name: 'Giorni' }).getByText(copyName).first()).toBeVisible();
+  await athlete.goto('/app/plans');
+  await expect(athlete.getByRole('region', { name: 'Schede attive (2)' })).toBeVisible();
+});
+
+test('5c. ADMIN reads the activity report and deletes an account with two confirmations', async () => {
+  // Report of the athlete: only recorded data.
+  await admin.goto('/admin/users');
+  await admin.getByRole('link', { name: `Apri Elena Test ${RUN}` }).click();
+  const report = admin.getByRole('region', { name: 'Report attività' });
+  await expect(report.getByRole('table', { name: 'Totale allenamenti ed esercizi' })).toBeVisible();
+  await expect(report.getByText("L'app non registra carichi, peso corporeo o progressi fisici.", { exact: false })).toBeVisible();
+
+  // A throwaway account is deleted and can no longer log in.
+  const victim = `del_${RUN}`;
+  await admin.goto('/admin/users');
+  await admin.getByRole('button', { name: 'Nuovo utente' }).click();
+  await admin.getByLabel(/^Nome/).fill('Da');
+  await admin.getByLabel(/^Cognome/).fill(`Eliminare ${RUN}`);
+  await admin.getByLabel(/^Username/).fill(victim);
+  await admin.getByLabel(/^Email/).fill(`${victim}@example.test`);
+  await admin.getByRole('button', { name: 'Crea utente' }).click();
+  const temporary = (await admin.getByTestId('temporary-password').textContent())?.trim() ?? '';
+  await admin.getByRole('link', { name: `Apri Da Eliminare ${RUN}` }).click();
+  await admin.getByRole('button', { name: `Elimina account di Da Eliminare ${RUN}` }).click();
+  await admin.getByRole('dialog').getByRole('button', { name: 'Continua' }).click();
+  await admin.getByRole('dialog').getByLabel(/Per confermare scrivi lo username/).fill(victim);
+  await admin.getByRole('dialog').getByRole('button', { name: `Elimina definitivamente ${victim}` }).click();
+  await expect(admin).toHaveURL(/\/admin\/users$/);
+  await expect(admin.getByText('Account eliminato')).toBeVisible();
+
+  const page = await admin.context().browser()!.newPage({ viewport: { width: 360, height: 740 } });
+  await login(page, victim, temporary);
+  await expect(page.getByText('Credenziali non valide.')).toBeVisible();
+  await page.close();
 });
 
 test('6. ADMIN edits the plan and past history stays unchanged', async () => {

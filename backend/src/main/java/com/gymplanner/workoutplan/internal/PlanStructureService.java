@@ -13,6 +13,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
  * version) and returns the full updated structure.
  */
 @Service
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class PlanStructureService {
 
     private final WorkoutPlanRepository plans;
@@ -31,16 +34,6 @@ class PlanStructureService {
     private final CatalogLookup catalog;
     private final ApplicationEventPublisher events;
     private final Clock clock;
-
-    PlanStructureService(WorkoutPlanRepository plans, PlanService planService, PlanStructureAssembler assembler,
-            CatalogLookup catalog, ApplicationEventPublisher events, Clock clock) {
-        this.plans = plans;
-        this.planService = planService;
-        this.assembler = assembler;
-        this.catalog = catalog;
-        this.events = events;
-        this.clock = clock;
-    }
 
     // ---------------------------------------------------------------- sessions
 
@@ -122,7 +115,7 @@ class PlanStructureService {
         WorkoutPlan plan = section.getPlanSession().getWorkoutPlan();
         PlanService.requireEditable(plan);
         ExerciseConfig config = ExerciseConfigValidator.validate(request);
-        catalog.requireSelectableExercise(request.exerciseId());
+        catalog.requireSelectableExercise(request.exerciseId(), section.getMuscleGroupId());
         section.addExercise(request.exerciseId(), config);
         return saved(plan, null);
     }
@@ -136,8 +129,9 @@ class PlanStructureService {
         PlanService.requireEditable(plan);
         ExerciseConfig config = ExerciseConfigValidator.validate(request);
         if (!exercise.getExerciseId().equals(request.exerciseId())) {
-            // Keeping an already used (even deactivated) exercise is allowed; a new one must be active.
-            catalog.requireSelectableExercise(request.exerciseId());
+            // Keeping an already used exercise is allowed even when it was deactivated or moved to
+            // another group (historic data, ADR 0007); a newly chosen one must be active and of this group.
+            catalog.requireSelectableExercise(request.exerciseId(), exercise.getMuscleSection().getMuscleGroupId());
         }
         exercise.apply(request.exerciseId(), config);
         return saved(plan, null);

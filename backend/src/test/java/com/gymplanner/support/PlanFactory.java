@@ -48,7 +48,7 @@ public class PlanFactory {
             UUID sectionId = UUID.fromString(plan.read("$.sessions[" + (s - 1) + "].sections[0].id"));
             sectionIds.add(sectionId);
             for (int e = 1; e <= exercisesPerSession; e++) {
-                UUID exercise = fixtures.createExercise("Esercizio " + s + "." + e);
+                UUID exercise = fixtures.createExercise("Esercizio " + s + "." + e, group);
                 plan = api.post(admin, "/api/admin/sections/" + sectionId + "/exercises", exerciseJson(exercise, sets, 10,
                         false, 60)).expect(201);
                 planExerciseIds.add(UUID.fromString(

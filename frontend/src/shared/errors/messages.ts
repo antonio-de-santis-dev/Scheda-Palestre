@@ -19,6 +19,8 @@ const MESSAGES: Record<string, string> = {
   EMAIL_TAKEN: 'Email già in uso.',
   CANNOT_DEACTIVATE_SELF: 'Non puoi disattivare il tuo account.',
   LAST_ACTIVE_ADMIN: 'Deve sempre esistere almeno un ADMIN attivo.',
+  MUSIC_DUPLICATE: 'Questo video o questa playlist è già nella tua musica.',
+  MUSIC_LIMIT_REACHED: 'Hai raggiunto il numero massimo di 200 link salvati: eliminane qualcuno prima di aggiungerne altri.',
   NAME_TAKEN: 'Esiste già un elemento con questo nome.',
   CATALOG_ITEM_INACTIVE: "L'elemento selezionato è disattivato e non può essere usato.",
   PLAN_DELETED: 'La scheda è eliminata: ripristinala prima di modificarla.',
@@ -37,14 +39,70 @@ const MESSAGES: Record<string, string> = {
   WORKOUT_ALREADY_EXISTS: "L'allenamento di questo giorno è già stato avviato.",
   WORKOUT_ALREADY_IN_PROGRESS: 'Hai già un allenamento in corso: concludilo o interrompilo prima.',
   WORKOUT_NOT_IN_PROGRESS: "L'allenamento non è più in corso.",
+  SET_RESULTS_CHANGED: 'Questa serie è già stata registrata con altri risultati. La schermata è stata aggiornata.',
   SET_NOT_CURRENT: 'Questa serie non è quella corrente. La schermata è stata aggiornata.',
   EXERCISE_NOT_IN_PROGRESS: 'Solo l’esercizio in corso può essere saltato.',
+  INVALID_HISTORY_FILTER: 'Controlla l’intervallo di date e il nome inseriti nei filtri.',
   RANGE_TOO_LARGE: "L'intervallo richiesto è troppo ampio (massimo 62 giorni).",
+  EXERCISE_GROUP_MISMATCH: 'L’esercizio scelto non appartiene al gruppo muscolare di questa sezione.',
+  SCHEDULE_DAY_CONFLICT: 'Alcuni giorni sono già usati da un’altra tua scheda attiva.',
+  REST_STATE_CHANGED: 'Il recupero o l’allenamento è cambiato: la schermata è stata aggiornata.',
+  REST_NOT_ACTIVE: 'Il recupero è già terminato: la schermata è stata aggiornata.',
+  REST_ALREADY_PAUSED: 'Il recupero è già in pausa.',
+  REST_NOT_PAUSED: 'Il recupero non è in pausa.',
+  REST_NOT_FINISHED: 'Il recupero non è ancora finito: la schermata è stata allineata al server.',
+  CANNOT_DELETE_SELF: 'Non puoi eliminare il tuo account.',
+  PROTECTED_ACCOUNT: "L'account ADMIN iniziale è protetto: non può essere eliminato né cambiare username.",
+  ACCOUNT_DELETED: "L'account è stato eliminato e non può essere modificato.",
+  ASSIGNMENT_NOT_ACTIVE: 'La scheda non è attiva: non puoi sceglierne i giorni.',
+  SCHEDULE_DAYS_REQUIRED: 'Scegli e salva prima almeno un giorno di allenamento.',
+  INVALID_EXERCISE_ORDER: "L'ordine degli esercizi non è più valido: la schermata è stata aggiornata.",
+  WORKOUT_STATE_CHANGED: "L'allenamento è cambiato nel frattempo: la schermata è stata aggiornata.",
+  SET_RESULTS_WINDOW_CLOSED: 'Il recupero di questa serie è terminato: i risultati non possono più essere modificati.',
+  RATE_LIMITED: 'Troppi tentativi in poco tempo. Attendi un minuto e riprova.',
+  UNPROCESSABLE: "L'operazione non è consentita nello stato attuale.",
+  METHOD_NOT_ALLOWED: 'Operazione non supportata.',
+  PAYLOAD_TOO_LARGE: 'I dati inviati sono troppo grandi.',
+  UNSUPPORTED_MEDIA_TYPE: 'Formato della richiesta non supportato.',
+  REQUEST_ERROR: 'La richiesta non può essere elaborata.',
+};
+
+const DAY_NAMES = ['', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];
+
+/** "lunedì e venerdì", "lunedì, martedì e giovedì". */
+function joinItalian(items: string[]): string {
+  return items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} e ${items[items.length - 1]}`;
+}
+
+interface DayConflict {
+  weekday: number;
+  planName: string;
+}
+
+const text = (value: unknown): string | null => (typeof value === 'string' && value.trim() ? value : null);
+
+/** Messages that use the extra Problem Details members to say exactly what is wrong. */
+const DETAILED: Record<string, (problem: Record<string, unknown>) => string | null> = {
+  SCHEDULE_DAY_CONFLICT: (p) => {
+    const conflicts = Array.isArray(p.conflicts) ? (p.conflicts as DayConflict[]) : [];
+    if (conflicts.length === 0) {
+      return null;
+    }
+    const byPlan = new Map<string, string[]>();
+    conflicts.forEach((c) => byPlan.set(c.planName, [...(byPlan.get(c.planName) ?? []), DAY_NAMES[c.weekday] ?? '?']));
+    const parts = [...byPlan].map(([plan, days]) => `${joinItalian(days)} ${days.length === 1 ? 'è già usato' : 'sono già usati'} da “${plan}”`);
+    return `${parts.join('; ')}. Scegli altri giorni oppure libera prima quelli dell’altra scheda.`.replace(/^./, (c) => c.toUpperCase());
+  },
+  EXERCISE_GROUP_MISMATCH: (p) => {
+    const exercise = text(p.exerciseName);
+    const group = text(p.muscleGroupName);
+    return exercise && group ? `“${exercise}” non appartiene al gruppo ${group}: scegli un esercizio di questo gruppo.` : null;
+  },
 };
 
 export function errorMessage(error: unknown, fallback = MESSAGES.INTERNAL_ERROR): string {
   if (isApiError(error)) {
-    return MESSAGES[error.code] ?? error.detail ?? fallback ?? 'Errore';
+    return DETAILED[error.code]?.(error.problem) ?? MESSAGES[error.code] ?? error.detail ?? fallback ?? 'Errore';
   }
   return fallback ?? 'Errore';
 }

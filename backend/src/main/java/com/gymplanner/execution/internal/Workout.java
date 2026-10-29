@@ -1,5 +1,6 @@
 package com.gymplanner.execution.internal;
 
+import com.gymplanner.shared.error.BusinessRuleException;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -11,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -20,7 +22,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * A workout and its immutable snapshot (spec 8.12). All state transitions of spec 10.8/10.10
+ * A workout and its snapshot (spec 8.12): names/sets are immutable, execution order can change. All state transitions of spec 10.8/10.10
  * live here so they can be unit tested without a database.
  */
 @Entity
@@ -48,6 +50,17 @@ public class Workout {
     private Instant startedAt;
 
     private Instant finishedAt;
+
+    private UUID restSetId;
+    private Instant restEndsAt;
+    private Long restRemainingMillis;
+    private Integer restDurationSeconds;
+    @Column(nullable = false)
+    private long restVersion;
+
+    /** Revision of execution actions, checked while holding the workout row lock. */
+    @Column(nullable = false)
+    private long executionVersion;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -79,7 +92,11 @@ public class Workout {
     }
 
     WorkoutExercise addExercise(UUID planExerciseId, String exerciseName, String muscleGroupName) {
-        WorkoutExercise exercise = new WorkoutExercise(this, planExerciseId, exercises.size() + 1, exerciseName,
+        return addExercise(planExerciseId, null, exerciseName, muscleGroupName);
+    }
+
+    WorkoutExercise addExercise(UUID planExerciseId, UUID catalogExerciseId, String exerciseName, String muscleGroupName) {
+        WorkoutExercise exercise = new WorkoutExercise(this, planExerciseId, catalogExerciseId, exercises.size() + 1, exerciseName,
                 muscleGroupName);
         exercises.add(exercise);
         return exercise;
@@ -117,18 +134,98 @@ public class Workout {
     void complete(Instant now) {
         this.status = WorkoutStatus.COMPLETED;
         this.finishedAt = now;
+        clearRest();
     }
 
     void interrupt(Instant now) {
         this.status = WorkoutStatus.INTERRUPTED;
         this.finishedAt = now;
+        clearRest();
     }
 
-    /** Most recently completed set, used to derive the rest timer. */
-    Optional<WorkoutSet> lastCompletedSet() {
-        return exercises.stream().flatMap(e -> e.getSets().stream())
-                .filter(WorkoutSet::isCompleted)
-                .max(Comparator.comparing(WorkoutSet::getCompletedAt));
+    private void clearRest() {
+        restSetId = null;
+        restEndsAt = null;
+        restRemainingMillis = null;
+        restDurationSeconds = null;
+        restVersion++;
+    }
+
+    void startRest(Instant now, int seconds) {
+        clearRest();
+        if (isInProgress() && seconds > 0) {
+            restDurationSeconds = seconds;
+            restEndsAt = now.plusSeconds(seconds);
+        }
+    }
+
+    long remainingRestMillis(Instant now) {
+        if (!isInProgress()) return 0;
+        return restRemainingMillis != null ? restRemainingMillis
+                : restEndsAt == null ? 0 : Math.max(0, Duration.between(now, restEndsAt).toMillis());
+    }
+
+    boolean isRestPaused() {
+        return isInProgress() && restRemainingMillis != null;
+    }
+
+    void changeRest(WorkoutDtos.RestAction action, Instant now) {
+        long remaining = remainingRestMillis(now);
+        if (remaining <= 0) throw new BusinessRuleException("REST_NOT_ACTIVE", "There is no active rest");
+        switch (action) {
+            case PAUSE -> {
+                if (isRestPaused()) throw new BusinessRuleException("REST_ALREADY_PAUSED", "Rest is already paused");
+                restRemainingMillis = remaining;
+                restEndsAt = null;
+            }
+            case RESUME -> {
+                if (!isRestPaused()) throw new BusinessRuleException("REST_NOT_PAUSED", "Rest is not paused");
+                restEndsAt = now.plusMillis(remaining);
+                restRemainingMillis = null;
+            }
+            case EXTEND -> {
+                restDurationSeconds = Math.addExact(restDurationSeconds, 30);
+                if (isRestPaused()) restRemainingMillis = remaining + 30_000;
+                else restEndsAt = restEndsAt.plusSeconds(30);
+            }
+            case SKIP -> {
+                clearRest();
+                return;
+            }
+        }
+        restVersion++;
+    }
+
+    Instant getRestEndsAt() { return restEndsAt; }
+    Integer getRestDurationSeconds() { return restDurationSeconds; }
+    long getRestVersion() { return restVersion; }
+
+    void attachRestSet(WorkoutSet set) {
+        restSetId = set.getId();
+    }
+
+    /** A final recovery is derived from persisted completion time, without extending workout duration. */
+    Optional<WorkoutSet> resultEntrySet(Instant now) {
+        if (restSetId == null) return Optional.empty();
+        return findSet(restSetId).filter(WorkoutSet::isCompleted).filter(set ->
+                remainingRestMillis(now) > 0 || finalResultEndsAt(set).filter(end -> end.isAfter(now)).isPresent());
+    }
+
+    private Optional<Instant> finalResultEndsAt(WorkoutSet set) {
+        return status == WorkoutStatus.COMPLETED && set.getCompletedAt().equals(finishedAt) && set.getRestSeconds() > 0
+                ? Optional.of(set.getCompletedAt().plusSeconds(set.getRestSeconds())) : Optional.empty();
+    }
+
+    Instant finalResultEndsAt(Instant now) {
+        return resultEntrySet(now).flatMap(this::finalResultEndsAt).orElse(null);
+    }
+
+    void executionChanged() {
+        executionVersion++;
+    }
+
+    public long getExecutionVersion() {
+        return executionVersion;
     }
 
     public UUID getId() {
@@ -149,6 +246,14 @@ public class Workout {
 
     public LocalDate getScheduledDate() {
         return scheduledDate;
+    }
+
+    /** Final elapsed wall time, including rest, reconstructed from persisted server instants. */
+    Long durationSeconds() {
+        if (isInProgress() || startedAt == null || finishedAt == null || finishedAt.isBefore(startedAt)) {
+            return null;
+        }
+        return Duration.between(startedAt, finishedAt).getSeconds();
     }
 
     public Instant getStartedAt() {

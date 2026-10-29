@@ -11,6 +11,8 @@ export function remainingRestMs(restEndsAt: string, serverTime: string, received
 
 interface TimerInput {
   restEndsAt: string | null;
+  restPaused?: boolean;
+  restRemainingMillis?: number;
   serverTime: string;
   receivedAt: number;
 }
@@ -26,7 +28,8 @@ export function useRestTimer(input: TimerInput | undefined, onVisible: () => voi
     callbacks.current = { onVisible, onFinished };
   });
 
-  const restEndsAt = input?.restEndsAt ?? null;
+  const finishedRest = useRef<string | null>(null);
+  const restEndsAt = input?.restPaused ? null : input?.restEndsAt ?? null;
   const serverTime = input?.serverTime ?? null;
   const receivedAt = input?.receivedAt ?? 0;
 
@@ -37,10 +40,17 @@ export function useRestTimer(input: TimerInput | undefined, onVisible: () => voi
     let running = true;
     const tick = () => {
       const current = Date.now();
-      setNow(current);
-      if (running && remainingRestMs(restEndsAt, serverTime, receivedAt, current) <= 0) {
+      const remaining = remainingRestMs(restEndsAt, serverTime, receivedAt, current);
+      // Re-render the workout only when the displayed second changes.
+      setNow((previous) => Math.ceil(remainingRestMs(restEndsAt, serverTime, receivedAt, previous) / 1000)
+        === Math.ceil(remaining / 1000) ? previous : current);
+      if (running && remaining <= 0) {
         running = false;
-        callbacks.current.onFinished?.();
+        window.clearInterval(id);
+        if (finishedRest.current !== restEndsAt) {
+          finishedRest.current = restEndsAt;
+          callbacks.current.onFinished?.();
+        }
       }
     };
     const first = window.setTimeout(tick, 0);
@@ -51,17 +61,24 @@ export function useRestTimer(input: TimerInput | undefined, onVisible: () => voi
     };
   }, [restEndsAt, serverTime, receivedAt]);
 
+  // Back from background, another tab or a sleeping phone: realign with the server.
   useEffect(() => {
-    const handler = () => {
+    const realign = () => {
       if (document.visibilityState === 'visible') {
         setNow(Date.now());
         callbacks.current.onVisible();
       }
     };
-    document.addEventListener('visibilitychange', handler);
-    return () => document.removeEventListener('visibilitychange', handler);
+    document.addEventListener('visibilitychange', realign);
+    window.addEventListener('focus', realign);
+    return () => {
+      document.removeEventListener('visibilitychange', realign);
+      window.removeEventListener('focus', realign);
+    };
   }, []);
 
-  const remainingMs = restEndsAt && serverTime ? remainingRestMs(restEndsAt, serverTime, receivedAt, now) : 0;
-  return Math.ceil(remainingMs / 1000);
+  // A new response can arrive after the last tick: never use an older clock sample
+  // to display a rest longer than the duration returned by the server.
+  const remainingMs = restEndsAt && serverTime ? remainingRestMs(restEndsAt, serverTime, receivedAt, Math.max(now, receivedAt)) : 0;
+  return input?.restPaused ? Math.ceil((input.restRemainingMillis ?? 0) / 1000) : Math.ceil(remainingMs / 1000);
 }

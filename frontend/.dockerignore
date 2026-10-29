@@ -3,3 +3,11 @@ dist
 coverage
 test-results
 playwright-report
+
+# Credenziali e chiavi
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.jks

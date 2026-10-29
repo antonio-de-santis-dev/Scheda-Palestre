@@ -524,3 +524,19 @@ La guida completa per verificare tutte le funzioni è in `GUIDA_TEST_MANUALE.md`
 | dal frontend "Connessione assente o server non raggiungibile" | backend spento | avviare il backend su 8080 |
 | "Credenziali non valide" dopo molti tentativi | account bloccato 15 minuti | attendere o far resettare la password dall'ADMIN |
 | 403 al login dietro un proxy diverso da quello fornito | l'header `Host` perde la porta | inoltrare `Host` completo o impostare `GYM_CORS_ALLOWED_ORIGINS` |
+
+## 29. Modifiche successive (branch `modifiche`)
+
+Le modifiche richieste dopo la versione 1.0 sono descritte nelle ADR e in `docs/progress.md`:
+
+| Area | Dove |
+| --- | --- |
+| Notifiche dopo salvataggio e assegnazione (state di React Router, `FlashOutlet`) | `docs/progress.md`, fase A |
+| Esercizio → gruppo muscolare, catalogo unificato, combobox accessibile (V7) | ADR 0007 |
+| Più schede attive, giorni senza sovrapposizione, lock per utente (V8) | ADR 0008 |
+| Durata consigliata `expires_on` | ADR 0009 |
+| Eliminazione logica con anonimizzazione e report attività (V9) | ADR 0010 |
+| Recupero bloccante, celebrazioni, guida vocale (O-06 superata) | ADR 0004, `docs/api.md` |
+
+Contratti aggiornati in `docs/api.md`; prova manuale nella Parte L di `GUIDA_TEST_MANUALE.md`.
+

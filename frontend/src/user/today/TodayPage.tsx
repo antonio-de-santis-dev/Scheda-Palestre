@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { BedDouble, CalendarClock, ClipboardList, Play, RotateCcw } from 'lucide-react';
+import { BedDouble, CalendarClock, ClipboardList, Music, Play, RotateCcw } from 'lucide-react';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
 import { Alert, ErrorAlert } from '../../shared/components/Alert';
@@ -10,6 +10,7 @@ import { PlanSessionView } from '../../shared/components/PlanSessionView';
 import { formatDate, formatLongDate, todayIso } from '../../shared/utils/format';
 import { useToday, useWorkoutAction, workoutApi, type Today } from '../workout/api';
 import { WorkoutStatusBadge } from '../workout/ExerciseStatusBadge';
+import { RecommendedDurationNotice } from '../../shared/components/RecommendedDurationNotice';
 
 /** US-16: planned workout, rest day, plan in preparation or missing days. */
 export function TodayPage() {
@@ -17,7 +18,9 @@ export function TodayPage() {
   const query = useToday(date);
   return (
     <>
-      <PageHeader title="Oggi" subtitle={formatLongDate(date)} />
+      <div className={query.data?.status === 'TRAINING_DAY' && query.data.session ? 'visually-hidden' : undefined}>
+        <PageHeader title="Oggi" subtitle={formatLongDate(date)} />
+      </div>
       <QueryState isLoading={query.isLoading} error={query.error} onRetry={() => void query.refetch()}>
         {query.data ? <TodayContent today={query.data} /> : null}
       </QueryState>
@@ -31,7 +34,23 @@ function TodayContent({ today }: { today: Today }) {
 
   return (
     <div className="stack">
+      <Link to="/app/music" className="btn btn--secondary"><Music size={20} aria-hidden="true" /> Aggiungi canzoni o playlist</Link>
       {today.pendingWorkout ? <PendingWorkout today={today} /> : null}
+
+      {today.recommendedDurationEnded.map((p) => (
+        <RecommendedDurationNotice key={p.assignmentId} planName={p.planName} expiresOn={p.expiresOn} ended={p.ended} />
+      ))}
+
+      {today.status !== 'NO_SCHEDULE'
+        ? today.plansWithoutDays.map((p) => (
+            <Alert key={p.assignmentId} tone="info" title="Scegli i giorni della nuova scheda">
+              <p>
+                La scheda “{p.planName}” non ha ancora giorni di allenamento.{' '}
+                <Link to={`/app/schedule?assignment=${p.assignmentId}`}>Scegli i giorni di {p.planName}</Link>
+              </p>
+            </Alert>
+          ))
+        : null}
 
       {today.status === 'NO_ACTIVE_ASSIGNMENT' ? (
         <EmptyState title="Nessuna scheda attiva" icon={<ClipboardList size={40} />}>
@@ -41,8 +60,21 @@ function TodayContent({ today }: { today: Today }) {
 
       {today.status === 'NO_SCHEDULE' ? (
         <EmptyState title="Scegli i tuoi giorni" icon={<CalendarClock size={40} />}>
-          <p>Indica in quali giorni ti alleni: le sessioni di “{today.planName}” verranno distribuite automaticamente.</p>
-          <Link to="/app/schedule" className="btn btn--primary">
+          {today.plansWithoutDays.length === 1 ? (
+            <p>
+              Indica in quali giorni ti alleni: le sessioni di “{today.plansWithoutDays[0]!.planName}” verranno distribuite
+              automaticamente.
+            </p>
+          ) : (
+            <p>
+              Hai {today.plansWithoutDays.length} schede senza giorni: scegli per ognuna in quali giorni ti alleni. Ogni giorno
+              può appartenere a una sola scheda.
+            </p>
+          )}
+          <Link
+            to={today.plansWithoutDays.length === 1 ? `/app/schedule?assignment=${today.plansWithoutDays[0]!.assignmentId}` : '/app/schedule'}
+            className="btn btn--primary"
+          >
             Scegli i giorni
           </Link>
         </EmptyState>
@@ -61,7 +93,8 @@ function TodayContent({ today }: { today: Today }) {
         >
           {today.nextTraining ? (
             <p>
-              Prossimo allenamento: <strong>{today.nextTraining.sessionTitle}</strong>, {formatLongDate(today.nextTraining.date)}.
+              Prossimo allenamento: <strong>{today.nextTraining.sessionTitle}</strong>
+              {today.activePlanCount > 1 ? ` di “${today.nextTraining.planName}”` : ''}, {formatLongDate(today.nextTraining.date)}.
             </p>
           ) : null}
           <Link to="/app/calendar" className="btn btn--secondary">
@@ -72,10 +105,10 @@ function TodayContent({ today }: { today: Today }) {
 
       {today.status === 'TRAINING_DAY' && today.session ? (
         <>
-          <section className="card" aria-labelledby="today-session">
+          <section className="today-hero" aria-labelledby="today-session">
             <div className="row row--between">
               <div>
-                <p className="muted small" style={{ margin: 0 }}>
+                <p className="today-hero__plan" style={{ margin: 0 }}>
                   {today.planName}
                 </p>
                 <h2 id="today-session" style={{ margin: 0 }}>
@@ -84,7 +117,11 @@ function TodayContent({ today }: { today: Today }) {
               </div>
               {today.workout ? <WorkoutStatusBadge status={today.workout.status} /> : null}
             </div>
-            <div style={{ marginTop: 'var(--space-4)' }}>
+            <div className="today-hero__chips">
+              <span>{today.session.sections.reduce((n, s) => n + s.exercises.length, 0)} esercizi</span>
+              <span>{today.session.sections.reduce((n, s) => n + s.exercises.reduce((total, e) => total + e.setsCount, 0), 0)} serie</span>
+            </div>
+            <div>
               {start.error ? <ErrorAlert error={start.error} /> : null}
               {today.canStart ? (
                 <Button
@@ -108,7 +145,10 @@ function TodayContent({ today }: { today: Today }) {
               ) : null}
             </div>
           </section>
-          <PlanSessionView session={today.session} headingLevel={3} />
+          <section className="card today-program" aria-labelledby="today-program-title">
+            <h2 id="today-program-title">Programma di oggi</h2>
+            <PlanSessionView session={today.session} headingLevel={3} hideTitle />
+          </section>
         </>
       ) : null}
     </div>

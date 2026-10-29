@@ -7,7 +7,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -20,14 +19,14 @@ final class PlanDtos {
     record CreatePlanRequest(
             @NotBlank @Size(max = 100) String name,
             @Size(max = 2000) String description,
-            LocalDate expiresOn) {
+            @Min(1) @Max(520) Integer durationWeeks) {
     }
 
     /** {@code version} enables optimistic locking on shared plans (spec 8.5 / 21). */
     record UpdatePlanRequest(
             @NotBlank @Size(max = 100) String name,
             @Size(max = 2000) String description,
-            LocalDate expiresOn,
+            @Min(1) @Max(520) Integer durationWeeks,
             @NotNull Long version) {
     }
 
@@ -53,10 +52,10 @@ final class PlanDtos {
             @Min(0) @Max(100) int reps,
             boolean toFailure,
             @Min(0) @Max(600) int restSeconds,
-            @Valid @Size(max = 20) List<SetRequest> customSets) {
+            @Valid @Size(max = 20) List<@NotNull SetRequest> customSets) {
     }
 
-    record PlanListItem(UUID id, String name, String description, LocalDate expiresOn, int sessionCount,
+    record PlanListItem(UUID id, String name, String description, Integer durationWeeks, int sessionCount,
             boolean executable, UUID copiedFromPlanId, Instant createdAt, Instant updatedAt, Instant deletedAt) {
     }
 }

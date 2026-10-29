@@ -12,7 +12,7 @@ uguale al cookie `XSRF-TOKEN` (ottenibile con `GET /api/auth/csrf`).
 | Metodo | Endpoint | Accesso | Risposte |
 | --- | --- | --- | --- |
 | GET | `/api/auth/csrf` | pubblico | 200 `{headerName, token}` + cookie `XSRF-TOKEN` |
-| POST | `/api/auth/login` | pubblico | 200 utente corrente; 401 `INVALID_CREDENTIALS` (sempre generico) |
+| POST | `/api/auth/login` | pubblico | 200 utente corrente; 401 `INVALID_CREDENTIALS` (sempre generico); 429 `RATE_LIMITED` da Nginx oltre 20 tentativi/minuto per IP (burst 20, `Retry-After: 60`) |
 | POST | `/api/auth/logout` | autenticato | 204 |
 | GET | `/api/auth/me` | autenticato | 200 `{id, username, firstName, lastName, email, role, mustChangePassword}` |
 | POST | `/api/auth/change-password` | autenticato | 200 utente; 400 `VALIDATION_ERROR` (`currentPassword`, `newPassword`) |
@@ -30,6 +30,17 @@ Con `mustChangePassword = true` gli altri endpoint rispondono 403 `PASSWORD_CHAN
 | 409 | `CONFLICT`, `CONCURRENT_MODIFICATION` e codici di duplicato specifici |
 | 422 | codici di regola di dominio specifici |
 
+Alcuni errori aggiungono membri leggibili dalla macchina al Problem Details (ramo `modifiche`):
+
+| `code` | HTTP | Membri extra |
+| --- | --- | --- |
+| `EXERCISE_GROUP_MISMATCH` | 422 | `exerciseId`, `exerciseName`, `muscleGroupId`, `muscleGroupName`, `exerciseMuscleGroupId` |
+| `SCHEDULE_DAY_CONFLICT` | 409 | `conflicts: [{weekday, assignmentId, planName}]` |
+| `REST_NOT_FINISHED` | 422 | `restEndsAt`, `serverTime` |
+
+Altri codici nuovi: `ASSIGNMENT_NOT_ACTIVE` (422), `CANNOT_DELETE_SELF`, `PROTECTED_ACCOUNT`,
+`ACCOUNT_DELETED` (422).
+
 ## Account (ADMIN)
 
 | Metodo | Endpoint | Funzione | Risposte |
@@ -37,10 +48,12 @@ Con `mustChangePassword = true` gli altri endpoint rispondono 403 `PASSWORD_CHAN
 | GET | `/api/admin/users?q=&role=&active=&page=&size=` | elenco paginato e ricerca (nome, username, email) | 200 `Page<User>` |
 | POST | `/api/admin/users` | crea USER (ruolo sempre USER) | 201 `{user, temporaryPassword}`; 409 `USERNAME_TAKEN`/`EMAIL_TAKEN` |
 | GET | `/api/admin/users/{id}` | dettaglio | 200; 404 |
-| PUT | `/api/admin/users/{id}` | modifica nome, cognome, username, email, telefono | 200; 409 |
+| PUT | `/api/admin/users/{id}` | modifica nome, cognome, username, email, telefono | 200; 409; 422 `PROTECTED_ACCOUNT` se si cambia lo username dell'ADMIN iniziale |
 | POST | `/api/admin/users/{id}/activate` | riattiva | 200 |
 | POST | `/api/admin/users/{id}/deactivate` | disattiva e invalida le sessioni | 200; 422 `CANNOT_DEACTIVATE_SELF`, `LAST_ACTIVE_ADMIN` |
-| POST | `/api/admin/users/{id}/reset-password` | password temporanea mostrata una sola volta | 200 `{user, temporaryPassword}` |
+| POST | `/api/admin/users/{id}/reset-password` | password temporanea mostrata una sola volta | 200 `{user, temporaryPassword}`; 422 `ACCOUNT_DELETED` |
+| DELETE | `/api/admin/users/{id}` | eliminazione **logica** con anonimizzazione (ADR 0010): chiude le assegnazioni, invalida le sessioni | 204 (anche se già eliminato); 404; 422 `CANNOT_DELETE_SELF`, `PROTECTED_ACCOUNT`, `LAST_ACTIVE_ADMIN` |
+| GET | `/api/admin/users/{id}/activity-report` | report attività con soli dati registrati | 200 `ActivityReport`; 404 |
 
 Corpo di creazione/modifica:
 
@@ -48,24 +61,38 @@ Corpo di creazione/modifica:
 { "firstName": "Mario", "lastName": "Rossi", "username": "mario", "email": "mario@example.test", "phone": null }
 ```
 
-`User`: `{id, firstName, lastName, username, email, phone, role, active, mustChangePassword, locked, createdAt, updatedAt}`.
+`User`: `{id, firstName, lastName, username, email, phone, role, active, mustChangePassword, locked, createdAt, updatedAt, deleted, protectedAccount}`.
+Gli account eliminati non compaiono nell'elenco; `PUT`, `activate` e `reset-password` rispondono 422 `ACCOUNT_DELETED`.
+
+`ActivityReport`: `{userId, generatedOn, totals:{workoutsCompleted, workoutsInterrupted, workoutsInProgress,
+setsCompleted, exercisesCompleted, exercisesSkipped, firstWorkoutDate, lastWorkoutDate}, plans:[{assignmentId,
+planId, planName, status, startDate, endDate, weekdays, planExpiresOn, recommendedDurationEnded, workoutsCompleted,
+workoutsInterrupted, workoutsInProgress, setsCompleted, exercisesCompleted, exercisesSkipped, lastWorkoutDate,
+sessionsInPlan, distinctSessionsCompleted}], weeks:[{weekStart, workoutsCompleted, workoutsInterrupted,
+setsCompleted}]}` (ultime 12 settimane ISO, incluse quelle senza attività).
 Il campo `passwordHash` non è mai esposto. `Page<T>`: `{content, page, size, totalElements, totalPages}`.
 
-## Cataloghi (ADMIN)
+## Catalogo (ADMIN)
 
-Stessa forma per `muscle-groups` ed `exercises`:
+Ogni esercizio appartiene a **un solo** gruppo muscolare (ADR 0007, migrazione V7).
 
 | Metodo | Endpoint | Funzione | Risposte |
 | --- | --- | --- | --- |
-| GET | `/api/admin/{catalog}?q=&active=&page=&size=` | ricerca paginata (attivi e disattivati) | 200 `Page<Item>` |
-| POST | `/api/admin/{catalog}` | crea `{name}` | 201; 409 `NAME_TAKEN` |
-| PUT | `/api/admin/{catalog}/{id}` | rinomina `{name}` | 200; 409 `NAME_TAKEN`; 404 |
-| POST | `/api/admin/{catalog}/{id}/activate` | riattiva | 200 |
-| POST | `/api/admin/{catalog}/{id}/deactivate` | disattiva (cancellazione logica) | 200 |
+| GET | `/api/admin/muscle-groups?q=&active=&page=&size=` | ricerca paginata dei gruppi | 200 `Page<MuscleGroup>` |
+| GET | `/api/admin/muscle-groups/{id}` | dettaglio con contatori | 200; 404 |
+| POST | `/api/admin/muscle-groups` | crea `{name}` | 201; 409 `NAME_TAKEN` |
+| PUT | `/api/admin/muscle-groups/{id}` | rinomina `{name}` | 200; 409 `NAME_TAKEN`; 404 |
+| POST | `/api/admin/muscle-groups/{id}/activate` · `/deactivate` | riattiva / disattiva (logica) | 200 |
+| GET | `/api/admin/exercises?muscleGroupId=&q=&active=&page=&size=` | ricerca paginata, filtrabile per gruppo | 200 `Page<Exercise>` |
+| POST | `/api/admin/exercises` | crea `{name, muscleGroupId}` (gruppo obbligatorio e attivo) | 201; 400 (`muscleGroupId`); 409 `NAME_TAKEN`; 422 `CATALOG_ITEM_INACTIVE` |
+| PUT | `/api/admin/exercises/{id}` | rinomina e/o sposta `{name, muscleGroupId?}` (null = stesso gruppo) | 200; 409; 422 `CATALOG_ITEM_INACTIVE` |
+| POST | `/api/admin/exercises/{id}/activate` · `/deactivate` | riattiva / disattiva (logica) | 200 |
 
-`Item`: `{id, name, active, createdAt, updatedAt}`. I nomi sono univoci senza distinzione fra
-maiuscole e minuscole e gli spazi multipli sono normalizzati. Un elemento disattivato resta visibile nelle schede
-che lo usano, ma non può essere inserito in nuove configurazioni (`422 CATALOG_ITEM_INACTIVE`).
+`MuscleGroup`: `{id, name, active, createdAt, updatedAt, exerciseCount, activeExerciseCount}` (contatori
+calcolati con una sola query aggregata). `Exercise`: `{id, name, active, muscleGroupId, createdAt, updatedAt}`.
+I nomi sono univoci nell'intero catalogo senza distinzione fra maiuscole e minuscole; gli spazi multipli sono
+normalizzati. Un elemento disattivato resta visibile nelle schede che lo usano, ma non può essere inserito in
+nuove configurazioni (`422 CATALOG_ITEM_INACTIVE`).
 
 ## Schede (ADMIN)
 
@@ -87,8 +114,8 @@ Tutte le operazioni di struttura restituiscono la **scheda completa aggiornata**
 | POST | `/api/admin/sessions/{id}/sections` | aggiunge sezione `{muscleGroupId}` | 409 `MUSCLE_GROUP_ALREADY_IN_SESSION`, 422 `CATALOG_ITEM_INACTIVE` |
 | DELETE | `/api/admin/sections/{id}` | elimina sezione | |
 | PUT | `/api/admin/sessions/{id}/sections/order` | riordina sezioni | 422 `INVALID_ORDER` |
-| POST | `/api/admin/sections/{id}/exercises` | aggiunge esercizio configurato | 400, 422 `CATALOG_ITEM_INACTIVE` |
-| PUT | `/api/admin/plan-exercises/{id}` | sostituisce la configurazione completa (serie personalizzate incluse) | 400 `INVALID_CUSTOM_SETS` |
+| POST | `/api/admin/sections/{id}/exercises` | aggiunge esercizio configurato (deve essere del gruppo della sezione) | 400, 422 `CATALOG_ITEM_INACTIVE`, `EXERCISE_GROUP_MISMATCH` |
+| PUT | `/api/admin/plan-exercises/{id}` | sostituisce la configurazione completa (serie personalizzate incluse); un esercizio **diverso** deve essere attivo e del gruppo, lo stesso esercizio resta ammesso anche se storico | 400 `INVALID_CUSTOM_SETS`, 422 `EXERCISE_GROUP_MISMATCH` |
 | DELETE | `/api/admin/plan-exercises/{id}` | elimina configurazione | |
 | PUT | `/api/admin/sections/{id}/exercises/order` | riordina esercizi | 422 `INVALID_ORDER` |
 
@@ -112,8 +139,11 @@ esattamente `setsCount` righe con indici da 1 a N.
 `PlanStructure`: `{id, name, description, expiresOn, createdBy, copiedFromPlanId, createdAt,
 updatedAt, deletedAt, version, executable, sessions:[{id, title, position, sections:[{id,
 muscleGroupId, muscleGroupName, muscleGroupActive, position, exercises:[{id, exerciseId,
-exerciseName, exerciseActive, position, setsCount, reps, toFailure, restSeconds, customized,
+exerciseName, exerciseActive, exerciseInSectionGroup, position, setsCount, reps, toFailure, restSeconds, customized,
 sets:[{setIndex, reps, toFailure, restSeconds}]}]}]}]}`. `sets` contiene sempre le N serie effettive.
+`exerciseInSectionGroup = false` segnala una riga storica il cui esercizio ora appartiene a un altro gruppo
+(tollerata e salvabile). `expiresOn` è la **fine della durata consigliata** (ADR 0009), non la fine di
+un'assegnazione.
 
 ## Assegnazioni (ADMIN)
 
@@ -122,34 +152,43 @@ sets:[{setIndex, reps, toFailure, restSeconds}]}]}]}]}`. `sets` contiene sempre 
 | GET | `/api/admin/plans/{id}/assignments` | assegnatari della scheda | 404 |
 | GET | `/api/admin/users/{id}/assignments` | assegnazioni dell'utente | 404 |
 | POST | `/api/admin/assignments` | assegna a uno o più USER (tutto o niente) | 422 `USER_NOT_ASSIGNABLE`, `PLAN_NOT_EXECUTABLE`, `PLAN_DELETED`; 409 `ASSIGNMENT_ALREADY_ACTIVE` |
-| POST | `/api/admin/assignments/{id}/activate` | attiva un'assegnazione in attesa `{copySchedule?}` | 422 `ASSIGNMENT_CLOSED`, `PLAN_NOT_EXECUTABLE` |
+| POST | `/api/admin/assignments/{id}/activate` | attiva un'assegnazione in attesa `{copySchedule?}` (corpo assente = nessuna copia) | 422 `ASSIGNMENT_CLOSED`, `PLAN_NOT_EXECUTABLE` |
 | POST | `/api/admin/assignments/{id}/close` | chiude (`active=false`, `endDate`) | |
+| GET | `/api/admin/assignments/recommended-duration-ended` | assegnazioni attive con durata consigliata terminata `[{userId, assignmentId, planId, planName, expiresOn}]` | |
 
 ```json
-{ "planId": "uuid", "userIds": ["uuid-1", "uuid-2"], "startDate": "2026-10-01", "activate": true, "copySchedule": true }
+{ "planId": "uuid", "userIds": ["uuid-1", "uuid-2"], "startDate": "2026-10-01", "activate": true, "copySchedule": false }
 ```
 
-L'attivazione avviene in un'unica transazione: chiude l'eventuale assegnazione attiva precedente
-(e interrompe l'allenamento in corso collegato), attiva la nuova, imposta l'ancoraggio della rotazione
-al giorno più tardo fra `startDate` e oggi e, con `copySchedule` (O-07, default `true`), copia i giorni
-settimanali della precedente.
+Un USER può avere **più schede attive** (ADR 0008). L'attivazione, sotto un lock per utente:
+- rifiuta una seconda assegnazione attiva della **stessa** scheda (`409 ASSIGNMENT_ALREADY_ACTIVE`);
+- **non** chiude le altre schede e **non** interrompe l'allenamento in corso;
+- imposta l'ancoraggio della rotazione al giorno più tardo fra `startDate` e oggi;
+- con `copySchedule: true` (default `false`) copia dall'ultima scheda chiusa dell'utente solo i
+  giorni ancora liberi, riportando `copiedWeekdays` e `skippedWeekdays` nella risposta.
 
-`Assignment`: `{id, userId, userFullName, username, planId, planName, planDeleted, startDate, endDate, active, status, createdAt}`
-con `status` ∈ `PENDING`, `ACTIVE`, `CLOSED`.
+`Assignment`: `{id, userId, userFullName, username, planId, planName, planDeleted, startDate, endDate, active,
+status, createdAt, copiedWeekdays, skippedWeekdays, planExpiresOn, recommendedDurationEnded}` con `status` ∈
+`PENDING`, `ACTIVE`, `CLOSED`. `recommendedDurationEnded` è calcolato dal server nel fuso della palestra
+(`oggi > planExpiresOn`) solo per le assegnazioni attive e non blocca nulla.
 
 ## Area USER - schede
 
 | Metodo | Endpoint | Funzione |
 | --- | --- | --- |
-| GET | `/api/me/assignments` | le proprie assegnazioni (attiva riconoscibile da `status`) |
+| GET | `/api/me/assignments` | le proprie assegnazioni (più schede possono essere `ACTIVE`) |
 | GET | `/api/me/assignments/{id}/plan` | struttura della scheda in sola lettura; 404 se l'assegnazione non è propria |
 
 ## Area USER - giorni di allenamento
 
 | Metodo | Endpoint | Funzione | Errori |
 | --- | --- | --- | --- |
-| GET | `/api/me/schedule` | giorni correnti `{assignmentId, weekdays}` (`assignmentId` null senza scheda attiva) | |
-| PUT | `/api/me/schedule` | sostituisce i giorni `{weekdays:[1,3,5]}` (ISO: 1=lunedì … 7=domenica) e ri-ancora la rotazione | 400 `VALIDATION_ERROR`, 422 `NO_ACTIVE_ASSIGNMENT` |
+| GET | `/api/me/schedules` | tutte le schede attive con i giorni `[{assignmentId, planId, planName, startDate, weekdays}]` | |
+| PUT | `/api/me/assignments/{id}/schedule` | sostituisce i giorni di **una** scheda `{weekdays:[1,3,5]}` (ISO: 1=lunedì … 7=domenica) e ne ri-ancora la rotazione | 400 `VALIDATION_ERROR`; 404 (non propria); 422 `ASSIGNMENT_NOT_ACTIVE`; 409 `SCHEDULE_DAY_CONFLICT` |
+
+Un giorno della settimana può appartenere a una sola scheda attiva dell'utente. Il controllo avviene
+dentro un `pg_advisory_xact_lock` per utente, quindi due richieste simultanee non possono prendere
+entrambe lo stesso giorno. Il vecchio `/api/me/schedule` è stato rimosso.
 
 ### Rotazione e ri-ancoraggio
 
@@ -165,12 +204,12 @@ prossima la stessa sessione che sarebbe stata proposta. Gli allenamenti esistent
 
 | Metodo | Endpoint | Funzione | Errori principali |
 | --- | --- | --- | --- |
-| GET | `/api/me/today?date=YYYY-MM-DD` | giornata: `status` ∈ `NO_ACTIVE_ASSIGNMENT`, `NOT_STARTED_YET`, `NO_SCHEDULE`, `PLAN_NOT_READY`, `REST_DAY`, `TRAINING_DAY`; anteprima `session`, `workout` del giorno, `pendingWorkout` (O-04), `nextTraining`, `canStart` | |
-| GET | `/api/me/calendar?from=&to=` | giorni (`TRAINING`/`REST`/`NONE`) con sessione ed esito; massimo 62 giorni | 400 `RANGE_TOO_LARGE`, `VALIDATION_ERROR` |
-| POST | `/api/me/workouts` | avvia l'allenamento pianificato `{date}` e crea lo snapshot | 422 `NO_ACTIVE_ASSIGNMENT`, `DATE_NOT_ALLOWED`, `NOT_A_TRAINING_DAY`, `PLAN_NOT_EXECUTABLE`; 409 `WORKOUT_ALREADY_EXISTS`, `WORKOUT_ALREADY_IN_PROGRESS` |
+| GET | `/api/me/today?date=YYYY-MM-DD` | giornata risolta fra tutte le schede attive: `status` ∈ `NO_ACTIVE_ASSIGNMENT`, `NOT_STARTED_YET`, `NO_SCHEDULE`, `PLAN_NOT_READY`, `REST_DAY`, `TRAINING_DAY`; `assignmentId`/`planName` della scheda del giorno; anteprima `session`, `workout` del giorno, `pendingWorkout` (O-04), `nextTraining {date, sessionTitle, planName}`, `canStart`, `activePlanCount`, `plansWithoutDays[]`, `recommendedDurationEnded[]` | |
+| GET | `/api/me/calendar?from=&to=` | giorni (`TRAINING`/`REST`/`NONE`) con sessione, `assignmentId`, `planName` ed esito; massimo 62 giorni | 400 `RANGE_TOO_LARGE`, `VALIDATION_ERROR` |
+| POST | `/api/me/workouts` | avvia l'allenamento pianificato `{date}` della scheda che allena in quella data e crea lo snapshot | 422 `NO_ACTIVE_ASSIGNMENT`, `DATE_NOT_ALLOWED`, `NOT_A_TRAINING_DAY`, `PLAN_NOT_EXECUTABLE`; 409 `WORKOUT_ALREADY_EXISTS`, `WORKOUT_ALREADY_IN_PROGRESS` |
 | GET | `/api/me/workouts/current` | allenamento in corso (204 se nessuno) | |
 | GET | `/api/me/workouts/{id}` | stato completo di un proprio allenamento | 404 |
-| POST | `/api/me/workouts/{id}/sets/{setId}/complete` | **Fine serie**, idempotente | 422 `SET_NOT_CURRENT`, `WORKOUT_NOT_IN_PROGRESS`; 404 |
+| POST | `/api/me/workouts/{id}/sets/{setId}/complete` | **Fine serie**, idempotente (ripetere una serie già completata restituisce lo stato attuale) | 422 `SET_NOT_CURRENT`, `WORKOUT_NOT_IN_PROGRESS`, `REST_NOT_FINISHED` (recupero in corso); 404 |
 | POST | `/api/me/workouts/{id}/exercises/{exerciseId}/skip` | salta l'esercizio in corso (idempotente) | 422 `EXERCISE_NOT_IN_PROGRESS` |
 | POST | `/api/me/workouts/{id}/interrupt` | interrompe (idempotente) | 422 `WORKOUT_NOT_IN_PROGRESS` |
 
@@ -191,7 +230,8 @@ Ogni risposta di esecuzione restituisce lo stato completo:
 }
 ```
 
-`nextAction` ∈ `COMPLETE_SET`, `WAIT_FOR_REST` (il timer è informativo, O-06), `FINISHED`.
+`nextAction` ∈ `COMPLETE_SET`, `WAIT_FOR_REST`, `FINISHED`. Durante `WAIT_FOR_REST` la serie successiva è
+rifiutata con `422 REST_NOT_FINISHED` (O-06 superata); "Salta" e "Interrompi" restano consentiti.
 
 ## Area USER - storico
 
@@ -209,3 +249,35 @@ Ogni risposta di esecuzione restituisce lo stato completo:
 
 Il cambio password usa `POST /api/auth/change-password` (password attuale obbligatoria) e chiude
 le altre sessioni aperte dell'utente.
+
+### Durata definitiva dell’allenamento (fixV2)
+
+`WorkoutState` e `WorkoutSummary` includono `durationSeconds` (`long` nullable). Il backend calcola i secondi interi tra i timestamp persistiti `startedAt` e `finishedAt` per gli allenamenti conclusi o interrotti, includendo i recuperi. Il campo è `null` per gli allenamenti ancora in corso o privi di timestamp validi. La lettura e i retry di azioni già applicate non modificano il valore finale. Anche lo storico precedente è coperto senza migrazioni o backfill aggiuntivi.
+
+### Recupero avanzato persistente (fixV2)
+
+`POST /api/me/workouts/{id}/rest` accetta `action` (`PAUSE`, `RESUME`, `EXTEND` = +30 secondi, `SKIP`), `expectedVersion` e `expectedExecutionVersion`, entrambi interi non negativi obbligatori. La risposta è `WorkoutState`, che include `restPaused`, `restRemainingMillis` e `restVersion`. Il timer in pausa blocca la serie successiva quanto un timer in esecuzione. Le revisioni vengono controllate sotto lock sul workout: duplicati o richieste basate su recupero/allenamento precedenti ricevono 409 `REST_STATE_CHANGED`; un recupero già terminato riceve 422 `REST_NOT_ACTIVE`. Le richieste non possono riaprire il recupero dopo la scadenza. Il salto ha conferma nella UI e non elimina risultati delle serie.
+
+### Filtri dello storico (fixV2)
+
+`GET /api/me/workouts` accetta `from` e `to` (date ISO inclusive sulla data dell’allenamento, opzionali anche singolarmente), `status` (`COMPLETED`, `INTERRUPTED`, `IN_PROGRESS`) e `q` (nome della scheda o della sessione salvato nello snapshot, sottostringa senza distinzione di maiuscole, massimo 100 caratteri dopo trim). Testo vuoto significa nessun filtro; i caratteri LIKE `%`, `_` e backslash sono letterali. I filtri si combinano con AND e includono sempre l’utente autenticato. La pagina e il totale sono riferiti ai risultati filtrati; l’ordine è `scheduledDate DESC, startedAt DESC, id DESC`. Intervalli invertiti e query troppo lunghe ricevono 400 `INVALID_HISTORY_FILTER`; date/esiti non validi ricevono 400. Le risposte mantengono il formato `PageResponse<WorkoutSummary>` precedente.
+
+### Risultati effettivi delle serie (fixV2)
+
+Il completamento serie `POST /api/me/workouts/{id}/sets/{setId}/complete` accetta il corpo facoltativo `{ "weightKgUsed": 32.75, "repsActual": 8 }`. Campi opzionali/null: risultato non registrato; zero: risultato esplicito. Peso tra 0 e 1000 con massimo due decimali; ripetizioni intere tra 0 e 1000. `SetState` restituisce `weightKgUsed` e `repsActual` anche nello storico. I valori previsti restano distinti. Retry identico idempotente; payload diverso su serie completata: 409 `SET_RESULTS_CHANGED`, senza modifiche. Richieste legacy senza corpo continuano a funzionare e non cancellano risultati salvati. Nessuna nuova migrazione: colonne V13.
+
+### Identità storica degli esercizi (fixV2)
+
+`ExerciseState.identity` contiene `{ "source": "CATALOG", "id": "UUID" }` per snapshot nuovi, oppure `source: "LEGACY"` per riferimenti storici limitati. La chiave è la coppia source/id: non usare nome o gruppo per collegare esercizi. L’UUID del catalogo è persistito all’avvio e resta disponibile dopo rinomina/eliminazione della voce originaria. I legacy conservano la vecchia voce della scheda o il proprio UUID di snapshot, senza deduzione del catalogo. La V19 riempie esclusivamente identità legacy mancanti e conserva riferimenti già salvati; risultati e recuperi restano invariati.
+
+### Volume registrato (fixV2)
+
+`WorkoutSummary`, `WorkoutState` ed `ExerciseState` includono `volume: { recordedKgReps, completedSets, recordedSets, missingWeightSets, missingRepsSets }`. Il volume è la somma esatta del peso usato per le ripetizioni effettive delle serie completate con entrambi i campi registrati. Nessuna serie calcolabile: `recordedKgReps: null`; risultati registrati pari a zero: `0`. Mancanze di peso e ripetizioni possono sovrapporsi: serie escluse = completedSets - recordedSets. Serie non svolte escluse da tutti i conteggi. I risultati completati di esercizi saltati o allenamenti interrotti rimangono inclusi. Nessuna stima dai valori previsti, nessuna nuova migrazione.
+
+### Riepilogo filtrato dello storico (fixV2)
+
+`GET /api/me/workout-stats?from=2026-10-01&to=2026-10-05&status=COMPLETED&q=Scheda` restituisce `totalWorkouts`, `completedWorkouts`, `interruptedWorkouts`, `inProgressWorkouts`, `recordedDurationSeconds`, `workoutsWithDuration`, `workoutsMissingDuration`, `volume` (contratto del volume precedente). Criteri e validazione come nell’elenco, inclusi ownership e nomi storici con wildcard letterali. Aggrega tutti i risultati filtrati, senza paginazione. Durata: somma dei secondi interi dei workout conclusi con timestamp coerenti; null se non disponibili, zero se validi ma inferiori a un secondo. Allenamenti in corso esclusi dalla durata, inclusi nei conteggi e nel volume delle serie già completate. Una sola query SQL aggregata, nessuna nuova migrazione.
+
+### Progressi mensili (fixV2)
+
+`GET /api/me/workout-progress` accetta from/to/status/q come riepilogo ed elenco. Restituisce `[{ "month": "2026-10-01", "totals": { ...contratto workout-stats... } }]`, ordinato per mese/anno, soltanto per mesi con workout filtrati. Le date filtrano i singoli workout prima dell’aggregazione. Query unica con criteri SQL condivisi col riepilogo; utente dalla sessione, nessuna paginazione/migrazione. Null e zero restano distinti; durata esclude workout in corso, volume include serie già completate. `chart` è soltanto una scelta frontend conservata nell’URL, non cambia il dataset backend.

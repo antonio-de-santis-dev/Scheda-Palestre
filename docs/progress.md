@@ -2,6 +2,7 @@
 
 | Incremento | Branch | Stato | User story | Verifica |
 | --- | --- | --- | --- | --- |
+| Modifiche A-F | `modifiche` (da `main`, deroga ad ADR 0006) | Completato, PR aperta verso `main` | Notifiche ADMIN, catalogo unificato, più schede attive, durata consigliata, eliminazione utente e report, recupero/celebrazioni/audio | Backend 206, frontend 78, E2E 7/7 su Vite e su stack Docker |
 | 0 - Fondamenta | `chore/increment-0-foundation` | Completato | — | Backend 19 test, frontend 10 test, build OK, login/logout manuale con curl |
 | 1 - Account e cataloghi | `feat/identity-accounts`, `feat/catalog-management` | Completato | US-01, US-02, US-25, US-04, US-05, US-21 (ruoli), US-22 | Backend 67 test, frontend 19 test, lint/build OK |
 | Finale - Verifica e rilascio | `test/integration-e2e`, `fix/nginx-forwarded-host`, `perf/route-code-splitting`, `docs/final-documentation` | Completato | Tutte | Backend 189, frontend 51, E2E 5/5 (6 flussi) su Vite e su stack Docker |
@@ -97,3 +98,20 @@ saltati mostrano "Saltato". *Profilo*: salvare un telefono e cambiare la passwor
 - Database ricreato da zero solo con Flyway; `./mvnw clean verify` 189/189; `npm test` 51/51;
   lint, typecheck e build senza errori né warning; nessun segreto nella cronologia Git.
 - Documentazione: `DOCUMENTAZIONE_IMPLEMENTAZIONE_COMPLETA.md`, `GUIDA_TEST_MANUALE.md`, `CLAUDE.md`.
+
+## Modifiche (branch `modifiche`)
+
+Branch creato da `main` aggiornato invece che da `develop`: è una deroga consapevole ad ADR 0006,
+richiesta dal proprietario. Ogni fase ha i suoi commit e la PR verso `main` resta aperta per la
+revisione.
+
+| Fase | Contenuto | ADR / migrazione |
+| --- | --- | --- |
+| A | Notifica dopo "Salva dati" ("Nuova scheda creata" / "Scheda modificata") e dopo l'assegnazione ("Scheda assegnata" con numero di utenti), trasportata dallo state di React Router e consumata subito | — |
+| B | Ogni esercizio appartiene a un gruppo; catalogo unico master-detail; combobox accessibile nell'editor; `EXERCISE_GROUP_MISMATCH` | ADR 0007, V7 |
+| E | Più schede attive per USER, giorni per scheda senza sovrapposizione (lock per utente), "Oggi" e calendario multi-scheda | ADR 0008, V8 |
+| D | Durata consigliata (`expires_on`): avviso dal giorno dopo, indicatore ADMIN | ADR 0009 |
+| C | Eliminazione logica con anonimizzazione, doppia conferma, report attività | ADR 0010, V9 |
+| F | "Fine serie" bloccato durante il recupero (`REST_NOT_FINISHED`), celebrazioni una volta per transizione, guida vocale opzionale | ADR 0004 (O-06 superata) |
+
+**Prova manuale.** Vedi `GUIDA_TEST_MANUALE.md`, sezione "Nuove funzionalità (branch modifiche)".

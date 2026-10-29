@@ -30,11 +30,28 @@ function readCookie(name: string): string | null {
 let csrfRequest: Promise<void> | null = null;
 
 async function fetchCsrf(): Promise<void> {
-  csrfRequest ??= fetch(buildUrl('/api/auth/csrf'), { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-    .then(() => undefined)
-    .finally(() => {
-      csrfRequest = null;
-    });
+  if (!csrfRequest) {
+    const timeout = AbortSignal.timeout(TIMEOUT_MS);
+    csrfRequest = fetch(buildUrl('/api/auth/csrf'), {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+      signal: timeout,
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw await toApiError(response);
+        }
+      })
+      .catch((error: unknown) => {
+        if (error instanceof ApiError) {
+          throw error;
+        }
+        throw ApiError.network(timeout.aborted);
+      })
+      .finally(() => {
+        csrfRequest = null;
+      });
+  }
   return csrfRequest;
 }
 
@@ -57,7 +74,11 @@ export interface RequestOptions {
 }
 
 export function buildUrl(path: string, query?: Record<string, QueryValue>): string {
-  const absolute = new URL(path, window.location.origin).toString();
+  const url = new URL(path, window.location.origin);
+  if (url.origin !== window.location.origin) {
+    throw new Error('API requests must use the application origin');
+  }
+  const absolute = url.toString();
   if (!query) {
     return absolute;
   }
@@ -85,6 +106,9 @@ async function toApiError(response: Response): Promise<ApiError> {
 }
 
 async function send(path: string, options: RequestOptions, retryCsrf: boolean): Promise<Response> {
+  // A cancelled query must not bootstrap CSRF or issue another request.
+  options.signal?.throwIfAborted();
+  buildUrl(path, options.query); // Validate before any CSRF bootstrap.
   const method = options.method ?? 'GET';
   const headers: Record<string, string> = { Accept: 'application/json, application/problem+json' };
   if (options.body !== undefined) {
@@ -138,8 +162,14 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   if (response.status === 204 || response.headers.get('Content-Length') === '0') {
     return undefined as T;
   }
-  const text = await response.text();
-  return (text ? JSON.parse(text) : undefined) as T;
+  try {
+    const text = await response.text();
+    return (text ? JSON.parse(text) : undefined) as T;
+  } catch (error) {
+    if (options.signal?.aborted) throw error;
+    if (error instanceof SyntaxError) throw error;
+    throw ApiError.network(error instanceof DOMException && error.name === 'TimeoutError');
+  }
 }
 
 export const http = {

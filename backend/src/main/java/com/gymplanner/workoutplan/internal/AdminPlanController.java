@@ -14,6 +14,8 @@ import com.gymplanner.workoutplan.internal.PlanDtos.UpdatePlanRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -32,17 +34,13 @@ import org.springframework.web.bind.annotation.RestController;
 /** ADMIN plan endpoints (spec 13.4). Structure mutations return the complete updated plan. */
 @RestController
 @RequestMapping("/api/admin")
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class AdminPlanController {
 
     private static final Sort SORT = Sort.by(Sort.Order.desc("updatedAt"), Sort.Order.asc("name"));
 
     private final PlanService plans;
     private final PlanStructureService structure;
-
-    AdminPlanController(PlanService plans, PlanStructureService structure) {
-        this.plans = plans;
-        this.structure = structure;
-    }
 
     @GetMapping("/plans")
     PageResponse<PlanListItem> list(@RequestParam(required = false) String q,

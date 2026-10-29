@@ -1,12 +1,17 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll } from 'vitest';
 import { server } from './server';
+
+// Lazy routes are compiled on first use: under load the first render can exceed 1 s.
+configure({ asyncUtilTimeout: 3000 });
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
   cleanup();
   server.resetHandlers();
+  localStorage.clear();
+  delete document.documentElement.dataset.theme;
   document.cookie = 'XSRF-TOKEN=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
 });
 afterAll(() => server.close());
@@ -17,6 +22,17 @@ if (!HTMLDialogElement.prototype.showModal) {
     this.setAttribute('open', '');
   };
   HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
+    if (!this.hasAttribute('open')) return;
     this.removeAttribute('open');
+    this.dispatchEvent(new Event('close'));
   };
 }
+
+// jsdom only logs "Not implemented" for scrolling and media playback: silent no-ops keep the
+// test output readable without hiding real warnings.
+window.scrollTo = () => undefined;
+Object.assign(HTMLMediaElement.prototype, {
+  pause: () => undefined,
+  load: () => undefined,
+  play: () => Promise.resolve(),
+});

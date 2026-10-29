@@ -37,15 +37,22 @@ class AdminAssignmentController {
         return service.listForUser(userId);
     }
 
+    /** Users with at least one active plan past its recommended duration (ADR 0009). */
+    @GetMapping("/api/admin/assignments/recommended-duration-ended")
+    List<AssignmentDtos.EndedDurationResponse> recommendedDurationEnded() {
+        return service.recommendedDurationEnded();
+    }
+
     @PostMapping("/api/admin/assignments")
     ResponseEntity<List<AssignmentResponse>> assign(@Valid @RequestBody AssignRequest body,
             @AuthenticationPrincipal AuthenticatedUser admin) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.assign(body, admin.id()));
     }
 
+    /** Without a body nothing is copied: {@code copySchedule} defaults to false (docs/api.md). */
     @PostMapping("/api/admin/assignments/{id}/activate")
     AssignmentResponse activate(@PathVariable UUID id, @RequestBody(required = false) ActivateRequest body) {
-        return service.activate(id, body == null || body.copy());
+        return service.activate(id, body != null && body.copy());
     }
 
     @PostMapping("/api/admin/assignments/{id}/close")

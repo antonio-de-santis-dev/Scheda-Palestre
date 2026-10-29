@@ -11,6 +11,9 @@ import { usersApi, useUserMutation, useUsers, type UserWithPassword } from './ap
 import { UserForm } from './UserForm';
 import { TemporaryPasswordNotice } from './TemporaryPasswordNotice';
 import { UserStatusBadges } from './UserStatusBadges';
+import { CalendarX2 } from 'lucide-react';
+import { StatusBadge } from '../../shared/components/StatusBadge';
+import { useRecommendedDurationEnded } from '../assignments/api';
 
 const PAGE_SIZE = 20;
 
@@ -23,6 +26,8 @@ export function UsersPage() {
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState<UserWithPassword | null>(null);
 
+  const ended = useRecommendedDurationEnded();
+  const endedUsers = new Set((ended.data ?? []).map((e) => e.userId));
   const query = useUsers({
     q: q || undefined,
     active: status === 'all' ? undefined : status === 'active',
@@ -47,7 +52,7 @@ export function UsersPage() {
     <>
       <PageHeader
         title="Utenti"
-        subtitle="Account USER della palestra. La registrazione pubblica non esiste: gli account li crei tu."
+        subtitle="Gestisci gli account e gli accessi alla palestra."
         actions={
           !creating ? (
             <Button icon={<UserPlus size={18} aria-hidden="true" />} onClick={() => setCreating(true)}>
@@ -121,7 +126,8 @@ export function UsersPage() {
             </p>
             <ul className="list" aria-label="Elenco utenti">
               {query.data?.content.map((user) => (
-                <li key={user.id} className="list-item">
+                <li key={user.id} className="list-item user-list-item">
+                  <span className="avatar avatar--soft" aria-hidden="true">{user.firstName.charAt(0)}{user.lastName.charAt(0)}</span>
                   <div className="list-item__main">
                     <div className="list-item__title">
                       {user.lastName} {user.firstName}
@@ -131,6 +137,11 @@ export function UsersPage() {
                     </div>
                   </div>
                   <UserStatusBadges user={user} />
+                  {endedUsers.has(user.id) ? (
+                    <StatusBadge tone="warning" icon={<CalendarX2 size={14} aria-hidden="true" />}>
+                      Scheda da rinnovare
+                    </StatusBadge>
+                  ) : null}
                   <div className="list-item__actions">
                     <Link
                       className="btn btn--secondary btn--sm"

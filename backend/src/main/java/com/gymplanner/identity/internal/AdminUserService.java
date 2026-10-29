@@ -1,5 +1,6 @@
 package com.gymplanner.identity.internal;
 
+import com.gymplanner.identity.api.UserEvents;
 import com.gymplanner.identity.api.UserRole;
 import com.gymplanner.identity.internal.AdminUserDtos.UserRequest;
 import com.gymplanner.shared.error.BusinessRuleException;
@@ -7,11 +8,15 @@ import com.gymplanner.shared.error.ConflictException;
 import com.gymplanner.shared.error.FieldViolation;
 import com.gymplanner.shared.error.NotFoundException;
 import com.gymplanner.shared.web.Paging;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Account management by the ADMIN (US-01, US-25). */
 @Service
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class AdminUserService {
 
     private static final Logger log = LoggerFactory.getLogger(AdminUserService.class);
@@ -29,10 +35,54 @@ class AdminUserService {
 
     private final UserRepository users;
     private final PasswordEncoder passwordEncoder;
+    private final AdminBootstrapProperties bootstrap;
+    private final ApplicationEventPublisher events;
+    private final Clock clock;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
-    AdminUserService(UserRepository users, PasswordEncoder passwordEncoder) {
-        this.users = users;
-        this.passwordEncoder = passwordEncoder;
+    /** A dedicated namespace serialises changes to the set of active administrators. */
+    private void lockAdminLifecycle() {
+        jdbc.queryForObject("select pg_advisory_xact_lock(?)", Object.class, 0x4750_4144_4D49_4E4CL);
+    }
+
+    /** The ADMIN created at start-up from the configuration cannot be deleted (ADR 0010). */
+    boolean isProtected(User user) {
+        return user.getRole() == UserRole.ADMIN && bootstrap.username() != null
+                && user.getUsername().equalsIgnoreCase(bootstrap.username().trim());
+    }
+
+    /**
+     * ADR 0010: logical deletion with anonymization. The row and everything that references it
+     * are kept; active assignments are closed through {@link UserEvents.UserDeleted}; the session
+     * version invalidates open sessions at once. Idempotent: an already deleted account is left
+     * as is. Refused for oneself, the protected bootstrap ADMIN and the last active ADMIN.
+     */
+    @Transactional
+    public void delete(UUID id, UUID currentAdminId) {
+        lockAdminLifecycle();
+        User user = get(id);
+        if (user.isDeleted()) {
+            return;
+        }
+        if (user.getId().equals(currentAdminId)) {
+            throw new BusinessRuleException("CANNOT_DELETE_SELF", "An ADMIN cannot delete their own account");
+        }
+        if (isProtected(user)) {
+            throw new BusinessRuleException("PROTECTED_ACCOUNT", "The initial ADMIN account cannot be deleted");
+        }
+        if (user.getRole() == UserRole.ADMIN && user.isActive() && users.countByRoleAndActiveTrue(UserRole.ADMIN) <= 1) {
+            throw new BusinessRuleException("LAST_ACTIVE_ADMIN", "At least one active ADMIN must exist");
+        }
+        user.anonymizeAndDelete(clock.instant(), passwordEncoder.encode(UUID.randomUUID().toString()));
+        users.saveAndFlush(user);
+        events.publishEvent(new UserEvents.UserDeleted(user.getId()));
+        log.info("Account id={} deleted logically and anonymized", user.getId());
+    }
+
+    private static void requireNotDeleted(User user) {
+        if (user.isDeleted()) {
+            throw new BusinessRuleException("ACCOUNT_DELETED", "The account was deleted and cannot be changed");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -61,7 +111,12 @@ class AdminUserService {
     @Transactional
     public User update(UUID id, UserRequest request) {
         User user = get(id);
+        requireNotDeleted(user);
         UserRequest r = request.normalized();
+        if (isProtected(user) && !user.getUsername().equalsIgnoreCase(r.username())) {
+            // The protection is bound to the configured username (ADR 0010): renaming would remove it.
+            throw new BusinessRuleException("PROTECTED_ACCOUNT", "The username of the initial ADMIN account cannot be changed");
+        }
         ensureUnique(r.username(), r.email(), id);
         user.updateDetails(r.firstName(), r.lastName(), r.username(), r.email(), r.phone());
         users.saveAndFlush(user);
@@ -71,6 +126,7 @@ class AdminUserService {
     @Transactional
     public User activate(UUID id) {
         User user = get(id);
+        requireNotDeleted(user);
         user.activate();
         return user;
     }
@@ -78,6 +134,7 @@ class AdminUserService {
     /** Deactivation invalidates open sessions (session version) and keeps at least one ADMIN. */
     @Transactional
     public User deactivate(UUID id, UUID currentAdminId) {
+        lockAdminLifecycle();
         User user = get(id);
         if (user.getId().equals(currentAdminId)) {
             throw new BusinessRuleException("CANNOT_DEACTIVATE_SELF", "An ADMIN cannot deactivate their own account");
@@ -96,6 +153,7 @@ class AdminUserService {
     @Transactional
     public CreatedUser resetPassword(UUID id) {
         User user = get(id);
+        requireNotDeleted(user);
         String temporary = PasswordPolicy.generateTemporary();
         user.resetPassword(passwordEncoder.encode(temporary));
         log.info("Password of account id={} reset by an ADMIN", user.getId());
