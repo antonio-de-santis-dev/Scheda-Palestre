@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import { expect, test, type Page } from '@playwright/test';
 import { api, buildPlan, createUser } from './api';
 import { changePassword, login, loginAsAdmin, RUN } from './helpers';
