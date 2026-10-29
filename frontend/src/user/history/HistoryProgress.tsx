@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router';
 import { http } from '../../shared/api/http';
 import { QueryState } from '../../shared/components/States';
 import { formatWorkoutDuration } from '../../shared/utils/format';
-import type { HistoryFilters } from './filters';
+import type { HistoryScope } from './filters';
 import type { HistoryStatsData } from './HistoryStats';
 
 export interface MonthlyProgress { month: string; totals: HistoryStatsData }
@@ -67,7 +67,7 @@ function MonthlyChart({ points, metric }: { points: MonthlyProgress[]; metric: M
   </div>;
 }
 
-export function HistoryProgress({ filters }: { filters: HistoryFilters }) {
+export function HistoryProgress({ filters }: { filters: HistoryScope }) {
   const [params, setParams] = useSearchParams();
   const requested = params.get('chart');
   const metric: Metric = requested === 'duration' || requested === 'workouts' ? requested : 'volume';

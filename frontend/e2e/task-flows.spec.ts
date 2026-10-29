@@ -124,7 +124,33 @@ test('Task 2: the session name chosen by the ADMIN is the title everywhere', asy
   await page.getByRole('button', { name: 'Interrompi' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Interrompi' }).click();
   await page.goto('/app/history');
-  await expect(page.getByText(/Parte superiore/).first()).toBeVisible();
+  await page.getByRole('link', { name: `Nomi ${RUN}` }).click();
+  await expect(page.locator('details.history-group summary').first()).toContainText('Parte superiore');
+  await page.context().close();
+});
+
+test('Task 4: history is organised by plan, also for a plan that is no longer active', async ({ browser }) => {
+  const first = await buildPlan(admin, `Storico A ${RUN}`, [{ title: 'Giorno 1', exercises: [{ name: `Storico uno ${RUN}` }] }]);
+  const { page, assignmentId } = await freshAthlete(browser, 'storico', first.plan.id);
+  await page.goto('/app/today');
+  await page.getByRole('button', { name: 'Inizia allenamento' }).click();
+  await page.getByRole('button', { name: /Fine serie/ }).click();
+  await expect(page.getByRole('heading', { name: 'Allenamento completato!' })).toBeVisible();
+  await api(admin, 'POST', `/api/admin/assignments/${assignmentId}/close`);
+
+  await page.goto('/app/history');
+  const plans = page.getByRole('list', { name: 'Schede con allenamenti' });
+  await expect(plans.getByRole('listitem').filter({ hasText: `Storico A ${RUN}` })).toContainText('Non attiva');
+  await expect(page.getByText('Record nei filtri selezionati')).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/task4-plans.png' });
+  await plans.getByRole('link', { name: `Storico A ${RUN}` }).click();
+  const group = page.locator('details.history-group').first();
+  await expect(group).toHaveAttribute('open', '');
+  await expect(group.locator('summary')).toContainText('Giorno 1');
+  await page.screenshot({ path: 'test-results/task4-plan.png', fullPage: true });
+  await group.getByRole('list', { name: 'Allenamenti' }).getByRole('link').first().click();
+  await expect(page.getByRole('heading', { name: 'Giorno 1' })).toBeVisible();
+  await expect(page.getByRole('region', { name: `Storico uno ${RUN}` })).toBeVisible();
   await page.context().close();
 });
 

@@ -203,7 +203,9 @@ test('4-5. USER completes sets with rest timer, skips an exercise and sees it in
   await athlete.getByRole('dialog').getByRole('button', { name: 'Salta esercizio' }).click();
   await expect(athlete.getByRole('heading', { name: 'Allenamento completato!' })).toBeVisible();
 
+  // Task 4: the history starts from the plans that have workouts.
   await athlete.goto('/app/history');
+  await athlete.getByRole('list', { name: 'Schede con allenamenti' }).getByRole('link', { name: names.plan }).click();
   const list = athlete.getByRole('list', { name: 'Allenamenti' });
   await expect(list.getByText(/1 completati, 1 saltati su 2/)).toBeVisible();
   await list.getByRole('link').first().click();
@@ -290,6 +292,7 @@ test('6. ADMIN edits the plan and past history stays unchanged', async () => {
   await expect(admin.getByRole('heading', { name: '1. Giorno 2' })).toBeVisible();
 
   await athlete.goto('/app/history');
+  await athlete.getByRole('list', { name: 'Schede con allenamenti' }).getByRole('link', { name: names.plan, exact: true }).click();
   await athlete.getByRole('list', { name: 'Allenamenti' }).getByRole('link').first().click();
   await expect(athlete.getByRole('heading', { name: 'Giorno 1' })).toBeVisible();
   await expect(athlete.getByRole('region', { name: names.bench })).toBeVisible();

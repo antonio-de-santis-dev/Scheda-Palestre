@@ -4,7 +4,7 @@ import { QueryState } from '../../shared/components/States';
 import { formatWorkoutDuration } from '../../shared/utils/format';
 import type { VolumeSummary } from '../workout/api';
 import { WorkoutVolume } from './WorkoutVolume';
-import type { HistoryFilters } from './filters';
+import type { HistoryScope } from './filters';
 
 export interface HistoryStatsData {
   totalWorkouts: number;
@@ -17,7 +17,7 @@ export interface HistoryStatsData {
   volume: VolumeSummary;
 }
 
-export function HistoryStats({ filters }: { filters: HistoryFilters }) {
+export function HistoryStats({ filters }: { filters: HistoryScope }) {
   const query = useQuery({
     queryKey: ['me', 'history', 'stats', filters],
     queryFn: ({ signal }) => http.get<HistoryStatsData>('/api/me/workout-stats', { ...filters }, signal),

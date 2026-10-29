@@ -1,4 +1,7 @@
 export interface HistoryFilters { from: string; to: string; status: string; q: string }
+
+/** Filters restricted to the plan selected in the history (Task 4). */
+export type HistoryScope = HistoryFilters & { plan?: string };
 export const HISTORY_FILTER_KEYS = ['from', 'to', 'status', 'q'] as const;
 
 export function readHistoryFilters(params: URLSearchParams): HistoryFilters {

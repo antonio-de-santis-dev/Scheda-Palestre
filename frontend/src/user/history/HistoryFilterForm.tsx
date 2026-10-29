@@ -25,7 +25,7 @@ export function HistoryFilterForm({ filters, onApply, onReset }: {
         <option value="INTERRUPTED">Interrotto</option>
         <option value="IN_PROGRESS">In corso</option>
       </select></label>
-      <label className="field">Nome scheda o sessione<input className="input" type="search" name="q"
+      <label className="field">Scheda, sessione o esercizio<input className="input" type="search" name="q"
         maxLength={100} defaultValue={filters.q} placeholder="Cerca nello storico" /></label>
     </div>
     {error ? <Alert tone="error"><p>{error}</p></Alert> : null}

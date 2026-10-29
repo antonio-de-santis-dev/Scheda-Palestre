@@ -22,7 +22,7 @@ describe('history', () => {
       ),
       http.get('*/api/me/workouts/:id', () => HttpResponse.json(done)),
     );
-    renderApp('/app/history');
+    renderApp('/app/history?plan=p-1');
     const list = await screen.findByRole('list', { name: 'Allenamenti' });
     expect(within(list).getByText(/1 completati, 1 saltati su 2/)).toBeInTheDocument();
     expect(within(list).getByText('Durata: 1 h')).toBeInTheDocument();

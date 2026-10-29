@@ -1423,3 +1423,30 @@ svg {
   font-weight: 600;
   color: var(--color-primary-text);
 }
+
+/* Task 4: history grouped by session, expandable. */
+.history-group {
+  padding: var(--space-3) var(--space-4);
+}
+
+.history-group__summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.history-group__title {
+  font-family: var(--font-heading);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.history-plan-header {
+  align-items: flex-end;
+  gap: var(--space-2);
+}
