@@ -639,6 +639,12 @@ body:has(.navigation-drawer[open]) {
   border-radius: 50%;
 }
 
+/* Task 3: a training day that was skipped (its session moved to another day). */
+.month-day--skipped .month-day__session {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+
 .month-day--done .month-day__dot {
   background: var(--color-success);
 }

@@ -100,7 +100,18 @@ export type TodayStatus =
   | 'NO_SCHEDULE'
   | 'PLAN_NOT_READY'
   | 'REST_DAY'
-  | 'TRAINING_DAY';
+  | 'TRAINING_DAY'
+  /** Task 3: today's training day was missed, skipped or moved. */
+  | 'SKIPPED_DAY';
+
+/** Task 3: a training day removed from the rotation; its session is trained on {@code landsOn}. */
+export interface DaySkip {
+  eventId: string;
+  kind: 'MISSED' | 'SKIPPED' | 'MOVED';
+  landsOn: string | null;
+  sessionId: string | null;
+  sessionTitle: string;
+}
 
 export interface Today {
   date: string;
@@ -119,11 +130,14 @@ export interface Today {
   plansWithoutDays: { assignmentId: string; planName: string }[];
   /** Active plans past their recommended duration (informative, ADR 0009). */
   recommendedDurationEnded: { assignmentId: string; planName: string; expiresOn: string; ended: boolean }[];
+  /** The session trained today recovers a skipped day (Task 3). */
+  rescheduledFrom?: string | null;
+  skip?: DaySkip | null;
 }
 
 export interface CalendarDay {
   date: string;
-  type: 'TRAINING' | 'REST' | 'NONE';
+  type: 'TRAINING' | 'REST' | 'NONE' | 'SKIPPED';
   sessionTitle: string | null;
   /** Stable session identity; titles may be duplicated or renamed. */
   sessionId: string | null;
@@ -131,6 +145,10 @@ export interface CalendarDay {
   assignmentId: string | null;
   planName: string | null;
   workout: WorkoutSummary | null;
+  /** TRAINING: first skipped day whose session is recovered here (Task 3). */
+  rescheduledFrom?: string | null;
+  /** SKIPPED: the event that removed the training day. */
+  skip?: DaySkip | null;
 }
 
 type RawState = Omit<WorkoutState, 'receivedAt'>;

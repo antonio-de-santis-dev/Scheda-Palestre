@@ -9,7 +9,13 @@ import java.util.List;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -59,11 +65,46 @@ class ScheduleController {
     }
 
     private final CalendarService service;
+    private final ScheduleChangeService changes;
+
+    /** Task 3: skip ({@code targetDate} null) or move the session of a training day. */
+    record ScheduleChangeRequest(@NotNull LocalDate date, LocalDate targetDate) {
+    }
 
     /** Every active plan with its days: the page shows which plan occupies each weekday. */
     @GetMapping("/schedules")
     List<PlanScheduleResponse> all(@AuthenticationPrincipal AuthenticatedUser user) {
+        changes.recordMissedSessions(user.id());
         return service.mySchedules(user.id()).stream().map(PlanScheduleResponse::of).toList();
+    }
+
+    /** Recent and future changes of one plan (missed, skipped, moved; undone ones included). */
+    @GetMapping("/assignments/{assignmentId}/schedule-changes")
+    List<ScheduleChangeService.ChangeView> changes(@AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable UUID assignmentId) {
+        changes.recordMissedSessions(user.id());
+        return changes.changes(user.id(), assignmentId);
+    }
+
+    /** What can be done on a day and the consequences on the following sessions. */
+    @GetMapping("/assignments/{assignmentId}/schedule-changes/options")
+    ScheduleChangeService.Options options(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID assignmentId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        changes.recordMissedSessions(user.id());
+        return changes.options(user.id(), assignmentId, date);
+    }
+
+    @PostMapping("/assignments/{assignmentId}/schedule-changes")
+    ResponseEntity<ScheduleChangeService.Options> change(@AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable UUID assignmentId, @Valid @RequestBody ScheduleChangeRequest body) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(changes.change(user.id(), assignmentId, body.date(), body.targetDate()));
+    }
+
+    @DeleteMapping("/assignments/{assignmentId}/schedule-changes/{changeId}")
+    ScheduleChangeService.Options undo(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID assignmentId,
+            @PathVariable UUID changeId) {
+        return changes.undo(user.id(), assignmentId, changeId);
     }
 
     @PutMapping("/assignments/{assignmentId}/schedule")

@@ -53,6 +53,8 @@ class CalendarService implements CalendarQueries {
     private final BusinessCalendar calendar;
     private final UserLock userLock;
     private final WorkoutScheduleAvailability workoutAvailability;
+    private final ScheduleEvents scheduleEvents;
+    private final ScheduleEventRepository eventRepository;
 
     /** The days of one active plan of the user. */
     record PlanSchedule(UUID assignmentId,
@@ -109,6 +111,10 @@ class CalendarService implements CalendarQueries {
         if (!oldDays.equals(newDays)) {
             int sessionCount = plans.sessionsInOrder(assignment.planId()).size();
             reanchor(assignment, oldDays, sessionCount, index -> index);
+            // Task 3: skips and moves of today and of future days referred to the old weekdays.
+            LocalDate today = calendar.today();
+            eventRepository.deleteAll(eventRepository.findByPlanAssignmentIdOrderByOriginalDateDesc(assignment.id())
+                    .stream().filter(e -> !e.getOriginalDate().isBefore(today)).toList());
             schedules.deleteByAssignment(assignment.id());
             newDays.forEach(day -> schedules.save(new WeeklySchedule(assignment.id(), day)));
             schedules.flush();
@@ -167,8 +173,10 @@ class CalendarService implements CalendarQueries {
             nextDate = assignment.startDate();
         }
 
-        while (!RotationCalculator.isScheduled(days, nextDate)
-                || workoutAvailability.hasWorkout(assignmentId, nextDate)) {
+        // First training slot without a workout (skipped/moved days are not slots, Task 3).
+        SlotPlanner planner = ScheduleEvents.planner(assignment, days, sessions.size(),
+                scheduleEvents.byAssignment(List.of(assignmentId)).get(assignmentId));
+        while (!planner.isSlot(nextDate) || workoutAvailability.hasWorkout(assignmentId, nextDate)) {
             nextDate = nextDate.plusDays(1);
         }
 
@@ -268,8 +276,10 @@ class CalendarService implements CalendarQueries {
             assignments.updateRotationAnchor(assignment.id(), anchor, Math.max(mapped, 0));
             return;
         }
-        LocalDate newAnchor = RotationCalculator.isScheduled(oldDays, today) ? today.plusDays(1) : today;
-        long k = RotationCalculator.countScheduledDays(oldDays, anchor, newAnchor);
+        SlotPlanner planner = ScheduleEvents.planner(assignment, oldDays, Math.max(oldSessionCount, 1),
+                scheduleEvents.byAssignment(List.of(assignment.id())).get(assignment.id()));
+        LocalDate newAnchor = planner.isSlot(today) ? today.plusDays(1) : today;
+        long k = planner.slotsBetween(anchor, newAnchor);
         int oldIndex = oldSessionCount > 0
                 ? (int) Math.floorMod(assignment.rotationAnchorIndex() + k, (long) oldSessionCount)
                 : 0;
@@ -285,13 +295,11 @@ class CalendarService implements CalendarQueries {
         if (active.isEmpty()) return Map.of();
         Map<UUID, Set<Integer>> days = weekdays(active.stream().map(AssignmentView::id).toList());
         var sessions = plans.sessionsInOrder(active.stream().map(AssignmentView::planId).distinct().toList());
+        var events = scheduleEvents.byAssignment(days.keySet());
         Map<UUID, List<DayPlan>> result = new java.util.HashMap<>();
         for (var assignment : active) {
-            List<DayPlan> range = new ArrayList<>();
-            for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
-                range.add(plan(assignment, days.get(assignment.id()), sessions.getOrDefault(assignment.planId(), List.of()), date));
-            }
-            result.put(assignment.id(), List.copyOf(range));
+            result.put(assignment.id(), plans(assignment, days.get(assignment.id()),
+                    sessions.getOrDefault(assignment.planId(), List.of()), events.get(assignment.id()), from, to));
         }
         return Map.copyOf(result);
     }
@@ -326,14 +334,25 @@ class CalendarService implements CalendarQueries {
     public List<DayPlan> range(AssignmentView assignment, LocalDate from, LocalDate to) {
         Set<Integer> days = weekdays(assignment.id());
         List<PlanSessionRef> sessions = plans.sessionsInOrder(assignment.planId());
-        List<DayPlan> result = new ArrayList<>((int) ChronoUnit.DAYS.between(from, to) + 1);
-        for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
-            result.add(plan(assignment, days, sessions, d));
-        }
-        return result;
+        return plans(assignment, days, sessions, scheduleEvents.byAssignment(List.of(assignment.id())).get(assignment.id()),
+                from, to);
     }
 
-    private static DayPlan plan(AssignmentView a, Set<Integer> days, List<PlanSessionRef> sessions, LocalDate d) {
+    private static List<DayPlan> plans(AssignmentView a, Set<Integer> days, List<PlanSessionRef> sessions,
+            List<ScheduleEvent> events, LocalDate from, LocalDate to) {
+        SlotPlanner planner = a.rotationAnchorDate() == null ? null
+                : ScheduleEvents.planner(a, days, sessions.size(), events);
+        Map<LocalDate, ScheduleEvent> active = ScheduleEvents.activeByDate(events);
+        List<DayPlan> result = new ArrayList<>((int) ChronoUnit.DAYS.between(from, to) + 1);
+        for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
+            result.add(plan(a, days, sessions, planner, active, d));
+        }
+        return List.copyOf(result);
+    }
+
+    /** Plan of one date (Task 3: skipped days and recovered sessions included). */
+    static DayPlan plan(AssignmentView a, Set<Integer> days, List<PlanSessionRef> sessions, SlotPlanner planner,
+            Map<LocalDate, ScheduleEvent> activeEvents, LocalDate d) {
         boolean inPeriod = a.active() && !d.isBefore(a.startDate()) && (a.endDate() == null || !d.isAfter(a.endDate()))
                 && a.rotationAnchorDate() != null;
         if (!inPeriod) {
@@ -345,12 +364,18 @@ class CalendarService implements CalendarQueries {
         if (sessions.isEmpty()) {
             return DayPlan.of(d, DayPlan.Type.NO_SESSIONS);
         }
-        int index = RotationCalculator.sessionIndex(days, sessions.size(), a.rotationAnchorDate(),
-                a.rotationAnchorIndex(), d);
+        ScheduleEvent event = activeEvents.get(d);
+        if (event != null && planner.wasSlot(d)) {
+            int index = planner.indexAt(d);
+            return new DayPlan(d, DayPlan.Type.SKIPPED, event.getSessionId(), event.getSessionTitle(), index, null,
+                    new DayPlan.Skip(event.getId(), event.getKind().name(), planner.landsOn(d), event.getSessionId(),
+                            event.getSessionTitle()));
+        }
+        int index = planner.sessionIndex(d);
         if (index < 0) {
             return DayPlan.of(d, DayPlan.Type.REST);
         }
         PlanSessionRef session = sessions.get(index);
-        return new DayPlan(d, DayPlan.Type.TRAINING, session.id(), session.title(), index);
+        return new DayPlan(d, DayPlan.Type.TRAINING, session.id(), session.title(), index, planner.rescheduledFrom(d), null);
     }
 }

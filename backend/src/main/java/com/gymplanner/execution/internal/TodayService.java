@@ -42,7 +42,9 @@ class TodayService {
         NO_SCHEDULE,
         PLAN_NOT_READY,
         REST_DAY,
-        TRAINING_DAY
+        TRAINING_DAY,
+        /** Task 3: the training day was missed, skipped or moved; {@code skip} says where its session goes. */
+        SKIPPED_DAY
     }
 
     record NextTraining(LocalDate date, String sessionTitle, String planName) {
@@ -64,17 +66,23 @@ class TodayService {
     record TodayResponse(LocalDate date, TodayStatus status, UUID assignmentId, String planName, List<Integer> weekdays,
             PlanStructure.Session session, WorkoutSummary workout, WorkoutSummary pendingWorkout,
             NextTraining nextTraining, boolean canStart, int activePlanCount, List<PlanRef> plansWithoutDays,
-            List<EndedPlan> recommendedDurationEnded) {
+            List<EndedPlan> recommendedDurationEnded, LocalDate rescheduledFrom, DayPlan.Skip skip) {
     }
 
     enum DayType {
         TRAINING,
         REST,
-        NONE
+        NONE,
+        /** Task 3: a training day that was missed, skipped or moved. */
+        SKIPPED
     }
 
+    /**
+     * @param rescheduledFrom TRAINING: the skipped day whose session is recovered here (Task 3)
+     * @param skip            SKIPPED: event, kind and day that receives the session
+     */
     record CalendarDay(LocalDate date, DayType type, String sessionTitle, UUID sessionId, UUID assignmentId, String planName,
-            WorkoutSummary workout) {
+            WorkoutSummary workout, LocalDate rescheduledFrom, DayPlan.Skip skip) {
     }
 
     private final WorkoutRepository workouts;
@@ -100,7 +108,7 @@ class TodayService {
         List<AssignmentView> active = assignments.listActiveForUser(userId);
         if (active.isEmpty()) {
             return new TodayResponse(date, TodayStatus.NO_ACTIVE_ASSIGNMENT, null, null, List.of(), null, null,
-                    pending, null, false, 0, List.of(), List.of());
+                    pending, null, false, 0, List.of(), List.of(), null, null);
         }
         Map<UUID, PlanSummary> names = plans.findPlans(active.stream().map(AssignmentView::planId).toList());
         // Bulk lookups: the number of queries does not grow with the number of active plans.
@@ -127,6 +135,15 @@ class TodayService {
                 .or(() -> active.stream().filter(a -> dayPlans.get(a.id()).isTraining()).findFirst())
                 .orElse(null);
 
+        AssignmentView skipped = chosen != null ? null
+                : active.stream().filter(a -> dayPlans.get(a.id()).type() == DayPlan.Type.SKIPPED).findFirst().orElse(null);
+        if (skipped != null) {
+            DayPlan day = dayPlans.get(skipped.id());
+            NextTraining next = nextTraining(active, names, date.plusDays(1));
+            return new TodayResponse(date, TodayStatus.SKIPPED_DAY, skipped.id(), name(names, skipped),
+                    List.copyOf(days.get(skipped.id())), null, null, pending, next, false, active.size(), withoutDays,
+                    ended, null, day.skip());
+        }
         if (chosen == null) {
             TodayStatus status = aggregateStatus(active, days, dayPlans);
             AssignmentView single = active.size() == 1 ? active.getFirst() : null;
@@ -135,7 +152,7 @@ class TodayService {
             return new TodayResponse(date, status, single == null ? null : single.id(),
                     single == null ? null : name(names, single),
                     single == null ? List.of() : List.copyOf(days.get(single.id())), null, null, pending, next, false,
-                    active.size(), withoutDays, ended);
+                    active.size(), withoutDays, ended, null, null);
         }
 
         PlanStructure structure = plans.getStructure(chosen.planId());
@@ -147,6 +164,7 @@ class TodayService {
             case NO_SESSIONS -> TodayStatus.PLAN_NOT_READY;
             case REST -> TodayStatus.REST_DAY;
             case TRAINING -> structure.executable() ? TodayStatus.TRAINING_DAY : TodayStatus.PLAN_NOT_READY;
+            case SKIPPED -> TodayStatus.SKIPPED_DAY;
         };
         PlanStructure.Session session = status == TodayStatus.TRAINING_DAY
                 ? structure.sessions().stream().filter(s -> s.id().equals(day.sessionId())).findFirst().orElse(null)
@@ -158,7 +176,7 @@ class TodayService {
                 && dateAllowed;
         return new TodayResponse(date, status, chosen.id(), structure.name(), List.copyOf(days.get(chosen.id())),
                 session, workoutOfDay == null ? null : summaryById.get(workoutOfDay.getId()), pending, next, canStart,
-                active.size(), withoutDays, ended);
+                active.size(), withoutDays, ended, day.rescheduledFrom(), day.skip());
     }
 
     private static TodayStatus aggregateStatus(List<AssignmentView> active, Map<UUID, Set<Integer>> days,
@@ -200,17 +218,27 @@ class TodayService {
         for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1), i++) {
             AssignmentView training = null;
             DayPlan trainingDay = null;
+            AssignmentView skippedPlan = null;
+            DayPlan skippedDay = null;
             boolean rest = false;
             for (AssignmentView a : active) {
                 DayPlan plan = ranges.get(a.id()).get(i);
                 if (plan.isTraining()) {
                     training = a;
                     trainingDay = plan;
+                } else if (plan.type() == DayPlan.Type.SKIPPED) {
+                    skippedPlan = a;
+                    skippedDay = plan;
                 } else if (plan.type() == DayPlan.Type.REST) {
                     rest = true;
                 }
             }
-            DayType type = training != null ? DayType.TRAINING : rest ? DayType.REST : DayType.NONE;
+            DayType type = training != null ? DayType.TRAINING : skippedDay != null ? DayType.SKIPPED
+                    : rest ? DayType.REST : DayType.NONE;
+            if (training == null && skippedDay != null) {
+                training = skippedPlan;
+                trainingDay = skippedDay;
+            }
             // Prefer the workout of the plan that trains that day, otherwise the latest one.
             List<Workout> ofDay = byDate.getOrDefault(d, List.of());
             UUID trainingId = training == null ? null : training.id();
@@ -219,7 +247,9 @@ class TodayService {
             result.add(new CalendarDay(d, type, trainingDay == null ? null : trainingDay.sessionTitle(),
                     trainingDay == null ? null : trainingDay.sessionId(),
                     trainingId, training == null ? null : name(names, training),
-                    w == null ? null : summaryById.get(w.getId())));
+                    w == null ? null : summaryById.get(w.getId()),
+                    trainingDay == null ? null : trainingDay.rescheduledFrom(),
+                    trainingDay == null ? null : trainingDay.skip()));
         }
         return result;
     }

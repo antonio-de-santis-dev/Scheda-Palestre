@@ -41,6 +41,7 @@ class HistoryIntegrationTest {
     AuthenticatedUser admin;
     AuthenticatedUser user;
     BuiltPlan plan;
+    String assignmentId;
 
     @BeforeEach
     void setUp() {
@@ -48,7 +49,7 @@ class HistoryIntegrationTest {
         admin = fixtures.createAdmin();
         user = fixtures.createUser();
         plan = factory.executablePlan(admin, "Storico", 2, 2, 1);
-        String assignmentId = api.post(admin, "/api/admin/assignments", """
+        assignmentId = api.post(admin, "/api/admin/assignments", """
                 {"planId":"%s","userIds":["%s"],"startDate":"%s","activate":true}"""
                 .formatted(plan.planId(), user.id(), MONDAY)).expect(201).read("$[0].id");
         api.put(user, "/api/me/assignments/" + assignmentId + "/schedule", "{\"weekdays\":[1,2,3,4,5,6,7]}").expect(200);
@@ -62,6 +63,17 @@ class HistoryIntegrationTest {
     private Api.Response startAt(LocalDate day) {
         clock.setDate(day);
         return api.post(user, "/api/me/workouts", "{\"date\":\"" + day + "\"}").expect(201);
+    }
+
+    /**
+     * Task 3: a training day without workout is rescheduled (its session moves to the next day).
+     * Accepting the loss restores the plain rotation, which these history tests rely on.
+     */
+    private void acceptMissedDay(LocalDate missed, LocalDate today) {
+        clock.setDate(today);
+        String base = "/api/me/assignments/" + assignmentId + "/schedule-changes";
+        String eventId = api.get(user, base + "/options?date=" + missed).expect(200).read("$.eventId");
+        api.delete(user, base + "/" + eventId).expect(200);
     }
 
     private void interrupt(Api.Response state) {
@@ -356,6 +368,7 @@ class HistoryIntegrationTest {
                 "{\"weightKgUsed\":80,\"repsActual\":5}").expect(200);
         api.post(user, "/api/me/workouts/" + id + "/exercises/" + next.read("$.currentExerciseId") + "/skip", null).expect(200);
         jdbc.update("update exercises set name = 'Nome record nuovo' where id = ?", UUID.fromString(identity));
+        acceptMissedDay(MONDAY.plusDays(1), MONDAY.plusDays(2));
         Api.Response second = startAt(MONDAY.plusDays(2));
         String secondId = second.read("$.workoutId"), secondSet = second.read("$.currentSetId");
         api.post(user, "/api/me/workouts/" + secondId + "/sets/" + secondSet + "/complete",
@@ -442,6 +455,7 @@ class HistoryIntegrationTest {
         assertThat((List<String>) records.read("$[*].identity.source")).containsExactlyInAnyOrder("CATALOG", "LEGACY");
         assertThat((List<String>) records.read("$[*].identity.id")).containsOnly(identity);
         // Repeating the catalog entry in another workout produces one record, preserving the earliest tie.
+        acceptMissedDay(MONDAY.plusDays(1), MONDAY.plusDays(2));
         Api.Response third = startAt(MONDAY.plusDays(2));
         api.post(user, "/api/me/workouts/" + third.read("$.workoutId") + "/sets/" + third.read("$.currentSetId") + "/complete",
                 "{\"weightKgUsed\":40,\"repsActual\":8}").expect(200);

@@ -83,5 +83,13 @@ class TaskMigrationsTest {
         assertThat(jdbc.queryForObject("select rest_after_seconds from workout_exercises where id = ?", Integer.class,
                 workoutExercise)).isNull();
         assertThat(jdbc.queryForObject("select count(*) from workout_sets", Integer.class)).isZero();
+
+        // V24 (Task 3): existing active assignments are tracked from yesterday, so no past day is
+        // rescheduled retroactively and today's rotation of the users does not change.
+        Flyway.configure().dataSource(ds).target("24").load().migrate();
+        assertThat(jdbc.queryForObject("select checked_until = current_date - 1 from schedule_tracking where plan_assignment_id = ?",
+                Boolean.class, assignment)).isTrue();
+        assertThat(jdbc.queryForObject("select count(*) from schedule_events", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from workouts", Integer.class)).isOne();
     }
 }
