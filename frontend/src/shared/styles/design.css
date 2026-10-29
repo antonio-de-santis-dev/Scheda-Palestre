@@ -447,6 +447,20 @@ body:has(.navigation-drawer[open]) {
 .session-tabs .btn {
   flex: none;
   white-space: nowrap;
+  gap: 6px;
+  max-width: 220px;
+}
+
+/* Task 2: the tab shows the session name, truncated on small screens (full name in title). */
+.session-tabs__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.session-tabs__index {
+  font-size: 0.8em;
+  opacity: 0.75;
 }
 
 .session-tabs [aria-selected=true] {

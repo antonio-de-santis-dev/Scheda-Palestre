@@ -1,4 +1,4 @@
-import type { PlanSession } from '../api/planTypes';
+import { sessionName, type PlanSession } from '../api/planTypes';
 
 interface SessionTabsProps {
   sessions: PlanSession[];
@@ -25,8 +25,9 @@ export function SessionTabs({ sessions, activeId, onSelect, prefix }: SessionTab
         onSelect(target.id);
         document.getElementById(`${prefix}-tab-${target.id}`)?.focus();
       }}>
-      {index < 26 ? `Sessione ${String.fromCharCode(65 + index)}` : `Sessione ${index + 1}`}
-      <span className="visually-hidden">: {session.title}</span>
+      {/* Task 2: the tab shows the name chosen by the ADMIN, not a generic letter. */}
+      <span className="session-tabs__index" aria-hidden="true">{index + 1}</span>
+      <span className="session-tabs__name" title={sessionName(session, index)}>{sessionName(session, index)}</span>
     </button>)}
   </div>;
 }

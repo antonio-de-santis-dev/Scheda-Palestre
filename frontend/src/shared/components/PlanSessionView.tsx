@@ -1,5 +1,5 @@
 import type { PlanSession } from '../api/planTypes';
-import { describeSets } from '../api/planTypes';
+import { describeSets, sessionGroups } from '../api/planTypes';
 import { restText } from '../utils/format';
 
 /** Read-only rendering of a session: muscle sections, exercises and planned values. */
@@ -9,7 +9,10 @@ export function PlanSessionView({ session, headingLevel = 2, hideTitle = false }
   return (
     <article className="plan-session plan-session--readonly" aria-label={session.title}>
       {!hideTitle ? <header className="plan-session__header">
-        <Heading>{session.title}</Heading>
+        <div className="plan-session__heading">
+          <Heading>{session.title}</Heading>
+          {session.sections.length ? <p className="plan-session__groups">{sessionGroups(session)}</p> : null}
+        </div>
       </header> : null}
       <div className="plan-session__body">
         {session.sections.length === 0 ? <p className="muted">Sessione ancora vuota.</p> : null}

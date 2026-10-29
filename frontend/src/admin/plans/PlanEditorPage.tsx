@@ -9,7 +9,7 @@ import { TextField } from '../../shared/components/Field';
 import { QueryState } from '../../shared/components/States';
 import { StatusBadge } from '../../shared/components/StatusBadge';
 import { restAfterText, restText } from '../../shared/utils/format';
-import { describeSets, type PlanSection, type PlanSession, type PlanStructure } from '../../shared/api/planTypes';
+import { describeSets, sessionGroups, sessionName, type PlanSection, type PlanSession, type PlanStructure } from '../../shared/api/planTypes';
 import { useActiveMuscleGroups } from '../catalog/api';
 import { Combobox } from '../../shared/components/Combobox';
 import { moved, plansApi, usePlan, usePlanMutation, type PlanExerciseInput } from './api';
@@ -217,7 +217,7 @@ function SessionCard({ session, index, total, readOnly, onMove, run, ask }: Sess
               }).catch(() => { /* The mutation error is displayed by the editor. */ });
             }}
           >
-            <TextField label="Titolo sessione" value={title} onChange={(e) => setTitle(e.target.value)} error={renameError} />
+            <TextField label="Nome sessione" hint="Es. Giorno 1, Gambe, Allenamento A" value={title} onChange={(e) => setTitle(e.target.value)} error={renameError} />
             <Button type="submit" size="sm">
               Salva
             </Button>
@@ -226,9 +226,13 @@ function SessionCard({ session, index, total, readOnly, onMove, run, ask }: Sess
             </Button>
           </form>
         ) : (
-          <h3 id={titleId}>
-            {index + 1}. {session.title}
-          </h3>
+          <div className="plan-session__heading">
+            <h3 id={titleId}>
+              {index + 1}. {sessionName(session, index)}
+            </h3>
+            {/* Muscle groups stay secondary information under the name chosen by the ADMIN. */}
+            {session.sections.length ? <p className="plan-session__groups">{sessionGroups(session)}</p> : null}
+          </div>
         )}
         {!readOnly && !renaming ? (
           <div className="row">
@@ -488,9 +492,9 @@ function AddSessionForm({
       {error ? <ErrorAlert error={error} /> : null}
       <div className="toolbar" style={{ marginBottom: 0 }}>
         <TextField
-          label="Nuova sessione"
+          label="Nome della nuova sessione"
           placeholder={suggested}
-          hint={`Se vuoto: “${suggested}”`}
+          hint={`Es. Giorno 1, Parte superiore, Gambe. Se vuoto: “${suggested}”. I gruppi muscolari si aggiungono dopo, dentro la sessione.`}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           error={fieldError}

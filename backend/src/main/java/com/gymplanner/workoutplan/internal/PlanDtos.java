@@ -57,7 +57,9 @@ final class PlanDtos {
             @Min(0) @Max(1200) Integer restAfterSeconds) {
     }
 
+    /** {@code sessionTitles}: names chosen by the ADMIN, in rotation order (Task 2). */
     record PlanListItem(UUID id, String name, String description, Integer durationWeeks, int sessionCount,
-            boolean executable, UUID copiedFromPlanId, Instant createdAt, Instant updatedAt, Instant deletedAt) {
+            boolean executable, UUID copiedFromPlanId, Instant createdAt, Instant updatedAt, Instant deletedAt,
+            java.util.List<String> sessionTitles) {
     }
 }

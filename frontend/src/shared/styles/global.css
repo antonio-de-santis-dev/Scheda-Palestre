@@ -1372,3 +1372,22 @@ svg {
   font-weight: 700;
   margin-bottom: var(--space-1);
 }
+
+/* Task 2: session name first, muscle groups as secondary information. */
+.plan-session__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.plan-session__groups {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.plan-list__sessions {
+  overflow-wrap: anywhere;
+}

@@ -48,7 +48,9 @@ class PlanService implements WorkoutPlanQueries {
         return plans.search(Paging.likePattern(q), deleted, pageable)
                 .map(p -> new PlanDtos.PlanListItem(p.getId(), p.getName(), p.getDescription(), p.getDurationWeeks(),
                         p.getSessions().size(), PlanStructureAssembler.isExecutable(p), p.getCopiedFromPlanId(),
-                        p.getCreatedAt(), p.getUpdatedAt(), p.getDeletedAt()));
+                        p.getCreatedAt(), p.getUpdatedAt(), p.getDeletedAt(),
+                        p.getSessions().stream().sorted(java.util.Comparator.comparingInt(PlanSession::getPosition))
+                                .map(PlanSession::getTitle).toList()));
     }
 
     @Transactional
