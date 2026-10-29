@@ -10,6 +10,7 @@ import { addDays, formatDate, formatLongDate, parseLocalDate, todayIso, toIsoDat
 import { useCalendar, type CalendarDay } from '../workout/api';
 import { WorkoutStatusBadge } from '../workout/ExerciseStatusBadge';
 import { useMyPlan } from '../plans/api';
+import { ScheduleChangePanel } from '../schedule/ScheduleChangePanel';
 
 const monthFormatter = new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric' });
 
@@ -49,28 +50,32 @@ export function CalendarPage() {
             {cells.map((date) => {
               const item = days.get(date);
               const training = item?.type === 'TRAINING' || !!item?.workout;
+              const skipped = item?.type === 'SKIPPED' && !item.workout;
               const completed = item?.workout?.status === 'COMPLETED';
               const outside = date.slice(0, 7) !== month.slice(0, 7);
               const label = item?.workout?.sessionTitle ?? item?.sessionTitle;
+              const state = skipped ? 'saltato' : item?.rescheduledFrom && !item.workout ? 'riprogrammato' : '';
               return <li key={date}><button type="button"
-                className={`month-day${training ? ' month-day--training' : ''}${completed ? ' month-day--done' : ''}${date === today ? ' month-day--today' : ''}${outside ? ' month-day--outside' : ''}`}
-                aria-label={`${formatDate(date)}, ${training ? label : 'riposo'}${completed ? ', completato' : ''}`}
+                className={`month-day${training ? ' month-day--training' : ''}${skipped ? ' month-day--skipped' : ''}${completed ? ' month-day--done' : ''}${date === today ? ' month-day--today' : ''}${outside ? ' month-day--outside' : ''}`}
+                aria-label={`${formatDate(date)}, ${training || skipped ? label : 'riposo'}${completed ? ', completato' : ''}${state ? `, ${state}` : ''}`}
                 aria-current={date === today ? 'date' : undefined} aria-pressed={date === selectedDate}
                 onClick={() => setSelected(date)}>
                 <span>{parseLocalDate(date).getDate()}</span>
-                <span className="month-day__session" aria-hidden="true">{training ? label : ''}</span>
+                <span className="month-day__session" aria-hidden="true">{training || skipped ? label : ''}</span>
                 {training ? <span className="month-day__dot" aria-hidden="true" /> : null}
               </button></li>;
             })}
           </ol>
         </QueryState>
-        <div className="calendar-legend"><StatusBadge tone="success">Svolto</StatusBadge><StatusBadge tone="primary">Previsto</StatusBadge><span className="small muted">Seleziona un giorno per i dettagli</span></div>
+        <div className="calendar-legend"><StatusBadge tone="success">Svolto</StatusBadge><StatusBadge tone="primary">Previsto</StatusBadge><StatusBadge tone="neutral">Saltato</StatusBadge><span className="small muted">Seleziona un giorno per i dettagli</span></div>
         <Button variant="ghost" size="sm" onClick={() => { setMonth(today.slice(0, 7) + '-01'); setSelected(today); }}>Torna a oggi</Button>
       </section>
       <CalendarDetail key={selectedDate} day={day} date={selectedDate} today={today} />
     </div>
   </>;
 }
+
+const SKIP_LABEL = { MISSED: 'Saltato', SKIPPED: 'Saltato da te', MOVED: 'Spostato' } as const;
 
 function CalendarDetail({ day, date, today }: { day: CalendarDay | undefined; date: string; today: string }) {
   const plan = useMyPlan(day?.type === 'TRAINING' && !day.workout ? day.assignmentId ?? '' : '');
@@ -83,9 +88,19 @@ function CalendarDetail({ day, date, today }: { day: CalendarDay | undefined; da
       <h3>{day.workout.sessionTitle}</h3><p className="muted">{day.workout.planName}</p>
       <Link className="btn btn--secondary" to={day.workout.status === 'IN_PROGRESS' ? `/app/workout/${day.workout.id}` : `/app/history/${day.workout.id}`}
         aria-label={`Apri allenamento del ${formatDate(date)}`}>{day.workout.status === 'IN_PROGRESS' ? 'Riprendi allenamento' : 'Vedi il riepilogo'}</Link>
+    </> : day?.type === 'SKIPPED' && day.skip ? <>
+      <h3>{day.skip.sessionTitle}</h3><p className="muted">{day.planName}</p>
+      <div className="row"><StatusBadge tone="neutral">{SKIP_LABEL[day.skip.kind]}</StatusBadge></div>
+      <p>{day.skip.landsOn
+        ? <>Riprogrammata {day.skip.kind === 'MOVED' ? 'a' : 'al prossimo allenamento,'} <strong>{formatLongDate(day.skip.landsOn)}</strong>. Le sessioni successive seguono l’ordine della scheda.</>
+        : 'La sessione sarà proposta al prossimo giorno di allenamento.'}</p>
+      {day.assignmentId ? <ScheduleChangePanel assignmentId={day.assignmentId} date={date} /> : null}
     </> : day?.type === 'TRAINING' ? <>
       <h3>{day.sessionTitle}</h3><p className="muted">{day.planName}</p>
-      {date < today ? <StatusBadge tone="neutral">Non svolto</StatusBadge> : <StatusBadge tone="primary">Previsto</StatusBadge>}
+      <div className="row">{date < today ? <StatusBadge tone="neutral">Non svolto</StatusBadge> : day.rescheduledFrom
+        ? <StatusBadge tone="warning">Riprogrammato</StatusBadge> : <StatusBadge tone="primary">Previsto</StatusBadge>}</div>
+      {day.rescheduledFrom ? <p className="small">Recupera la sessione saltata il {formatLongDate(day.rescheduledFrom)}.</p> : null}
+      {day.assignmentId ? <ScheduleChangePanel assignmentId={day.assignmentId} date={date} /> : null}
       <QueryState isLoading={plan.isLoading} error={plan.error} onRetry={() => void plan.refetch()}>
         {session ? <PlanSessionView session={session} headingLevel={3} hideTitle /> : null}
       </QueryState>

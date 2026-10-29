@@ -82,7 +82,8 @@ test('Task 1: ADMIN sets the recovery between exercises and USER sees it during 
 });
 
 /** A fresh USER with its own plan, so every task flow is independent from the others. */
-async function freshAthlete(browser: import('@playwright/test').Browser, suffix: string, planId: string) {
+async function freshAthlete(browser: import('@playwright/test').Browser, suffix: string, planId: string,
+    weekdays = [1, 2, 3, 4, 5, 6, 7]) {
   const page = await (await browser.newContext({ viewport: { width: 360, height: 740 } })).newPage();
   const name = `${suffix}_${RUN}`;
   const user = await createUser(admin, name);
@@ -93,7 +94,7 @@ async function freshAthlete(browser: import('@playwright/test').Browser, suffix:
   const [assignment] = await api<{ id: string }[]>(admin, 'POST', '/api/admin/assignments', {
     planId, userIds: [user.id], startDate: today, activate: true,
   });
-  await api(page, 'PUT', `/api/me/assignments/${assignment!.id}/schedule`, { weekdays: [1, 2, 3, 4, 5, 6, 7] });
+  await api(page, 'PUT', `/api/me/assignments/${assignment!.id}/schedule`, { weekdays });
   return { page, assignmentId: assignment!.id };
 }
 
@@ -124,5 +125,51 @@ test('Task 2: the session name chosen by the ADMIN is the title everywhere', asy
   await page.getByRole('dialog').getByRole('button', { name: 'Interrompi' }).click();
   await page.goto('/app/history');
   await expect(page.getByText(/Parte superiore/).first()).toBeVisible();
+  await page.context().close();
+});
+
+/** ISO weekday (1 = Monday) of today + offset days, in the gym time zone. */
+function weekday(offset: number) {
+  const date = new Date(new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' }) + 'T12:00:00Z');
+  date.setUTCDate(date.getUTCDate() + offset);
+  return date.getUTCDay() === 0 ? 7 : date.getUTCDay();
+}
+
+test('Task 3: USER skips today with a preview, restores it and moves the session to a free day', async ({ browser }) => {
+  const { plan } = await buildPlan(admin, `Slitta ${RUN}`, [
+    { title: 'Giorno A', exercises: [{ name: `Uno ${RUN}` }] },
+    { title: 'Giorno B', exercises: [{ name: `Due ${RUN}` }] },
+  ]);
+  // Training today and in two days: tomorrow is a free day.
+  const { page } = await freshAthlete(browser, 'slitta', plan.id, [weekday(0), weekday(2)]);
+  await page.goto('/app/calendar');
+  await page.getByRole('button', { name: 'Segna come saltato' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Segnare il giorno come saltato?' });
+  const table = dialog.getByRole('table', { name: 'Conseguenze sui prossimi giorni' });
+  await expect(table.getByRole('row').nth(1)).toContainText('Giorno A');
+  await expect(table.getByRole('row').nth(1)).toContainText('saltato');
+  await expect(table.getByRole('row').nth(2)).toContainText('Giorno B');
+  await expect(table.getByRole('row').nth(2)).toContainText('Giorno A');
+  await page.screenshot({ path: 'test-results/task3-preview.png' });
+  await dialog.getByRole('button', { name: 'Salta e riprogramma' }).click();
+  await expect(page.getByText('Saltato da te')).toBeVisible();
+  await expect(page.getByText(/Riprogrammata al prossimo allenamento/)).toBeVisible();
+  await page.screenshot({ path: 'test-results/task3-calendar.png', fullPage: true });
+
+  await page.goto('/app/today');
+  await expect(page.getByRole('heading', { name: 'Allenamento di oggi saltato' })).toBeVisible();
+  await page.getByRole('link', { name: 'Gestisci nel calendario' }).click();
+  await page.getByRole('button', { name: 'Annulla modifica' }).click();
+  await page.getByRole('dialog', { name: 'Annullare la modifica?' }).getByRole('button', { name: 'Annulla modifica' }).click();
+  await expect(page.getByRole('button', { name: 'Segna come saltato' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Sposta a un altro giorno' }).click();
+  const move = page.getByRole('dialog', { name: 'Spostare la sessione?' });
+  await expect(move.getByLabel('Nuovo giorno').locator('option')).toHaveCount(1);
+  await move.getByRole('button', { name: 'Sposta sessione' }).click();
+  await expect(page.getByText('Spostato', { exact: true })).toBeVisible();
+  await page.goto('/app/today');
+  await expect(page.getByRole('heading', { name: 'Allenamento di oggi saltato' })).toBeVisible();
+  await expect(page.getByText(/è stato spostato/)).toBeVisible();
   await page.context().close();
 });

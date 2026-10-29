@@ -86,6 +86,18 @@ function TodayContent({ today }: { today: Today }) {
         </EmptyState>
       ) : null}
 
+      {today.status === 'SKIPPED_DAY' && today.skip ? (
+        <EmptyState title="Allenamento di oggi saltato" icon={<CalendarClock size={40} />}>
+          <p>
+            “{today.skip.sessionTitle}” {today.skip.kind === 'MOVED' ? 'è stato spostato' : 'non va persa: è stata riprogrammata'}
+            {today.skip.landsOn ? <> a <strong>{formatLongDate(today.skip.landsOn)}</strong></> : ' al prossimo giorno di allenamento'}.
+          </p>
+          <Link to="/app/calendar" className="btn btn--secondary">
+            Gestisci nel calendario
+          </Link>
+        </EmptyState>
+      ) : null}
+
       {today.status === 'REST_DAY' || today.status === 'NOT_STARTED_YET' ? (
         <EmptyState
           title={today.status === 'REST_DAY' ? 'Giorno di riposo' : 'La scheda non è ancora iniziata'}
@@ -114,6 +126,9 @@ function TodayContent({ today }: { today: Today }) {
                 <h2 id="today-session" style={{ margin: 0 }}>
                   {today.session.title}
                 </h2>
+                {today.rescheduledFrom ? (
+                  <p className="today-hero__plan" style={{ margin: 0 }}>Recupero della sessione saltata il {formatLongDate(today.rescheduledFrom)}</p>
+                ) : null}
               </div>
               {today.workout ? <WorkoutStatusBadge status={today.workout.status} /> : null}
             </div>
