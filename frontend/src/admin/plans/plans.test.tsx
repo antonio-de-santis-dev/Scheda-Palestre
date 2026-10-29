@@ -135,7 +135,7 @@ describe('plan editor', () => {
       expect(calls).toContainEqual({
         method: 'POST',
         url: '/api/admin/sections/sec-1/exercises',
-        body: { exerciseId: 'ex-3', setsCount: 3, reps: 0, toFailure: true, restSeconds: 60, customSets: [] },      }),
+        body: { exerciseId: 'ex-3', setsCount: 3, reps: 0, toFailure: true, restSeconds: 60, customSets: [], restAfterSeconds: 60 },      }),
     );
     // Only the active exercises of the section's group are offered.
     expect(exerciseQueries.some((q) => q.includes('muscleGroupId=mg-1') && q.includes('active=true'))).toBe(true);
@@ -210,9 +210,39 @@ describe('plan editor', () => {
             { setIndex: 1, reps: 12, toFailure: false, restSeconds: 60 },
             { setIndex: 2, reps: 10, toFailure: false, restSeconds: 90 },
           ],
+          restAfterSeconds: 90,
         },
       }),
     );
+  });
+
+  it('sets the recovery before the next exercise in minutes and seconds, or none', async () => {
+    const plan = planStructure();
+    plan.sessions[0]!.sections[0]!.exercises = [exercise({ restAfterSeconds: 150 })];
+    const { calls } = setup(plan);
+    renderApp('/admin/plans/plan-1/edit');
+    const user = userEvent.setup();
+    expect(await screen.findByText(/poi 2:30 prima del prossimo esercizio/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Modifica Panca piana' }));
+    const form = screen.getByRole('form', { name: 'Modifica esercizio' });
+    const group = within(form).getByRole('group', { name: 'Recupero prima del prossimo esercizio' });
+    const minutes = within(group).getByRole('spinbutton', { name: 'Minuti' });
+    const seconds = within(group).getByRole('spinbutton', { name: 'Secondi' });
+    expect(minutes).toHaveValue(2);
+    expect(seconds).toHaveValue(30);
+    expect(within(group).getByText(/recupero di 2 min 30 s/)).toBeInTheDocument();
+
+    await user.clear(minutes);
+    await user.type(minutes, '21');
+    await user.click(within(form).getByRole('button', { name: 'Salva esercizio' }));
+    expect(await within(form).findByText('Max 20')).toBeInTheDocument();
+    expect(calls.filter((c) => c.method === 'PUT')).toHaveLength(0);
+
+    await user.click(within(group).getByLabelText('Nessun recupero'));
+    expect(minutes).toBeDisabled();
+    expect(minutes).toHaveValue(0);
+    await user.click(within(form).getByRole('button', { name: 'Salva esercizio' }));
+    await waitFor(() => expect(calls.find((c) => c.method === 'PUT')?.body).toMatchObject({ restAfterSeconds: 0 }));
   });
 });
 

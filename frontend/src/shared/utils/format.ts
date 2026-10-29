@@ -85,6 +85,11 @@ export function restText(seconds: number): string {
   return seconds === 0 ? 'nessun recupero' : `recupero ${formatRest(seconds)}`;
 }
 
+/** Recovery before the next exercise, written out for the plan editor and the plan view. */
+export function restAfterText(seconds: number): string {
+  return seconds === 0 ? 'nessun recupero prima del prossimo esercizio' : `poi ${formatRest(seconds)} prima del prossimo esercizio`;
+}
+
 /** Elapsed workout time: hours never wrap at midnight. The backend owns the calculation. */
 export function formatWorkoutDuration(seconds: number | null | undefined): string {
   if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return 'Non disponibile';

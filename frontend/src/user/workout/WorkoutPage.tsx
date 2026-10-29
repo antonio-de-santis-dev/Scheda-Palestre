@@ -78,13 +78,18 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
 
   const timerState = state.finalResultEndsAt ? { ...state, restEndsAt: state.finalResultEndsAt, restPaused: false } : state;
   const remaining = useRestTimer(timerState, refetch, () => {
-    setAnnouncement(state.status === 'COMPLETED' ? 'Recupero finale terminato.' : 'Recupero terminato: puoi completare la prossima serie.');
+    const next = state.exercises.find((e) => e.id === state.currentExerciseId);
+    setAnnouncement(state.status === 'COMPLETED' ? 'Recupero finale terminato.'
+      : state.restKind === 'BETWEEN_EXERCISES' && next ? `Recupero terminato: puoi iniziare ${next.exerciseName}.`
+        : 'Recupero terminato: puoi completare la prossima serie.');
     restAlert.play();
     if ('vibrate' in navigator) {
       navigator.vibrate?.(300);
     }
   });
   const resting = remaining > 0;
+  const betweenExercises = state.restKind === 'BETWEEN_EXERCISES';
+  const restLabel = betweenExercises ? 'Recupero tra esercizi' : 'Recupero';
 
   /** Called only from a successful mutation (never from an effect watching the data). */
   const onActionSuccess = (before: WorkoutState, after: WorkoutState) => {
@@ -222,10 +227,19 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
             </div>
           </div>
 
+          {remaining > 0 && betweenExercises ? (
+            <p className="rest-transition" role="status">
+              <span className="rest-transition__title">Recupero tra esercizi</span>
+              <strong>Appena concluso:</strong> {resultExercise?.exerciseName ?? 'esercizio precedente'}
+              <br />
+              <strong>Prossimo esercizio:</strong> {current.exerciseName}
+            </p>
+          ) : null}
           {remaining > 0 ? (
-            <div className="timer timer--ring" style={{ '--rest-progress': `${Math.min(100, remaining / Math.max(1, state.restSeconds ?? currentSet.restSeconds) * 100)}%` } as CSSProperties} role="timer" aria-live="off" aria-label={`Recupero${state.restPaused ? ' in pausa' : ''}: ${formatDuration(remaining)} rimanenti`}>
+            <div className="timer timer--ring" style={{ '--rest-progress': `${Math.min(100, remaining / Math.max(1, state.restSeconds ?? currentSet.restSeconds) * 100)}%` } as CSSProperties} role="timer" aria-live="off" aria-label={`${restLabel}${state.restPaused ? ' in pausa' : ''}: ${formatDuration(remaining)} rimanenti`}>
               <span className="timer__label">
                 <Hourglass size={22} aria-hidden="true" />
+                {/* Short visible label: the ring is narrow on phones; the kind is in the box above. */}
                 {state.restPaused ? 'Recupero in pausa' : 'Recupero'}
               </span>
               <span className="timer__value">{formatDuration(remaining)}</span>
