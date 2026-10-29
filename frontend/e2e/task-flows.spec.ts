@@ -80,3 +80,49 @@ test('Task 1: ADMIN sets the recovery between exercises and USER sees it during 
   await expect(athlete.getByRole('heading', { name: 'Allenamento completato!' })).toBeVisible();
   await expect(athlete.locator('.rest-transition')).toHaveCount(0);
 });
+
+/** A fresh USER with its own plan, so every task flow is independent from the others. */
+async function freshAthlete(browser: import('@playwright/test').Browser, suffix: string, planId: string) {
+  const page = await (await browser.newContext({ viewport: { width: 360, height: 740 } })).newPage();
+  const name = `${suffix}_${RUN}`;
+  const user = await createUser(admin, name);
+  await login(page, name, user.temporary);
+  await changePassword(page, user.temporary, password);
+  await expect(page.getByRole('heading', { name: 'Oggi' })).toBeVisible();
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
+  const [assignment] = await api<{ id: string }[]>(admin, 'POST', '/api/admin/assignments', {
+    planId, userIds: [user.id], startDate: today, activate: true,
+  });
+  await api(page, 'PUT', `/api/me/assignments/${assignment!.id}/schedule`, { weekdays: [1, 2, 3, 4, 5, 6, 7] });
+  return { page, assignmentId: assignment!.id };
+}
+
+test('Task 2: the session name chosen by the ADMIN is the title everywhere', async ({ browser }) => {
+  const { plan } = await buildPlan(admin, `Nomi ${RUN}`, [
+    { title: 'Parte superiore', exercises: [{ name: `Panca nomi ${RUN}` }] },
+    { title: 'Gambe', exercises: [{ name: `Squat nomi ${RUN}` }] },
+  ]);
+  await admin.goto(`/admin/plans/${plan.id}/edit`);
+  const tabs = admin.getByRole('tablist', { name: 'Sessioni della scheda' });
+  await expect(tabs.getByRole('tab', { name: 'Parte superiore' })).toBeVisible();
+  await expect(tabs.getByRole('tab', { name: 'Gambe' })).toBeVisible();
+  await expect(admin.getByRole('heading', { name: '1. Parte superiore' })).toBeVisible();
+  await admin.screenshot({ path: 'test-results/task2-editor.png' });
+  await admin.goto('/admin/plans');
+  await expect(admin.getByText('Sessioni: Parte superiore · Gambe').first()).toBeVisible();
+
+  const { page, assignmentId } = await freshAthlete(browser, 'nomi', plan.id);
+  await page.goto(`/app/plans/${assignmentId}`);
+  await expect(page.getByRole('tab', { name: 'Parte superiore' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('heading', { name: 'Parte superiore' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/task2-user-plan.png' });
+  await page.goto('/app/today');
+  await expect(page.getByRole('heading', { name: 'Parte superiore' })).toBeVisible();
+  await page.getByRole('button', { name: 'Inizia allenamento' }).click();
+  await expect(page.getByRole('heading', { name: 'Parte superiore', level: 1 })).toBeVisible();
+  await page.getByRole('button', { name: 'Interrompi' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Interrompi' }).click();
+  await page.goto('/app/history');
+  await expect(page.getByText(/Parte superiore/).first()).toBeVisible();
+  await page.context().close();
+});

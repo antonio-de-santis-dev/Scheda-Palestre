@@ -9,6 +9,8 @@ export interface PlanListItem {
   description: string | null;
   durationWeeks: number | null;
   sessionCount: number;
+  /** Session names in rotation order. */
+  sessionTitles?: string[];
   executable: boolean;
   copiedFromPlanId: string | null;
   createdAt: string;

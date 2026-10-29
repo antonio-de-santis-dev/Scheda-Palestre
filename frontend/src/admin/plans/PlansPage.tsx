@@ -119,6 +119,9 @@ export function PlansPage() {
                       {plan.durationWeeks ? ` · durata consigliata ${plan.durationWeeks} ${plan.durationWeeks === 1 ? 'settimana' : 'settimane'}` : ''} · modificata il{' '}
                       {formatDateTime(plan.updatedAt)}
                     </div>
+                    {plan.sessionTitles?.length ? (
+                      <div className="list-item__meta plan-list__sessions">Sessioni: {plan.sessionTitles.join(' · ')}</div>
+                    ) : null}
                   </div>
                   <PlanStatusBadge executable={plan.executable} deleted={plan.deletedAt !== null} />
                   <div className="list-item__actions">

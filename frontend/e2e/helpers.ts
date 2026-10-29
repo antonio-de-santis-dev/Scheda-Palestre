@@ -42,5 +42,5 @@ export async function loginAsAdmin(page: Page) {
 
 export async function logout(page: Page) {
   await page.getByRole('button', { name: 'Esci' }).click();
-  await expect(page.getByRole('heading', { name: 'Accedi' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Bentornato' })).toBeVisible();
 }

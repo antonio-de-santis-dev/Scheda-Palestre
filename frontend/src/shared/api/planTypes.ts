@@ -55,6 +55,19 @@ export interface PlanStructure {
   sessions: PlanSession[];
 }
 
+/**
+ * Name chosen by the ADMIN for a session (Task 2). The database never stores a blank title; the
+ * fallback "Giorno N" only protects the UI from unexpected data.
+ */
+export function sessionName(session: Pick<PlanSession, 'title'>, index: number): string {
+  return session.title?.trim() || `Giorno ${index + 1}`;
+}
+
+/** Muscle groups of a session: secondary information, never a replacement of its name. */
+export function sessionGroups(session: Pick<PlanSession, 'sections'>): string {
+  return session.sections.map((section) => section.muscleGroupName).join(' · ');
+}
+
 /** "3 × 10", "3 × MAX" or per-set summary when customised. */
 export function describeSets(exercise: Pick<PlanExercise, 'setsCount' | 'reps' | 'toFailure' | 'customized' | 'sets'>): string {
   if (exercise.customized) {

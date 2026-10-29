@@ -81,8 +81,8 @@ async function addExercise(page: Page, group: string, exercise: string, sets: nu
   const form = page.getByRole('form', { name: 'Nuovo esercizio' });
   await form.getByRole('combobox', { name: 'Esercizio' }).fill(exercise);
   await form.getByRole('option', { name: exercise }).click();
-  await form.getByRole('spinbutton', { name: 'Serie' }).fill(String(sets));
-  await form.getByLabel(/^Recupero/).fill(String(rest));
+  await form.getByRole('spinbutton', { name: 'Serie', exact: true }).fill(String(sets));
+  await form.getByLabel(/^Recupero tra le serie/).fill(String(rest));
   if (reps === 'MAX') {
     await form.getByLabel('A cedimento (MAX)').check();
   } else {
@@ -106,7 +106,7 @@ test('2. ADMIN builds catalog and plan, then assigns it', async () => {
   await admin.getByLabel(/^Nome scheda/).fill(names.plan);
   await admin.getByRole('button', { name: "Crea e apri l'editor" }).click();
   await expect(admin).toHaveURL(/\/admin\/plans\/[0-9a-f-]+\/edit$/);
-  await expect(admin.getByText('Incompleta')).toBeVisible();
+  await expect(admin.getByText('Incompleta').first()).toBeVisible();
   planEditorUrl = admin.url();
 
   await admin.getByRole('button', { name: 'Aggiungi sessione' }).click();
@@ -114,18 +114,22 @@ test('2. ADMIN builds catalog and plan, then assigns it', async () => {
   await admin.getByRole('button', { name: 'Aggiungi sessione' }).click();
   await expect(admin.getByRole('heading', { name: '2. Giorno 2' })).toBeVisible();
 
+  // The editor shows one session at a time: the tabs carry the session names (Task 2).
+  await admin.getByRole('tab', { name: 'Giorno 1' }).click();
   await admin.getByRole('combobox', { name: 'Nuova sezione in Giorno 1' }).fill(names.chest);
   await admin.getByRole('option', { name: names.chest }).click();
   await admin.getByRole('button', { name: 'Aggiungi sezione' }).first().click();
   await addExercise(admin, names.chest, names.bench, 2, 10, 3);
   await addExercise(admin, names.chest, names.pullUp, 1, 'MAX', 0);
 
+  await admin.getByRole('tab', { name: 'Giorno 2' }).click();
   await admin.getByRole('combobox', { name: 'Nuova sezione in Giorno 2' }).fill(names.back);
   await admin.getByRole('option', { name: names.back }).click();
-  await admin.getByRole('button', { name: 'Aggiungi sezione' }).nth(1).click();
+  await admin.getByRole('button', { name: 'Aggiungi sezione' }).first().click();
   await addExercise(admin, names.back, names.row, 3, 12, 45);
 
   await expect(admin.getByText('Pronta')).toBeVisible();
+  await admin.getByRole('tab', { name: 'Giorno 1' }).click();
   await expect(admin.getByText(/1 × MAX/)).toBeVisible();
 
   // "Salva dati" confirms the creation: back to the list with a one-shot notification.
@@ -237,7 +241,9 @@ test('5b. ADMIN assigns a second plan and USER shares the week between the two',
   await expect(copyForm.getByText(/Giorni salvati/)).toBeVisible();
 
   await athlete.goto('/app/calendar');
-  await expect(athlete.getByRole('list', { name: 'Giorni' }).getByText(copyName).first()).toBeVisible();
+  // The grid shows day numbers: the detail of the last Sunday names the plan that owns it.
+  await athlete.getByRole('list', { name: 'Giorni' }).locator('li:nth-child(7n) button').last().click();
+  await expect(athlete.getByText(copyName, { exact: true }).first()).toBeVisible();
   await athlete.goto('/app/plans');
   await expect(athlete.getByRole('region', { name: 'Schede attive (2)' })).toBeVisible();
 });
@@ -245,6 +251,8 @@ test('5b. ADMIN assigns a second plan and USER shares the week between the two',
 test('5c. ADMIN reads the activity report and deletes an account with two confirmations', async () => {
   // Report of the athlete: only recorded data.
   await admin.goto('/admin/users');
+  // The list is paginated: search the account instead of relying on the first page.
+  await admin.getByLabel('Cerca').fill(user.username);
   await admin.getByRole('link', { name: `Apri Elena Test ${RUN}` }).click();
   const report = admin.getByRole('region', { name: 'Report attività' });
   await expect(report.getByRole('table', { name: 'Totale allenamenti ed esercizi' })).toBeVisible();
@@ -260,6 +268,7 @@ test('5c. ADMIN reads the activity report and deletes an account with two confir
   await admin.getByLabel(/^Email/).fill(`${victim}@example.test`);
   await admin.getByRole('button', { name: 'Crea utente' }).click();
   const temporary = (await admin.getByTestId('temporary-password').textContent())?.trim() ?? '';
+  await admin.getByLabel('Cerca').fill(victim);
   await admin.getByRole('link', { name: `Apri Da Eliminare ${RUN}` }).click();
   await admin.getByRole('button', { name: `Elimina account di Da Eliminare ${RUN}` }).click();
   await admin.getByRole('dialog').getByRole('button', { name: 'Continua' }).click();

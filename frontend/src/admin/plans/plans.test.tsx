@@ -51,7 +51,7 @@ describe('plan editor', () => {
     renderApp('/admin/plans/plan-1/edit');
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Rinomina Giorno 1' }));
-    const input = screen.getByRole('textbox', { name: 'Titolo sessione' });
+    const input = screen.getByRole('textbox', { name: 'Nome sessione' });
     await user.clear(input);
     await user.type(input, 'Titolo da riprovare');
     await user.click(screen.getByRole('button', { name: 'Salva' }));
@@ -81,7 +81,7 @@ describe('plan editor', () => {
     expect(within(section).getByText(/3 × 10/)).toBeInTheDocument();
     expect(within(section).getByText(/3 × MAX/)).toBeInTheDocument();
     expect(screen.getByText('Pronta')).toBeInTheDocument();
-    await userEvent.setup().click(screen.getByRole('tab', { name: /Sessione B/ }));
+    await userEvent.setup().click(screen.getByRole('tab', { name: /Giorno 2/ }));
     expect(screen.getByRole('heading', { name: '2. Giorno 2' })).toBeInTheDocument();
   });
 
@@ -113,7 +113,7 @@ describe('plan editor', () => {
     const { calls } = setup();
     renderApp('/admin/plans/plan-1/edit');
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('tab', { name: /Sessione B/ }));
+    await user.click(await screen.findByRole('tab', { name: /Giorno 2/ }));
     await user.click(await screen.findByRole('button', { name: 'Elimina Giorno 2' }));
     const dialog = await screen.findByRole('dialog');
     expect(calls.filter((c) => c.method === 'DELETE')).toHaveLength(0);

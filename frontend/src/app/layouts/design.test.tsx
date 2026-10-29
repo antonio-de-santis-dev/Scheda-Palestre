@@ -47,16 +47,16 @@ describe('mockup navigation and preferences', () => {
     renderApp('/admin/plans/plan-1/edit');
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Rinomina Giorno 1' }));
-    const draft = screen.getByRole('textbox', { name: 'Titolo sessione' });
+    const draft = screen.getByRole('textbox', { name: 'Nome sessione' });
     await user.clear(draft);
     await user.type(draft, 'Bozza sessione');
-    screen.getByRole('tab', { name: /Sessione A/ }).focus();
+    screen.getByRole('tab', { name: /Giorno 1/ }).focus();
     await user.keyboard('{ArrowRight}');
-    expect(screen.getByRole('tab', { name: /Sessione B/ })).toHaveFocus();
+    expect(screen.getByRole('tab', { name: /Giorno 2/ })).toHaveFocus();
     expect(screen.getByRole('heading', { name: '2. Giorno 2' })).toBeInTheDocument();
     await user.keyboard('{Home}');
-    expect(screen.getByRole('tab', { name: /Sessione A/ })).toHaveFocus();
-    expect(screen.getByRole('textbox', { name: 'Titolo sessione' })).toHaveValue('Bozza sessione');
+    expect(screen.getByRole('tab', { name: /Giorno 1/ })).toHaveFocus();
+    expect(screen.getByRole('textbox', { name: 'Nome sessione' })).toHaveValue('Bozza sessione');
   });
 });
 
