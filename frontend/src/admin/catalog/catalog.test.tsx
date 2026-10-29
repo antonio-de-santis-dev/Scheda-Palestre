@@ -138,6 +138,23 @@ describe('unified catalog page', () => {
     expect(screen.getByLabelText(/^Nuovo gruppo muscolare/)).toHaveValue('Petto');
   });
 
+  it('opens the new group after creating it, even when the list has more pages', async () => {
+    catalogServer();
+    const created: MuscleGroup = { id: 'g9', name: 'Polpacci', active: true, exerciseCount: 0, activeExerciseCount: 0, ...stamp };
+    server.use(
+      http.post('*/api/admin/muscle-groups', () => HttpResponse.json(created, { status: 201 })),
+      http.get('*/api/admin/muscle-groups/g9', () => HttpResponse.json(created)),
+      http.get('*/api/admin/exercises', () => HttpResponse.json({ content: [], page: 0, size: 25, totalElements: 0, totalPages: 0 })),
+    );
+    const { router } = renderApp('/admin/catalog');
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText(/^Nuovo gruppo muscolare/), 'Polpacci');
+    await user.click(screen.getByRole('button', { name: 'Aggiungi gruppo' }));
+    expect(await screen.findByLabelText(/^Nuovo esercizio in Polpacci/)).toBeInTheDocument();
+    expect(router.state.location.search).toContain('group=g9');
+    expect(screen.getByLabelText(/^Nuovo gruppo muscolare/)).toHaveValue('');
+  });
+
   it('explains an empty group', async () => {
     catalogServer();
     server.use(

@@ -168,7 +168,15 @@ function GroupsPanel({ selectedId }: { selectedId: string | null }) {
                 pending={create.isPending}
                 error={create.error}
                 resetOnSuccess
-                onSubmit={(name) => create.mutateAsync(name)}
+                onSubmit={async (name) => {
+                    // The list is paginated alphabetically: open the new group so it is
+                    // always visible, ready to receive its exercises.
+                    const group = await create.mutateAsync(name);
+                    const next = new URLSearchParams(params);
+                    next.set('group', group.id);
+                    next.delete('epage');
+                    setParams(next);
+                }}
             />
 
             <div
