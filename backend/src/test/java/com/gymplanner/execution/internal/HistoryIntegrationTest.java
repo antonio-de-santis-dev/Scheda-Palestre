@@ -41,7 +41,6 @@ class HistoryIntegrationTest {
     AuthenticatedUser admin;
     AuthenticatedUser user;
     BuiltPlan plan;
-    String assignmentId;
 
     @BeforeEach
     void setUp() {
@@ -49,7 +48,7 @@ class HistoryIntegrationTest {
         admin = fixtures.createAdmin();
         user = fixtures.createUser();
         plan = factory.executablePlan(admin, "Storico", 2, 2, 1);
-        assignmentId = api.post(admin, "/api/admin/assignments", """
+        String assignmentId = api.post(admin, "/api/admin/assignments", """
                 {"planId":"%s","userIds":["%s"],"startDate":"%s","activate":true}"""
                 .formatted(plan.planId(), user.id(), MONDAY)).expect(201).read("$[0].id");
         api.put(user, "/api/me/assignments/" + assignmentId + "/schedule", "{\"weekdays\":[1,2,3,4,5,6,7]}").expect(200);
@@ -63,17 +62,6 @@ class HistoryIntegrationTest {
     private Api.Response startAt(LocalDate day) {
         clock.setDate(day);
         return api.post(user, "/api/me/workouts", "{\"date\":\"" + day + "\"}").expect(201);
-    }
-
-    /**
-     * Task 3: a training day without workout is rescheduled (its session moves to the next day).
-     * Accepting the loss restores the plain rotation, which these history tests rely on.
-     */
-    private void acceptMissedDay(LocalDate missed, LocalDate today) {
-        clock.setDate(today);
-        String base = "/api/me/assignments/" + assignmentId + "/schedule-changes";
-        String eventId = api.get(user, base + "/options?date=" + missed).expect(200).read("$.eventId");
-        api.delete(user, base + "/" + eventId).expect(200);
     }
 
     private void interrupt(Api.Response state) {
@@ -356,135 +344,6 @@ class HistoryIntegrationTest {
         api.get(user, "/api/me/workout-progress?from=2026-10-06&to=2026-10-05").expectCode(400, "INVALID_HISTORY_FILTER");
         api.get(user, "/api/me/workout-progress?from=wrong").expect(400);
         api.get(user, "/api/me/workout-progress?status=wrong").expect(400);
-    }
-
-    @Test
-    void recordsKeepIndependentMaximaAndOriginalSeriesAcrossRenameAndDeletion() {
-        Api.Response first = startAt(MONDAY);
-        String id = first.read("$.workoutId"), firstSet = first.read("$.currentSetId");
-        String identity = first.read("$.exercises[0].identity.id");
-        String originalName = first.read("$.exercises[0].exerciseName");
-        Api.Response next = api.post(user, "/api/me/workouts/" + id + "/sets/" + firstSet + "/complete",
-                "{\"weightKgUsed\":80,\"repsActual\":5}").expect(200);
-        api.post(user, "/api/me/workouts/" + id + "/exercises/" + next.read("$.currentExerciseId") + "/skip", null).expect(200);
-        jdbc.update("update exercises set name = 'Nome record nuovo' where id = ?", UUID.fromString(identity));
-        acceptMissedDay(MONDAY.plusDays(1), MONDAY.plusDays(2));
-        Api.Response second = startAt(MONDAY.plusDays(2));
-        String secondId = second.read("$.workoutId"), secondSet = second.read("$.currentSetId");
-        api.post(user, "/api/me/workouts/" + secondId + "/sets/" + secondSet + "/complete",
-                "{\"weightKgUsed\":50,\"repsActual\":12}").expect(200);
-        interrupt(second);
-        api.delete(admin, "/api/admin/plans/" + plan.planId()).expect(204);
-        Api.Response records = api.get(user, "/api/me/workout-records?size=1&page=999").expect(200);
-        assertThat((List<Object>) records.read("$")).hasSize(1);
-        assertThat((String) records.read("$[0].identity.id")).isEqualTo(identity);
-        assertThat((String) records.read("$[0].exerciseName")).isEqualTo("Nome record nuovo");
-        assertThat(((Number) records.read("$[0].completedSets")).longValue()).isEqualTo(2);
-        assertThat(((Number) records.read("$[0].weightRecord.weightKgUsed")).doubleValue()).isEqualTo(80);
-        assertThat((Integer) records.read("$[0].weightRecord.repsActual")).isEqualTo(5);
-        assertThat((String) records.read("$[0].weightRecord.setId")).isEqualTo(firstSet);
-        assertThat((String) records.read("$[0].weightRecord.workoutId")).isEqualTo(id);
-        assertThat((String) records.read("$[0].weightRecord.exerciseName")).isEqualTo(originalName);
-        assertThat((String) records.read("$[0].weightRecord.scheduledDate")).isEqualTo(MONDAY.toString());
-        assertThat((String) records.read("$[0].weightRecord.completedAt")).isEqualTo(first.read("$.serverTime"));
-        assertThat((Integer) records.read("$[0].repsRecord.repsActual")).isEqualTo(12);
-        assertThat(((Number) records.read("$[0].repsRecord.weightKgUsed")).doubleValue()).isEqualTo(50);
-        assertThat((String) records.read("$[0].repsRecord.setId")).isEqualTo(secondSet);
-        assertThat((String) records.read("$[0].repsRecord.workoutId")).isEqualTo(secondId);
-        assertThat((List<Object>) api.get(user, "/api/me/workout-records").expect(200).read("$")).isEqualTo(records.read("$"));
-        Api.Response filtered = api.get(user, "/api/me/workout-records", Map.of("from", MONDAY.toString(), "to", MONDAY.toString(), "status", "COMPLETED", "q", "storICO")).expect(200);
-        assertThat(((Number) filtered.read("$[0].weightRecord.weightKgUsed")).doubleValue()).isEqualTo(80);
-        assertThat((Integer) filtered.read("$[0].repsRecord.repsActual")).isEqualTo(5);
-    }
-
-    @Test
-    void recordsDistinguishMissingValuesAndZeroAndDoNotUsePlannedRepetitions() {
-        Api.Response first = startAt(MONDAY);
-        api.post(user, "/api/me/workouts/" + first.read("$.workoutId") + "/sets/" + first.read("$.currentSetId") + "/complete",
-                "{\"weightKgUsed\":0}").expect(200);
-        interrupt(first);
-        Api.Response second = startAt(MONDAY.plusDays(1));
-        api.post(user, "/api/me/workouts/" + second.read("$.workoutId") + "/sets/" + second.read("$.currentSetId") + "/complete", null).expect(200);
-        interrupt(second);
-        Api.Response third = startAt(MONDAY.plusDays(2));
-        api.post(user, "/api/me/workouts/" + third.read("$.workoutId") + "/sets/" + third.read("$.currentSetId") + "/complete",
-                "{\"repsActual\":0}").expect(200);
-        Api.Response records = api.get(user, "/api/me/workout-records").expect(200);
-        assertThat((List<Object>) records.read("$")).hasSize(2);
-        Map<String, Object> available = ((List<Map<String, Object>>) records.read("$")).stream()
-                .filter(row -> row.get("weightRecord") != null).findFirst().orElseThrow();
-        assertThat(((Number) available.get("completedSets")).longValue()).isEqualTo(2);
-        assertThat(((Number) available.get("recordedWeightSets")).longValue()).isEqualTo(1);
-        assertThat(((Number) available.get("recordedRepsSets")).longValue()).isEqualTo(1);
-        Map<String, Object> weight = (Map<String, Object>) available.get("weightRecord");
-        Map<String, Object> reps = (Map<String, Object>) available.get("repsRecord");
-        assertThat(((Number) weight.get("weightKgUsed")).doubleValue()).isZero();
-        assertThat(weight.get("repsActual")).isNull();
-        assertThat(reps.get("weightKgUsed")).isNull();
-        assertThat((Integer) reps.get("repsActual")).isZero();
-        Map<String, Object> missing = ((List<Map<String, Object>>) records.read("$")).stream()
-                .filter(row -> row.get("weightRecord") == null).findFirst().orElseThrow();
-        assertThat(missing.get("repsRecord")).isNull();
-        assertThat(((Number) missing.get("completedSets")).longValue()).isEqualTo(1);
-        assertThat(((Number) missing.get("recordedWeightSets")).longValue()).isZero();
-        assertThat(((Number) missing.get("recordedRepsSets")).longValue()).isZero();
-    }
-
-    @Test
-    void recordsSeparateEqualNamesAndIdentityNamespacesAndChooseEarliestTies() {
-        Api.Response first = startAt(MONDAY);
-        String id = first.read("$.workoutId"), setId = first.read("$.currentSetId");
-        String identity = first.read("$.exercises[0].identity.id");
-        Api.Response next = api.post(user, "/api/me/workouts/" + id + "/sets/" + setId + "/complete",
-                "{\"weightKgUsed\":40,\"repsActual\":8}").expect(200);
-        clock.advance(java.time.Duration.ofSeconds(61));
-        next = api.post(user, "/api/me/workouts/" + id + "/sets/" + next.read("$.currentSetId") + "/complete",
-                "{\"weightKgUsed\":40,\"repsActual\":8}").expect(200);
-        jdbc.update("update workout_exercises set exercise_name_snapshot = 'Omonimo' where workout_id = ?", UUID.fromString(id));
-        Api.Response records = api.get(user, "/api/me/workout-records").expect(200);
-        assertThat((List<Object>) records.read("$")).hasSize(2);
-        Map<String, Object> selected = ((List<Map<String, Object>>) records.read("$")).stream()
-                .filter(row -> ((Map<String, Object>) row.get("identity")).get("id").equals(identity)).findFirst().orElseThrow();
-        String recordSet = (String) ((Map<String, Object>) selected.get("weightRecord")).get("setId");
-        assertThat(recordSet).isEqualTo(setId);
-        assertThat((List<String>) records.read("$[*].exerciseName")).containsOnly("Omonimo");
-        // Same UUID, distinct origins: never merge a legacy snapshot with a catalog exercise.
-        jdbc.update("update workout_exercises set catalog_exercise_id = null, legacy_exercise_id = ? where id = ?",
-                UUID.fromString(identity), UUID.fromString(first.read("$.exercises[1].id")));
-        records = api.get(user, "/api/me/workout-records").expect(200);
-        assertThat((List<String>) records.read("$[*].identity.source")).containsExactlyInAnyOrder("CATALOG", "LEGACY");
-        assertThat((List<String>) records.read("$[*].identity.id")).containsOnly(identity);
-        // Repeating the catalog entry in another workout produces one record, preserving the earliest tie.
-        acceptMissedDay(MONDAY.plusDays(1), MONDAY.plusDays(2));
-        Api.Response third = startAt(MONDAY.plusDays(2));
-        api.post(user, "/api/me/workouts/" + third.read("$.workoutId") + "/sets/" + third.read("$.currentSetId") + "/complete",
-                "{\"weightKgUsed\":40,\"repsActual\":8}").expect(200);
-        records = api.get(user, "/api/me/workout-records").expect(200);
-        Map<String, Object> catalog = ((List<Map<String, Object>>) records.read("$")).stream()
-                .filter(row -> ((Map<String, Object>) row.get("identity")).get("source").equals("CATALOG")).findFirst().orElseThrow();
-        assertThat(((Map<String, Object>) catalog.get("weightRecord")).get("setId")).isEqualTo(setId);
-        assertThat(((Map<String, Object>) catalog.get("repsRecord")).get("setId")).isEqualTo(setId);
-        assertThat(((Number) catalog.get("completedSets")).longValue()).isEqualTo(2);
-    }
-
-    @Test
-    void recordsRespectPrivacyLiteralSearchAndFilterValidation() {
-        Api.Response first = startAt(MONDAY);
-        api.post(user, "/api/me/workouts/" + first.read("$.workoutId") + "/sets/" + first.read("$.currentSetId") + "/complete",
-                "{\"weightKgUsed\":10,\"repsActual\":1}").expect(200);
-        jdbc.update("update workouts set plan_name_snapshot = 'Record 100% _' where id = ?", UUID.fromString(first.read("$.workoutId")));
-        for (String q : List.of("100%", "_")) {
-            assertThat((List<Object>) api.get(user, "/api/me/workout-records", Map.of("q", q)).expect(200).read("$")).hasSize(1);
-        }
-        assertThat((List<Object>) api.get(user, "/api/me/workout-records", Map.of("q", "' OR 1=1 --")).expect(200).read("$")).isEmpty();
-        assertThat((List<Object>) api.get(user, "/api/me/workout-records?status=COMPLETED").expect(200).read("$")).isEmpty();
-        assertThat((List<Object>) api.get(fixtures.createUser(), "/api/me/workout-records?userId=" + user.id()).expect(200).read("$")).isEmpty();
-        api.get(admin, "/api/me/workout-records").expect(403);
-        api.get(null, "/api/me/workout-records").expect(401);
-        api.get(user, "/api/me/workout-records?from=2026-10-06&to=2026-10-05").expectCode(400, "INVALID_HISTORY_FILTER");
-        api.get(user, "/api/me/workout-records?from=wrong").expect(400);
-        api.get(user, "/api/me/workout-records?status=wrong").expect(400);
-        api.get(user, "/api/me/workout-records", Map.of("q", "x".repeat(101))).expectCode(400, "INVALID_HISTORY_FILTER");
     }
 
     @Test

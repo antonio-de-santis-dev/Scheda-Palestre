@@ -34,8 +34,8 @@ class WorkoutController {
     private final WorkoutService workouts;
     private final TodayService today;
     private final WorkoutHistoryStatsService historyStats;
-    private final WorkoutRecordsService records;
     private final ScheduleMaintenance schedule;
+    private final HistoryPlansService historyPlans;
 
     @GetMapping("/today")
     TodayService.TodayResponse today(@AuthenticationPrincipal AuthenticatedUser user,
@@ -72,34 +72,37 @@ class WorkoutController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) WorkoutStatus status,
-            @RequestParam(required = false) String q) {
+            @RequestParam(required = false) String q, @RequestParam(required = false) UUID plan) {
         Sort sort = Sort.by(Sort.Order.desc("scheduledDate"), Sort.Order.desc("startedAt"), Sort.Order.desc("id"));
         return PageResponse.of(workouts.history(user.id(), Paging.of(page, size, sort),
-                new WorkoutHistoryFilter(from, to, status, q)), s -> s);
+                historyPlans.scope(user.id(), plan, new WorkoutHistoryFilter(from, to, status, q))), s -> s);
+    }
+
+    /** Task 4: plans with at least one workout matching the filters (closed or changed plans included). */
+    @GetMapping("/workout-plans")
+    List<HistoryPlansService.HistoryPlan> historyPlans(@AuthenticationPrincipal AuthenticatedUser user,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) WorkoutStatus status, @RequestParam(required = false) String q) {
+        return historyPlans.plans(user.id(), new WorkoutHistoryFilter(from, to, status, q));
     }
 
     @GetMapping("/workout-stats")
     WorkoutHistoryStatsService.HistoryStats stats(@AuthenticationPrincipal AuthenticatedUser user,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false) WorkoutStatus status, @RequestParam(required = false) String q) {
-        return historyStats.get(user.id(), new WorkoutHistoryFilter(from, to, status, q));
+            @RequestParam(required = false) WorkoutStatus status, @RequestParam(required = false) String q,
+            @RequestParam(required = false) UUID plan) {
+        return historyStats.get(user.id(), historyPlans.scope(user.id(), plan, new WorkoutHistoryFilter(from, to, status, q)));
     }
 
     @GetMapping("/workout-progress")
     List<WorkoutHistoryStatsService.MonthlyProgress> progress(@AuthenticationPrincipal AuthenticatedUser user,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false) WorkoutStatus status, @RequestParam(required = false) String q) {
-        return historyStats.progress(user.id(), new WorkoutHistoryFilter(from, to, status, q));
-    }
-
-    @GetMapping("/workout-records")
-    List<WorkoutRecordsService.ExerciseRecords> records(@AuthenticationPrincipal AuthenticatedUser user,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false) WorkoutStatus status, @RequestParam(required = false) String q) {
-        return records.get(user.id(), new WorkoutHistoryFilter(from, to, status, q));
+            @RequestParam(required = false) WorkoutStatus status, @RequestParam(required = false) String q,
+            @RequestParam(required = false) UUID plan) {
+        return historyStats.progress(user.id(), historyPlans.scope(user.id(), plan, new WorkoutHistoryFilter(from, to, status, q)));
     }
 
     /** Full state of one of the user's workouts (resume after reload, history detail). */
