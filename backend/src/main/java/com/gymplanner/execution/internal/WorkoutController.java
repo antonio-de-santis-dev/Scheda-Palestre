@@ -1,5 +1,6 @@
 package com.gymplanner.execution.internal;
 
+import com.gymplanner.calendar.api.ScheduleMaintenance;
 import com.gymplanner.execution.internal.WorkoutDtos.StartWorkoutRequest;
 import com.gymplanner.execution.internal.WorkoutDtos.WorkoutState;
 import com.gymplanner.shared.security.AuthenticatedUser;
@@ -34,10 +35,12 @@ class WorkoutController {
     private final TodayService today;
     private final WorkoutHistoryStatsService historyStats;
     private final WorkoutRecordsService records;
+    private final ScheduleMaintenance schedule;
 
     @GetMapping("/today")
     TodayService.TodayResponse today(@AuthenticationPrincipal AuthenticatedUser user,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        schedule.recordMissedSessions(user.id()); // Task 3: days ended without a workout are rescheduled
         return today.today(user.id(), date);
     }
 
@@ -45,12 +48,14 @@ class WorkoutController {
     List<TodayService.CalendarDay> calendar(@AuthenticationPrincipal AuthenticatedUser user,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        schedule.recordMissedSessions(user.id());
         return today.calendar(user.id(), from, to);
     }
 
     @PostMapping("/workouts")
     ResponseEntity<WorkoutState> start(@AuthenticationPrincipal AuthenticatedUser user,
             @Valid @RequestBody StartWorkoutRequest body) {
+        schedule.recordMissedSessions(user.id());
         WorkoutState state = workouts.start(user.id(), body.date());
         return ResponseEntity.created(URI.create("/api/me/workouts/" + state.workoutId())).body(state);
     }

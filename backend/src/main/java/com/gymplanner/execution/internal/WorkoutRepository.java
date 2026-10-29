@@ -34,4 +34,13 @@ interface WorkoutRepository extends JpaRepository<Workout, UUID>, JpaSpecificati
             @Param("status") WorkoutStatus status);
 
     List<Workout> findByUserIdAndScheduledDateBetweenOrderByStartedAtAsc(UUID userId, LocalDate from, LocalDate to);
+
+    /** Dates only: no workout entity is loaded (Task 3 schedule checks). */
+    @Query("select w.scheduledDate from Workout w where w.planAssignmentId = :assignmentId and w.scheduledDate between :from and :to")
+    List<LocalDate> findScheduledDates(@Param("assignmentId") UUID assignmentId, @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    @Query("select w.scheduledDate from Workout w where w.userId = :userId and w.scheduledDate between :from and :to")
+    List<LocalDate> findUserScheduledDates(@Param("userId") UUID userId, @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
 }
