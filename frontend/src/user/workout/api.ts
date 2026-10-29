@@ -42,6 +42,8 @@ export interface WorkoutExerciseState {
   setsPlanned: number;
   setsCompleted: number;
   sets: WorkoutSetState[];
+  /** Snapshot of the recovery before the next exercise; null for workouts started before it existed. */
+  restAfterSeconds?: number | null;
 }
 
 export interface RecordSetResultsRequest { results: SetResults; expectedExecutionVersion: number; expectedRestVersion: number }
@@ -66,6 +68,8 @@ export interface WorkoutState {
   restEndsAt: string | null;
   restSeconds: number | null;
   restPaused: boolean;
+  /** Which recovery is running (null when none): between two sets or before the next exercise. */
+  restKind?: 'BETWEEN_SETS' | 'BETWEEN_EXERCISES' | null;
   restRemainingMillis: number;
   restVersion: number;
   serverTime: string;

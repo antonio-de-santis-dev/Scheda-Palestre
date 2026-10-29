@@ -15,7 +15,7 @@ class ExerciseConfigValidatorTest {
     private static final UUID EXERCISE = UUID.randomUUID();
 
     private static PlanExerciseRequest request(int sets, int reps, boolean failure, List<SetRequest> custom) {
-        return new PlanExerciseRequest(EXERCISE, sets, reps, failure, 90, custom);
+        return new PlanExerciseRequest(EXERCISE, sets, reps, failure, 90, custom, null);
     }
 
     @Test
@@ -64,8 +64,17 @@ class ExerciseConfigValidatorTest {
     }
 
     @Test
+    void restBetweenExercisesDefaultsToTheLastSetRestForOlderClients() {
+        assertThat(ExerciseConfigValidator.validate(request(3, 10, false, null)).restAfterSeconds()).isEqualTo(90);
+        List<SetRequest> custom = List.of(new SetRequest(1, 10, false, 30), new SetRequest(2, 10, false, 45));
+        assertThat(ExerciseConfigValidator.validate(request(2, 10, false, custom)).restAfterSeconds()).isEqualTo(45);
+        var explicit = new PlanExerciseRequest(EXERCISE, 3, 10, false, 90, null, 0);
+        assertThat(ExerciseConfigValidator.validate(explicit).restAfterSeconds()).isZero();
+    }
+
+    @Test
     void effectiveSetsRepeatGeneralValuesWhenNotCustomized() {
-        var exercise = new PlanExercise(null, EXERCISE, 1, new ExerciseConfig(3, 12, false, 60, List.of()));
+        var exercise = new PlanExercise(null, EXERCISE, 1, new ExerciseConfig(3, 12, false, 60, 60, List.of()));
         assertThat(exercise.isCustomized()).isFalse();
         assertThat(exercise.effectiveSets()).hasSize(3)
                 .allSatisfy(s -> assertThat(s.reps()).isEqualTo(12))

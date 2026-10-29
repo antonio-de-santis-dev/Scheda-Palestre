@@ -92,12 +92,13 @@ public class Workout {
     }
 
     WorkoutExercise addExercise(UUID planExerciseId, String exerciseName, String muscleGroupName) {
-        return addExercise(planExerciseId, null, exerciseName, muscleGroupName);
+        return addExercise(planExerciseId, null, exerciseName, muscleGroupName, null);
     }
 
-    WorkoutExercise addExercise(UUID planExerciseId, UUID catalogExerciseId, String exerciseName, String muscleGroupName) {
+    WorkoutExercise addExercise(UUID planExerciseId, UUID catalogExerciseId, String exerciseName, String muscleGroupName,
+            Integer restAfterSeconds) {
         WorkoutExercise exercise = new WorkoutExercise(this, planExerciseId, catalogExerciseId, exercises.size() + 1, exerciseName,
-                muscleGroupName);
+                muscleGroupName, restAfterSeconds);
         exercises.add(exercise);
         return exercise;
     }
@@ -202,6 +203,17 @@ public class Workout {
 
     void attachRestSet(WorkoutSet set) {
         restSetId = set.getId();
+    }
+
+    /**
+     * Task 1: the running recovery follows the last set of an exercise that is now completed, so
+     * it separates two exercises; otherwise it is the ordinary recovery between two sets.
+     */
+    WorkoutDtos.RestKind restKind(Instant now) {
+        if (remainingRestMillis(now) <= 0 || restSetId == null) return null;
+        return findSet(restSetId).map(set -> set.getWorkoutExercise().getStatus() == WorkoutExerciseStatus.COMPLETED
+                ? WorkoutDtos.RestKind.BETWEEN_EXERCISES : WorkoutDtos.RestKind.BETWEEN_SETS)
+                .orElse(WorkoutDtos.RestKind.BETWEEN_SETS);
     }
 
     /** A final recovery is derived from persisted completion time, without extending workout duration. */

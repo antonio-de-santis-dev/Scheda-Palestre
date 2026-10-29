@@ -51,7 +51,23 @@ const schema = z
           .max(600, 'Massimo 600 secondi'),
       custom: z.boolean(),
       customSets: z.array(setSchema),
+      // Task 1: recovery before the next exercise, entered as minutes + seconds (max 20 min).
+      noRestAfter: z.boolean(),
+      restAfterMinutes: z
+          .number({ message: 'Minuti' })
+          .int('Numero intero')
+          .min(0, 'Min 0')
+          .max(20, 'Max 20'),
+      restAfterSecondsPart: z
+          .number({ message: 'Secondi' })
+          .int('Numero intero')
+          .min(0, 'Min 0')
+          .max(59, 'Max 59'),
     })
+    .refine(
+        (v) => v.noRestAfter || v.restAfterMinutes * 60 + v.restAfterSecondsPart <= 1200,
+        { path: ['restAfterMinutes'], message: 'Al massimo 20 minuti' },
+    )
     .refine(
         (v) => v.toFailure || (v.reps >= 1 && v.reps <= 100),
         {
@@ -61,6 +77,13 @@ const schema = z
     );
 
 type FormInput = z.input<typeof schema>;
+
+/** "1 min 30 s", "45 s", "2 min". */
+function formatRestLong(total: number): string {
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return [minutes ? `${minutes} min` : '', seconds ? `${seconds} s` : ''].filter(Boolean).join(' ');
+}
 type FormValues = z.output<typeof schema>;
 
 interface ExerciseEditorProps {
@@ -92,6 +115,7 @@ export function ExerciseEditor({
     handleSubmit,
     watch,
     getValues,
+    setValue,
     formState: { errors },
   } = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver<FormInput, unknown, FormValues>(schema),
@@ -102,6 +126,9 @@ export function ExerciseEditor({
       toFailure: initial?.toFailure ?? false,
       restSeconds: initial?.restSeconds ?? 60,
       custom: initial?.customized ?? false,
+      noRestAfter: initial ? initial.restAfterSeconds === 0 : false,
+      restAfterMinutes: Math.floor((initial?.restAfterSeconds ?? 60) / 60),
+      restAfterSecondsPart: (initial?.restAfterSeconds ?? 60) % 60,
       customSets: initial?.customized
           ? initial.sets.map((s) => ({
             reps: s.reps,
@@ -121,6 +148,16 @@ export function ExerciseEditor({
   const setsCount = watch('setsCount');
   const custom = watch('custom');
   const toFailure = watch('toFailure');
+  const noRestAfter = watch('noRestAfter');
+  const restAfterTotal = (watch('restAfterMinutes') || 0) * 60 + (watch('restAfterSecondsPart') || 0);
+
+  // "Nessun recupero" means 0: clearing the disabled inputs also drops any invalid value left in them.
+  useEffect(() => {
+    if (noRestAfter) {
+      setValue('restAfterMinutes', 0, { shouldValidate: true });
+      setValue('restAfterSecondsPart', 0, { shouldValidate: true });
+    }
+  }, [noRestAfter, setValue]);
 
   // Mantiene una riga per ogni serie quando la personalizzazione è attiva.
   useEffect(() => {
@@ -200,6 +237,7 @@ export function ExerciseEditor({
           restSeconds: set.restSeconds,
         }))
         : [],
+    restAfterSeconds: values.noRestAfter ? 0 : values.restAfterMinutes * 60 + values.restAfterSecondsPart,
   });
 
   const submit = handleSubmit(async (values: FormValues) => {
@@ -254,7 +292,7 @@ export function ExerciseEditor({
             />
 
             <TextField
-                label="Recupero (secondi)"
+                label="Recupero tra le serie (secondi)"
                 type="number"
                 inputMode="numeric"
                 min={0}
@@ -282,6 +320,38 @@ export function ExerciseEditor({
                 {...register('toFailure')}
             />
           </div>
+
+          <fieldset className="rest-after">
+            <legend>Recupero prima del prossimo esercizio</legend>
+            <Checkbox label="Nessun recupero" {...register('noRestAfter')} />
+            <div className="rest-after__inputs">
+              <TextField
+                  label="Minuti"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={20}
+                  disabled={noRestAfter}
+                  error={errors.restAfterMinutes?.message}
+                  {...register('restAfterMinutes', { valueAsNumber: true })}
+              />
+              <TextField
+                  label="Secondi"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={59}
+                  disabled={noRestAfter}
+                  error={errors.restAfterSecondsPart?.message}
+                  {...register('restAfterSecondsPart', { valueAsNumber: true })}
+              />
+            </div>
+            <p className="field__hint" aria-live="polite">
+              {noRestAfter || restAfterTotal === 0
+                  ? "Dopo l'ultima serie si passa subito al prossimo esercizio."
+                  : `Dopo l'ultima serie parte un recupero di ${formatRestLong(restAfterTotal)}. Non si applica all'ultimo esercizio dell'allenamento.`}
+            </p>
+          </fieldset>
 
           <Checkbox
               label="Personalizza ogni serie"

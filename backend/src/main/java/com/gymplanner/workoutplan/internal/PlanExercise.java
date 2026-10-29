@@ -50,6 +50,10 @@ public class PlanExercise implements Positioned {
     @Column(nullable = false)
     private int restSeconds;
 
+    /** Recovery after the last set, before the next exercise of the workout (0 = none). */
+    @Column(nullable = false)
+    private int restAfterSeconds;
+
     @OneToMany(mappedBy = "planExercise", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("setIndex")
     private List<PlanSet> sets = new ArrayList<>();
@@ -71,6 +75,7 @@ public class PlanExercise implements Positioned {
         this.reps = config.reps();
         this.toFailure = config.toFailure();
         this.restSeconds = config.restSeconds();
+        this.restAfterSeconds = config.restAfterSeconds();
         this.sets.clear();
         for (ExerciseConfig.SetConfig set : config.customSets()) {
             sets.add(new PlanSet(this, set.setIndex(), set.reps(), set.toFailure(), set.restSeconds()));
@@ -98,7 +103,7 @@ public class PlanExercise implements Positioned {
 
     ExerciseConfig config() {
         List<ExerciseConfig.SetConfig> custom = isCustomized() ? effectiveSets() : List.of();
-        return new ExerciseConfig(setsCount, reps, toFailure, restSeconds, custom);
+        return new ExerciseConfig(setsCount, reps, toFailure, restSeconds, restAfterSeconds, custom);
     }
 
     @Override
@@ -138,6 +143,10 @@ public class PlanExercise implements Positioned {
 
     public int getRestSeconds() {
         return restSeconds;
+    }
+
+    public int getRestAfterSeconds() {
+        return restAfterSeconds;
     }
 
     public List<PlanSet> getSets() {

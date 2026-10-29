@@ -294,6 +294,28 @@ svg {
   font-weight: 500;
 }
 
+/* Task 1: recovery before the next exercise (minutes + seconds). */
+.rest-after {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  min-width: 0;
+}
+
+.rest-after legend {
+  padding: 0 var(--space-1);
+  font-weight: 600;
+}
+
+.rest-after__inputs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
 .field__hint {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
@@ -1334,3 +1356,19 @@ svg {
 .history-records__results a { overflow-wrap: anywhere; }
 [id^="exercise-"] { scroll-margin-top: 5rem; }
 @media (min-width: 640px) { .history-records__results { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Task 1: shown above the countdown between two exercises. */
+.rest-transition {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.rest-transition__title {
+  display: block;
+  font-weight: 700;
+  margin-bottom: var(--space-1);
+}

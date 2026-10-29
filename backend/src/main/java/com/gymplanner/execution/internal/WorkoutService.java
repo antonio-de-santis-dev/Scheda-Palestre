@@ -93,7 +93,7 @@ class WorkoutService {
                         .sorted(Comparator.comparingInt(PlanStructure.Exercise::position))
                         .forEach(exercise -> {
                             WorkoutExercise we = workout.addExercise(exercise.id(), exercise.exerciseId(), exercise.exerciseName(),
-                                    section.muscleGroupName());
+                                    section.muscleGroupName(), exercise.restAfterSeconds());
                             exercise.sets().forEach(s -> we.addSet(s.setIndex(), s.reps(), s.toFailure(), s.restSeconds()));
                         }));
         workout.begin();
@@ -163,11 +163,15 @@ class WorkoutService {
         set.complete(now, request == null ? null : request.weightKgUsed(),
                 request == null ? null : request.actualRepetitions());
         workout.executionChanged();
+        int rest = set.getRestSeconds();
         if (exercise.nextSet().isEmpty()) {
             exercise.markCompleted();
             advance(workout, now);
+            // Task 1: one single timer. After the last set the recovery before the next exercise
+            // replaces the set recovery; after the last exercise the workout is over (no timer).
+            rest = exercise.restBeforeNextExercise(set);
         }
-        if (workout.isInProgress()) workout.startRest(now, set.getRestSeconds());
+        if (workout.isInProgress()) workout.startRest(now, rest);
         workout.attachRestSet(set);
         workouts.flush();
         return WorkoutStateMapper.toState(workout, now);

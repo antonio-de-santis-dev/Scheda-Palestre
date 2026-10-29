@@ -18,6 +18,8 @@ export interface PlanExercise {
   reps: number;
   toFailure: boolean;
   restSeconds: number;
+  /** Recovery after the last set, before the next exercise of the workout (0 = none). */
+  restAfterSeconds: number;
   customized: boolean;
   sets: PlanSet[];
 }

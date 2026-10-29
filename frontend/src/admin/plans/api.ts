@@ -36,6 +36,8 @@ export interface PlanExerciseInput {
   toFailure: boolean;
   restSeconds: number;
   customSets: SetInput[];
+  /** 0-1200 seconds; 0 = no recovery before the next exercise. */
+  restAfterSeconds: number;
 }
 
 export const plansKeys = {
