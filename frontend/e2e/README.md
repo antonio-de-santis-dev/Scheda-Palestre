@@ -17,6 +17,19 @@ Aggiunti nel branch `modifiche`:
 - seconda scheda attiva (duplicazione + assegnazione), giorni divisi fra due schede, giorno occupato non selezionabile;
 - report attività ed eliminazione di un account con doppia conferma (login poi rifiutato).
 
+Aggiunti con i Task 1-6 (`e2e/task-flows.spec.ts` e `e2e/layout.spec.ts`):
+
+- recupero tra esercizi impostato dall'ADMIN e mostrato durante l'allenamento;
+- nome della sessione usato come titolo ovunque;
+- giorno saltato con anteprima, ripristino e spostamento in un giorno libero;
+- storico organizzato per scheda, anche per una scheda non più attiva;
+- ultimo peso della stessa serie mostrato (mai precompilato);
+- schermate principali ADMIN e USER a 360 px senza scorrimento orizzontale né controlli tagliati, con nomi lunghi
+  (`LAYOUT_SHOTS=/percorso` salva anche le schermate).
+
+Gli elenchi di gruppi e utenti sono paginati: i test cercano il nome appena creato invece di
+dipendere dalla prima pagina, così restano stabili anche su un database con molti dati.
+
 ## Esecuzione
 
 1. Avvia PostgreSQL, backend e frontend come nel `README.md` (backend su 8080, Vite su 5173).
