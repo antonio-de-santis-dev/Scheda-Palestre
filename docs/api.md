@@ -281,3 +281,50 @@ Il completamento serie `POST /api/me/workouts/{id}/sets/{setId}/complete` accett
 ### Progressi mensili (fixV2)
 
 `GET /api/me/workout-progress` accetta from/to/status/q come riepilogo ed elenco. Restituisce `[{ "month": "2026-10-01", "totals": { ...contratto workout-stats... } }]`, ordinato per mese/anno, soltanto per mesi con workout filtrati. Le date filtrano i singoli workout prima dell’aggregazione. Query unica con criteri SQL condivisi col riepilogo; utente dalla sessione, nessuna paginazione/migrazione. Null e zero restano distinti; durata esclude workout in corso, volume include serie già completate. `chart` è soltanto una scelta frontend conservata nell’URL, non cambia il dataset backend.
+
+## Modifiche Task 1-6
+
+### Recupero tra esercizi (Task 1, V23)
+
+- `POST/PUT` degli esercizi di una scheda accettano `restAfterSeconds` (0-1200, facoltativo): recupero
+  dopo l'ultima serie, prima dell'esercizio successivo. Se manca vale il recupero dell'ultima serie
+  (comportamento precedente). Le righe esistenti sono state valorizzate dalla migrazione allo stesso modo.
+- La struttura della scheda restituisce `restAfterSeconds` per ogni esercizio.
+- `WorkoutState`: ogni esercizio ha `restAfterSeconds` (null negli allenamenti precedenti a V23) e lo stato
+  ha `restKind` (`BETWEEN_SETS`, `BETWEEN_EXERCISES` o null se nessun recupero è in corso).
+
+### Nomi delle sessioni (Task 2)
+
+- `GET /api/admin/plans` aggiunge `sessionTitles` (titoli delle sessioni in ordine) a ogni elemento.
+
+### Allenamenti saltati e riprogrammazione (Task 3, V24)
+
+| Metodo | Percorso | Descrizione | Errori |
+| --- | --- | --- | --- |
+| GET | `/api/me/assignments/{id}/schedule-changes` | modifiche registrate `[{id, originalDate, kind, targetDate, landsOn, sessionTitle, active}]` | 404 |
+| GET | `/api/me/assignments/{id}/schedule-changes/options?date=` | cosa si può fare in quella data: `{date, state, sessionTitle, eventId, eventKind, landsOn, canSkip, canMove, canUndo, moveTargets, skipPreview, undoPreview}`; le anteprime `[{date, before, after}]` mostrano le conseguenze sui prossimi giorni | 404 |
+| POST | `/api/me/assignments/{id}/schedule-changes` | `{date}` salta la sessione (che passa al giorno di allenamento successivo), `{date, targetDate}` la sposta in un giorno libero prima del prossimo allenamento; 201 con le nuove `Options` | 422 `SCHEDULE_DATE_NOT_ALLOWED`, `SCHEDULE_TARGET_NOT_ALLOWED`, `ASSIGNMENT_NOT_ACTIVE`, `SCHEDULE_DAYS_REQUIRED`, `PLAN_NOT_EXECUTABLE`; 404 |
+| DELETE | `/api/me/assignments/{id}/schedule-changes/{changeId}` | annulla la modifica (ripristina la pianificazione precedente) | 409 `SCHEDULE_CHANGE_LOCKED` se la sessione è già stata allenata; 404 |
+
+- `kind`: `MISSED` (giorno passato senza allenamento, registrato automaticamente alla prima lettura di
+  Oggi/Calendario/avvio), `SKIPPED` (saltato dall'utente), `MOVED` (spostato in un giorno libero).
+- `GET /api/me/today`: nuovo stato `SKIPPED_DAY` e campi `rescheduledFrom`, `skip`.
+- `GET /api/me/calendar`: nuovo tipo di giorno `SKIPPED` e campi `rescheduledFrom`, `skip`
+  (`{eventId, kind, landsOn, sessionId, sessionTitle}`).
+- Cambiare i giorni di una scheda elimina le modifiche di oggi e dei giorni futuri (quelle passate restano).
+
+### Storico per scheda (Task 4)
+
+- Rimosso `GET /api/me/workout-records` (sezione "Record nei filtri selezionati").
+- Nuovo `GET /api/me/workout-plans?from=&to=&status=&q=`: schede con allenamenti
+  `[{planId, planName, active, totalWorkouts, completedWorkouts, interruptedWorkouts, inProgressWorkouts, firstWorkoutDate, lastWorkoutDate}]`, anche se l'assegnazione è chiusa (nome dallo snapshot).
+- `GET /api/me/workouts`, `/api/me/workout-stats`, `/api/me/workout-progress` accettano `plan=<planId>`
+  per limitare i risultati a una scheda. `q` cerca anche nei nomi degli esercizi.
+
+### Ultimo peso per serie (Task 5, V25)
+
+- `GET /api/me/workouts/{id}/previous-weights` → `[{exerciseId, setIndex, weightKgUsed, workoutId, scheduledDate}]`:
+  per ogni esercizio dell'allenamento (`exerciseId` = id dell'esercizio nello snapshot) e ogni serie, il peso
+  della stessa serie nell'ultimo allenamento **concluso** dello stesso esercizio (identità di catalogo).
+  Escluse serie non completate, esercizi saltati e pesi non registrati. 404 se l'allenamento non è proprio.
+  Il valore è solo informativo: il frontend non precompila il campo peso.
