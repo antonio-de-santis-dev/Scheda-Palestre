@@ -28,7 +28,7 @@ function setupList() {
 describe('monthly progress charts', () => {
   it('distinguishes missing, zero and partial bars and exposes exact values in the table', async () => {
     setupList(); server.use(http.get('*/api/me/workout-progress', () => HttpResponse.json(points)));
-    renderApp('/app/history');
+    renderApp('/app/history?plan=p-1');
     const region = await screen.findByRole('region', { name: /Grafico: Volume registrato/ });
     expect(within(region).getByText('N/D')).toBeInTheDocument();
     expect(within(region).getByText('240*')).toBeInTheDocument();
@@ -48,14 +48,14 @@ describe('monthly progress charts', () => {
     server.use(http.get('*/api/me/workout-progress', ({ request }) => {
       requests.push(new URL(request.url).searchParams); return HttpResponse.json(points);
     }));
-    const view = renderApp('/app/history?chart=duration&from=2026-09-01&status=INTERRUPTED&q=Scheda');
+    const view = renderApp('/app/history?plan=p-1&chart=duration&from=2026-09-01&status=INTERRUPTED&q=Scheda');
     await screen.findByRole('img', { name: 'Durata registrata per mese, in minuti' });
     expect(screen.getByLabelText('Dato del grafico')).toHaveValue('duration');
-    expect(Object.fromEntries(requests[0]!)).toEqual({ from: '2026-09-01', status: 'INTERRUPTED', q: 'Scheda' });
+    expect(Object.fromEntries(requests[0]!)).toEqual({ from: '2026-09-01', status: 'INTERRUPTED', q: 'Scheda', plan: 'p-1' });
     await userEvent.setup().selectOptions(screen.getByLabelText('Dato del grafico'), 'workouts');
     expect(screen.getByRole('img', { name: 'Allenamenti per mese, in allenamenti' })).toBeInTheDocument();
     expect(requests).toHaveLength(1);
-    view.unmount(); renderApp('/app/history?chart=workouts&from=2026-09-01&status=INTERRUPTED&q=Scheda');
+    view.unmount(); renderApp('/app/history?plan=p-1&chart=workouts&from=2026-09-01&status=INTERRUPTED&q=Scheda');
     expect(await screen.findByRole('img', { name: 'Allenamenti per mese, in allenamenti' })).toBeInTheDocument();
     expect(screen.getByLabelText('Esito')).toHaveValue('INTERRUPTED');
   });
@@ -68,10 +68,10 @@ describe('monthly progress charts', () => {
       }
       return HttpResponse.json(points);
     }));
-    renderApp('/app/history');
+    renderApp('/app/history?plan=p-1');
     await screen.findByRole('img', { name: /Volume registrato per mese/ });
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText(/Nome scheda/), 'Nuovo');
+    await user.type(screen.getByLabelText(/Scheda, sessione/), 'Nuovo');
     await user.click(screen.getByRole('button', { name: 'Applica filtri' }));
     await waitFor(() => expect(release).toBeDefined());
     expect(screen.queryByRole('img', { name: /Volume registrato per mese/ })).not.toBeInTheDocument();
@@ -83,7 +83,7 @@ describe('monthly progress charts', () => {
   it('supports an independent retry without hiding the other history sections', async () => {
     setupList(); let calls = 0;
     server.use(http.get('*/api/me/workout-progress', () => ++calls === 1 ? problem(500, 'INTERNAL_ERROR') : HttpResponse.json(points)));
-    renderApp('/app/history');
+    renderApp('/app/history?plan=p-1');
     const region = await screen.findByRole('region', { name: 'Progressi mensili' });
     await userEvent.setup().click(await within(region).findByRole('button', { name: /Riprova/ }));
     expect(await within(region).findByRole('img', { name: /Volume registrato per mese/ })).toBeInTheDocument();

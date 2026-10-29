@@ -40,7 +40,7 @@ describe('recorded volume', () => {
         page: 0, size: 20, totalElements: 1, totalPages: 1 })),
       http.get('*/api/me/workouts/:id', () => HttpResponse.json(state)),
     );
-    const view = renderApp('/app/history?status=INTERRUPTED');
+    const view = renderApp('/app/history?plan=p-1&status=INTERRUPTED');
     const list = await screen.findByRole('list', { name: 'Allenamenti' });
     expect(within(list).getByText('Volume registrato: 262 kg × ripetizioni')).toBeInTheDocument();
     await userEvent.setup().click(within(list).getByRole('link'));

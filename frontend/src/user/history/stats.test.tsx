@@ -28,7 +28,7 @@ describe('filtered history summary', () => {
     server.use(http.get('*/api/me/workout-stats', ({ request }) => {
       requests.push(new URL(request.url).searchParams); return HttpResponse.json(stats);
     }));
-    renderApp('/app/history?from=2026-10-01&to=2026-10-05&status=COMPLETED&q=Scheda');
+    renderApp('/app/history?plan=p-1&from=2026-10-01&to=2026-10-05&status=COMPLETED&q=Scheda');
     const region = await screen.findByRole('region', { name: 'Riepilogo dei risultati filtrati' });
     expect(await within(region).findByText('22')).toBeInTheDocument();
     expect(within(region).getByText('Tempo registrato: 1 h 1 s')).toBeInTheDocument();
@@ -36,7 +36,7 @@ describe('filtered history summary', () => {
     expect(within(region).getByText(/Gli allenamenti in corso non contribuiscono/)).toBeInTheDocument();
     expect(within(region).getByText('Volume registrato: 240 kg × ripetizioni')).toBeInTheDocument();
     expect(within(region).getByText(/Serie completate escluse: 2/)).toBeInTheDocument();
-    expect(Object.fromEntries(requests[0]!)).toEqual({ from: '2026-10-01', to: '2026-10-05', status: 'COMPLETED', q: 'Scheda' });
+    expect(Object.fromEntries(requests[0]!)).toEqual({ from: '2026-10-01', to: '2026-10-05', status: 'COMPLETED', q: 'Scheda', plan: 'p-1' });
     await userEvent.setup().click(screen.getByRole('button', { name: /Successiva/ }));
     await screen.findByText(/Pagina 2/);
     expect(within(region).getByText('22')).toBeInTheDocument();
@@ -52,18 +52,18 @@ describe('filtered history summary', () => {
       if (q === 'Nuova' && requests.length === 2) await new Promise<void>((resolve) => { release = resolve; });
       return HttpResponse.json({ ...stats, totalWorkouts: q === 'Nuova' ? 7 : 22 });
     }));
-    const view = renderApp('/app/history?q=Scheda');
+    const view = renderApp('/app/history?plan=p-1&q=Scheda');
     const region = await screen.findByRole('region', { name: 'Riepilogo dei risultati filtrati' });
     await within(region).findByText('22');
     const user = userEvent.setup();
-    const field = screen.getByLabelText(/Nome/);
+    const field = screen.getByLabelText(/Scheda, sessione/);
     await user.clear(field); await user.type(field, 'Nuova');
     await user.click(screen.getByRole('button', { name: 'Applica filtri' }));
     await waitFor(() => expect(release).toBeDefined());
     expect(within(region).queryByText('22')).not.toBeInTheDocument();
     expect(within(region).getByText('Caricamento riepilogo…')).toBeInTheDocument();
     release!(); await within(region).findByText('7');
-    view.unmount(); renderApp('/app/history?q=Nuova');
+    view.unmount(); renderApp('/app/history?plan=p-1&q=Nuova');
     expect(await screen.findByText('7')).toBeInTheDocument();
     expect(requests).toEqual(['Scheda', 'Nuova', 'Nuova']);
   });
@@ -71,7 +71,7 @@ describe('filtered history summary', () => {
   it('allows retrying a summary failure while keeping the workout list available', async () => {
     setupList(); let calls = 0;
     server.use(http.get('*/api/me/workout-stats', () => ++calls === 1 ? problem(500, 'INTERNAL_ERROR') : HttpResponse.json(stats)));
-    renderApp('/app/history');
+    renderApp('/app/history?plan=p-1');
     const region = await screen.findByRole('region', { name: 'Riepilogo dei risultati filtrati' });
     expect(await screen.findByRole('list', { name: 'Allenamenti' })).toBeInTheDocument();
     await userEvent.setup().click(await within(region).findByRole('button', { name: /Riprova/ }));
@@ -82,7 +82,7 @@ describe('filtered history summary', () => {
   it('does not request statistics for invalid URL filters', async () => {
     setupList(); let calls = 0;
     server.use(http.get('*/api/me/workout-stats', () => { calls++; return HttpResponse.json(stats); }));
-    renderApp('/app/history?from=2026-10-05&to=2026-10-01');
+    renderApp('/app/history?plan=p-1&from=2026-10-05&to=2026-10-01');
     await screen.findByText(/La data iniziale/);
     expect(screen.queryByRole('region', { name: 'Riepilogo dei risultati filtrati' })).not.toBeInTheDocument();
     expect(calls).toBe(0);
