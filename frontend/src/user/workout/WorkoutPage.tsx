@@ -8,7 +8,7 @@ import { QueryState } from '../../shared/components/States';
 import { isApiError } from '../../shared/errors/ApiError';
 import { formatDuration, formatRest } from '../../shared/utils/format';
 import { repsLabel } from '../../shared/api/planTypes';
-import { STALE_STATE_CODES, useWorkout, useWorkoutAction, workoutApi, type RecordSetResultsRequest, type RestAction, type RestRequest, type WorkoutState } from './api';
+import { previousWeightText, STALE_STATE_CODES, usePreviousWeights, useWorkout, useWorkoutAction, workoutApi, type RecordSetResultsRequest, type RestAction, type RestRequest, type WorkoutState } from './api';
 import { useRestTimer } from './useRestTimer';
 import { WorkoutStatusBadge } from './ExerciseStatusBadge';
 import { celebrate, transitions, type Feedback } from './feedback';
@@ -38,6 +38,7 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
   // Transitions already celebrated: refetches, retries and StrictMode never repeat them.
   const celebrated = useRef(new Set<string>());
   const restAlert = useRestAlert();
+  const previous = usePreviousWeights(state.workoutId);
   const complete = useWorkoutAction(state.workoutId, (setId: string) => workoutApi.completeSet(state.workoutId, setId, { weightKgUsed: null, repsActual: null }), true);
   const results = useWorkoutAction(state.workoutId,
     (args: { setId: string; request: RecordSetResultsRequest }) => workoutApi.recordResults(state.workoutId, args.setId, args.request), true);
@@ -121,6 +122,7 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
   const recoveryResults = resting && resultExercise && resultSet ? <RecoveryResultsForm
     key={`${resultSet.id}:${resultSet.weightKgUsed}:${resultSet.repsActual}`} set={resultSet}
     exerciseName={resultExercise.exerciseName} busy={busy} loading={results.isPending}
+    previousWeight={previous.loaded ? previousWeightText(resultSet.setIndex, previous.weightFor(resultExercise.id, resultSet.setIndex)) : undefined}
     onSave={(values) => {
       results.mutate({ setId: resultSet.id, request: { results: values,
         expectedExecutionVersion: state.executionVersion, expectedRestVersion: state.restVersion } },
@@ -227,6 +229,9 @@ function WorkoutView({ state, refetch }: { state: WorkoutState; refetch: () => v
             </div>
           </div>
 
+          {previous.loaded ? (
+            <p className="previous-weight small">{previousWeightText(currentSet.setIndex, previous.weightFor(current.id, currentSet.setIndex))}</p>
+          ) : null}
           {remaining > 0 && betweenExercises ? (
             <p className="rest-transition" role="status">
               <span className="rest-transition__title">Recupero tra esercizi</span>

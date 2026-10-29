@@ -4,8 +4,10 @@ import { TextField } from '../../shared/components/Field';
 import type { SetResults, WorkoutSetState } from './api';
 
 /** Results belong to the completed recovery series, never to the next current series. */
-export function RecoveryResultsForm({ set, exerciseName, busy, loading, onSave }: {
+export function RecoveryResultsForm({ set, exerciseName, busy, loading, onSave, previousWeight }: {
   set: WorkoutSetState; exerciseName: string; busy: boolean; loading: boolean; onSave: (results: SetResults) => void;
+  /** Task 5: reference of the same set in the last completed workout; never copied into the field. */
+  previousWeight?: string;
 }) {
   const [weight, setWeight] = useState(set.weightKgUsed == null ? '' : String(set.weightKgUsed));
   const [reps, setReps] = useState(set.repsActual == null ? '' : String(set.repsActual));
@@ -24,7 +26,7 @@ export function RecoveryResultsForm({ set, exerciseName, busy, loading, onSave }
   }}>
     <h3 style={{ margin: 0 }}>Serie appena svolta: {exerciseName} · {set.setIndex}</h3>
     <div className="form-grid form-grid--2">
-      <TextField label="Peso usato (kg)" inputMode="decimal" value={weight} disabled={busy}
+      <TextField label="Peso usato (kg)" inputMode="decimal" value={weight} disabled={busy} hint={previousWeight}
         error={errors.weight} onChange={(event) => setWeight(event.target.value)} />
       <TextField label="Ripetizioni effettive" inputMode="numeric" value={reps} disabled={busy}
         error={errors.reps} onChange={(event) => setReps(event.target.value)} />
