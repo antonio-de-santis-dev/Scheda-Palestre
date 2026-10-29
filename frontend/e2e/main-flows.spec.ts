@@ -63,11 +63,14 @@ async function addGroup(page: Page, name: string) {
   await page.goto('/admin/catalog');
   await page.getByLabel(/^Nuovo gruppo muscolare/).fill(name);
   await page.getByRole('button', { name: 'Aggiungi gruppo' }).click();
+  // The list is paginated alphabetically: search the new name so it is on the first page.
+  await page.getByLabel('Cerca gruppo').fill(name);
   await expect(page.getByRole('list', { name: 'Elenco gruppi muscolari' }).getByText(name, { exact: true })).toBeVisible();
 }
 
 async function addExercisesToGroup(page: Page, group: string, exercises: string[]) {
   await page.goto('/admin/catalog');
+  await page.getByLabel('Cerca gruppo').fill(group);
   await page.getByRole('list', { name: 'Elenco gruppi muscolari' }).getByRole('link', { name: new RegExp(group) }).click();
   for (const name of exercises) {
     await page.getByLabel(new RegExp(`^Nuovo esercizio in ${group}`)).fill(name);
@@ -146,6 +149,7 @@ test('2. ADMIN builds catalog and plan, then assigns it', async () => {
   await expect(admin.getByText('Scheda modificata')).toBeVisible();
 
   await admin.goto(planEditorUrl.replace('/edit', '/assignments'));
+  await admin.getByLabel('Cerca utenti').fill(user.username);
   await admin.getByLabel(new RegExp(`\\(@${user.username}\\)`)).check();
   await admin.getByRole('button', { name: 'Assegna' }).click();
   await expect(admin).toHaveURL(/\/admin\/plans$/);
@@ -221,6 +225,7 @@ test('5b. ADMIN assigns a second plan and USER shares the week between the two',
   await admin.getByRole('button', { name: 'Salva dati' }).click();
   await expect(admin.getByText('Nuova scheda creata')).toBeVisible();
   await admin.getByRole('link', { name: `Assegnazioni di ${copyName}` }).click();
+  await admin.getByLabel('Cerca utenti').fill(user.username);
   await admin.getByLabel(new RegExp(`\\(@${user.username}\\)`)).check();
   await admin.getByRole('button', { name: 'Assegna' }).click();
   await expect(admin.getByText('Scheda assegnata', { exact: true })).toBeVisible();

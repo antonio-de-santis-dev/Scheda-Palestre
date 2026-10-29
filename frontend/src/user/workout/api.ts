@@ -176,7 +176,39 @@ export const workoutApi = {
   changeRest: async (workoutId: string, request: RestRequest) =>
     stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/rest`, request)),
   interrupt: async (workoutId: string) => stamp(await http.post<RawState>(`/api/me/workouts/${workoutId}/interrupt`)),
+  previousWeights: (workoutId: string, signal?: AbortSignal) =>
+    http.get<PreviousWeight[]>(`/api/me/workouts/${workoutId}/previous-weights`, undefined, signal),
 };
+
+/** Task 5: weight used the last time for the same exercise and set number (reference only). */
+export interface PreviousWeight {
+  exerciseId: string;
+  setIndex: number;
+  weightKgUsed: number;
+  workoutId: string;
+  scheduledDate: string;
+}
+
+/** One request per workout; the values never change while the workout is open. */
+export function usePreviousWeights(workoutId: string) {
+  const query = useQuery({
+    queryKey: ['me', 'workout', workoutId, 'previous-weights'],
+    queryFn: ({ signal }) => workoutApi.previousWeights(workoutId, signal),
+    staleTime: 30 * 60 * 1000,
+    enabled: !!workoutId,
+  });
+  const byKey = new Map((query.data ?? []).map((p) => [`${p.exerciseId}:${p.setIndex}`, p.weightKgUsed]));
+  return {
+    loaded: query.isSuccess,
+    weightFor: (exerciseId: string, setIndex: number): number | null => byKey.get(`${exerciseId}:${setIndex}`) ?? null,
+  };
+}
+
+/** "Ultima volta — Serie 2: 22,5 kg" or "Nessun peso precedente". */
+export function previousWeightText(setIndex: number, weight: number | null): string {
+  return weight == null ? 'Nessun peso precedente'
+    : `Ultima volta — Serie ${setIndex}: ${weight.toLocaleString('it-IT', { maximumFractionDigits: 2 })} kg`;
+}
 
 export function useToday(date: string) {
   return useQuery({ queryKey: workoutKeys.today(date), queryFn: ({ signal }) => workoutApi.today(date, signal) });

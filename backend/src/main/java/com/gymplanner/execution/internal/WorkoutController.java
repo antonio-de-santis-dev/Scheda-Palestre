@@ -36,6 +36,7 @@ class WorkoutController {
     private final WorkoutHistoryStatsService historyStats;
     private final ScheduleMaintenance schedule;
     private final HistoryPlansService historyPlans;
+    private final PreviousWeightsService previousWeights;
 
     @GetMapping("/today")
     TodayService.TodayResponse today(@AuthenticationPrincipal AuthenticatedUser user,
@@ -109,6 +110,13 @@ class WorkoutController {
     @GetMapping("/workouts/{id}")
     WorkoutState get(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id) {
         return workouts.get(user.id(), id);
+    }
+
+    /** Task 5: last weight used per exercise and set number, for the whole workout in one request. */
+    @GetMapping("/workouts/{id}/previous-weights")
+    List<PreviousWeightsService.PreviousWeight> previousWeights(@AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable UUID id) {
+        return previousWeights.previousWeights(user.id(), id);
     }
 
     @PostMapping("/workouts/{id}/sets/{setId}/complete")

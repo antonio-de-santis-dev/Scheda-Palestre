@@ -199,3 +199,40 @@ test('Task 3: USER skips today with a preview, restores it and moves the session
   await expect(page.getByText(/è stato spostato/)).toBeVisible();
   await page.context().close();
 });
+
+test('Task 5: during the workout the weight of the same set last time is shown, never pre-filled', async ({ browser }) => {
+  const { plan } = await buildPlan(admin, `Pesi ${RUN}`, [{ title: 'Giorno 1', exercises: [{ name: `Stacco ${RUN}`, sets: 2, rest: 30 }] }]);
+  const { page, assignmentId } = await freshAthlete(browser, 'pesi', plan.id);
+  // A completed previous workout with weights (prepared through the API, then marked as an earlier day).
+  const first = await api<{ workoutId: string; currentSetId: string }>(page, 'POST', '/api/me/workouts',
+    { date: new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' }) });
+  await page.goto(`/app/workout/${first.workoutId}`);
+  await expect(page.getByText('Nessun peso precedente')).toBeVisible();
+  await page.getByRole('button', { name: /Fine serie/ }).click();
+  await page.getByLabel(/Peso usato/).fill('22,5');
+  await page.getByRole('button', { name: 'Salva risultati' }).click();
+  await expect(page.getByText('Risultati della serie salvati.')).toBeAttached();
+  await page.getByRole('button', { name: 'Salta recupero' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Salta recupero' }).click();
+  await page.getByRole('button', { name: /Fine serie/ }).click();
+  await expect(page.getByRole('heading', { name: 'Allenamento completato!' })).toBeVisible();
+  // Close the plan and assign it again, so a new workout can start today with the same exercise.
+  await api(admin, 'POST', `/api/admin/assignments/${assignmentId}/close`);
+  const users = await api<{ content: { id: string }[] }>(admin, 'GET', `/api/admin/users?q=pesi_${RUN}`);
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
+  const [again] = await api<{ id: string }[]>(admin, 'POST', '/api/admin/assignments', {
+    planId: plan.id, userIds: [users.content[0]!.id], startDate: today, activate: true,
+  });
+  await api(page, 'PUT', `/api/me/assignments/${again!.id}/schedule`, { weekdays: [1, 2, 3, 4, 5, 6, 7] });
+
+  await page.goto('/app/today');
+  await page.getByRole('button', { name: 'Inizia allenamento' }).click();
+  await expect(page.getByText('Ultima volta — Serie 1: 22,5 kg')).toBeVisible();
+  await page.getByRole('button', { name: /Fine serie/ }).click();
+  const form = page.getByRole('form', { name: 'Risultati della serie appena svolta' });
+  await expect(form.getByLabel(/Peso usato/)).toHaveValue('');
+  await expect(form.getByText('Ultima volta — Serie 1: 22,5 kg')).toBeVisible();
+  await expect(page.getByText('Nessun peso precedente')).toBeVisible(); // set 2 had no recorded weight
+  await page.locator('.workout-current').screenshot({ path: 'test-results/task5-workout.png' });
+  await page.context().close();
+});
