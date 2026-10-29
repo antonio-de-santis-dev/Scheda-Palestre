@@ -57,6 +57,10 @@ public class WorkoutExercise {
     @Column(nullable = false, updatable = false)
     private int setsPlanned;
 
+    /** Snapshot of the recovery before the next exercise; null for workouts started before V23. */
+    @Column(updatable = false)
+    private Integer restAfterSeconds;
+
     @OneToMany(mappedBy = "workoutExercise", cascade = CascadeType.ALL)
     @OrderBy("setIndex")
     private List<WorkoutSet> sets = new ArrayList<>();
@@ -65,7 +69,7 @@ public class WorkoutExercise {
     }
 
     WorkoutExercise(Workout workout, UUID planExerciseId, UUID catalogExerciseId, int position, String exerciseNameSnapshot,
-            String muscleGroupNameSnapshot) {
+            String muscleGroupNameSnapshot, Integer restAfterSeconds) {
         this.workout = workout;
         this.planExerciseId = planExerciseId;
         this.catalogExerciseId = catalogExerciseId;
@@ -74,6 +78,7 @@ public class WorkoutExercise {
         this.exerciseNameSnapshot = exerciseNameSnapshot;
         this.muscleGroupNameSnapshot = muscleGroupNameSnapshot;
         this.status = WorkoutExerciseStatus.TODO;
+        this.restAfterSeconds = restAfterSeconds;
     }
 
     void addSet(int setIndex, int repsPlanned, boolean toFailure, int restSeconds) {
@@ -145,6 +150,15 @@ public class WorkoutExercise {
 
     public int getSetsPlanned() {
         return setsPlanned;
+    }
+
+    public Integer getRestAfterSeconds() {
+        return restAfterSeconds;
+    }
+
+    /** Recovery started after the last set of this exercise when another exercise follows. */
+    int restBeforeNextExercise(WorkoutSet lastSet) {
+        return restAfterSeconds != null ? restAfterSeconds : lastSet.getRestSeconds();
     }
 
     public List<WorkoutSet> getSets() {

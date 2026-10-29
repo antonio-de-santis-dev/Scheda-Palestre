@@ -27,6 +27,9 @@ final class WorkoutDtos {
 
     enum RestAction { PAUSE, RESUME, EXTEND, SKIP }
 
+    /** Which recovery is running: between two sets, or before the next exercise (Task 1). */
+    enum RestKind { BETWEEN_SETS, BETWEEN_EXERCISES }
+
     record RestRequest(@NotNull RestAction action, @NotNull @PositiveOrZero Long expectedVersion,
             @NotNull @PositiveOrZero Long expectedExecutionVersion) {
     }
@@ -69,7 +72,8 @@ final class WorkoutDtos {
     }
 
     record ExerciseState(UUID id, int position, WorkoutExerciseStatus status, String exerciseName,
-            String muscleGroupName, int setsPlanned, int setsCompleted, List<SetState> sets, ExerciseIdentity identity, VolumeSummary volume) {
+            String muscleGroupName, int setsPlanned, int setsCompleted, List<SetState> sets, ExerciseIdentity identity, VolumeSummary volume,
+            Integer restAfterSeconds) {
     }
 
     /**
@@ -80,7 +84,8 @@ final class WorkoutDtos {
     record WorkoutState(UUID workoutId, WorkoutStatus status, LocalDate scheduledDate, String planName,
             String sessionTitle, Instant startedAt, Instant finishedAt, List<ExerciseState> exercises,
             UUID currentExerciseId, UUID currentSetId, Instant restEndsAt, Integer restSeconds, Instant serverTime,
-            NextAction nextAction, long executionVersion, Long durationSeconds, boolean restPaused, long restRemainingMillis, long restVersion, VolumeSummary volume, UUID resultEntrySetId, Instant finalResultEndsAt) {
+            NextAction nextAction, long executionVersion, Long durationSeconds, boolean restPaused, long restRemainingMillis, long restVersion, VolumeSummary volume, UUID resultEntrySetId, Instant finalResultEndsAt,
+            RestKind restKind) {
     }
 
     record WorkoutSummary(UUID id, LocalDate scheduledDate, WorkoutStatus status, String planName,

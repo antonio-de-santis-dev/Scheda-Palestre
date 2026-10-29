@@ -46,8 +46,11 @@ final class ExerciseConfigValidator {
         if (!errors.isEmpty()) {
             throw new BadRequestException("VALIDATION_ERROR", "One or more fields are invalid", errors);
         }
+        // Older clients omit the field: the rest of the last set keeps running between exercises.
+        int restAfter = request.restAfterSeconds() != null ? request.restAfterSeconds()
+                : sets.isEmpty() ? request.restSeconds() : sets.getLast().restSeconds();
         return new ExerciseConfig(request.setsCount(), request.reps(), request.toFailure(), request.restSeconds(),
-                List.copyOf(sets));
+                restAfter, List.copyOf(sets));
     }
 
     private static void checkReps(String field, int reps, boolean toFailure, List<FieldViolation> errors) {

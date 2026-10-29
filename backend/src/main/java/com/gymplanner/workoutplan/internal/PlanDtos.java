@@ -52,7 +52,9 @@ final class PlanDtos {
             @Min(0) @Max(100) int reps,
             boolean toFailure,
             @Min(0) @Max(600) int restSeconds,
-            @Valid @Size(max = 20) List<@NotNull SetRequest> customSets) {
+            @Valid @Size(max = 20) List<@NotNull SetRequest> customSets,
+            /** Recovery before the next exercise, 0-1200 s (0 = none); null = last set's rest. */
+            @Min(0) @Max(1200) Integer restAfterSeconds) {
     }
 
     record PlanListItem(UUID id, String name, String description, Integer durationWeeks, int sessionCount,
